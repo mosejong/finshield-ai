@@ -162,7 +162,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **139 passed**, frontend **16 passed**, Next build,
+현재 `main` 기준: Python **143 passed**, frontend **18 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -235,12 +235,17 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 절감액을 계산하지 않으며 두 요청 중 하나라도 실패하면 비교 전체 실패를 명시한다.
 결과는 공식 상환표가 아니고 수수료·세금·보험료·중도상환수수료를 포함하지 않는다.
 
+`GET /api/v1/guidance/wealth`와 `/learn/wealth`는 재테크에 관심 있는 사용자가
+상품 선택 전에 돈의 흐름, 목표·저축, 부채·신용, 투자 위험을 순서대로 학습하는
+기초 가이드다. 입력 없이 versioned 정적 계약을 반환하며 6개 공식 자료의 URL,
+검토일, module 지지 관계를 검증한다. 계좌·보유종목·거래내역을 수집하지 않고
+특정 상품·종목·매매 시점·수익률을 추천하거나 투자 가능 여부를 판정하지 않는다.
+
 ## Next priorities
 
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - 상품 상세·공식 상품 비교 화면
-- 공식 근거 기반 재테크 기초 가이드(현금흐름·비상자금·부채·투자위험, 종목 추천 제외)
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
 - PostgreSQL·SQLAlchemy·Alembic 영구 저장과 인증·소유권 경계
