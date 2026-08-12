@@ -8,7 +8,12 @@ from app.clients.public_data_products import (
     PublicDataProductClient,
 )
 from app.domain.finance.product_identity import SNAPSHOT_IDENTITY_POLICY
-from app.schemas.product import ProductCatalogIdentity, ProductCatalogResponse
+from app.schemas.product import (
+    FinancialProduct,
+    ProductCatalogIdentity,
+    ProductCatalogResponse,
+    ProductComparisonResponse,
+)
 from app.services.product_catalog_snapshot import (
     ProductCatalogSnapshot,
     ProductCatalogSnapshotCache,
@@ -19,6 +24,14 @@ from app.services.product_catalog_snapshot import (
 
 DEFAULT_CACHE_TTL_SECONDS = 300.0
 DEFAULT_LOOKBACK_MONTHS = 36
+PRODUCT_COMPARISON_DISCLAIMER = (
+    "공식 원문을 나란히 표시한 결과이며 적격성, 승인 가능성, 금리 우열을 "
+    "판정하거나 보장하지 않습니다. 최신 조건은 취급기관에서 확인하세요."
+)
+
+
+class ProductNotFoundError(LookupError):
+    pass
 
 
 class ProductCatalogService:
@@ -74,6 +87,38 @@ class ProductCatalogService:
                 lookback_months=self._lookback_months,
             )
         )
+
+    def get_product(self, source_product_id: str) -> FinancialProduct:
+        snapshot = self.get_snapshot()
+        return self._find_product(snapshot, source_product_id)
+
+    def compare_products(
+        self,
+        product_ids: list[str],
+    ) -> ProductComparisonResponse:
+        snapshot = self.get_snapshot()
+        items = [
+            self._find_product(snapshot, source_product_id)
+            for source_product_id in product_ids
+        ]
+        return ProductComparisonResponse(
+            provider=PROVIDER_NAME,
+            source_base_month=snapshot.key.base_month,
+            fetched_at=snapshot.fetched_at,
+            source_reference=DATASET_URL,
+            items=items,
+            disclaimer=PRODUCT_COMPARISON_DISCLAIMER,
+        )
+
+    @staticmethod
+    def _find_product(
+        snapshot: ProductCatalogSnapshot,
+        source_product_id: str,
+    ) -> FinancialProduct:
+        for item in snapshot.items:
+            if item.source_product_id == source_product_id:
+                return item
+        raise ProductNotFoundError(source_product_id)
 
 
 def build_product_catalog_service() -> ProductCatalogService:

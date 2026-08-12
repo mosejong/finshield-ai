@@ -121,6 +121,26 @@ def test_service_normalizes_text_without_inventing_numeric_eligibility() -> None
     assert str(product.source_reference) == DATASET_URL
 
 
+def test_service_decodes_provider_html_character_references_once() -> None:
+    escaped_item = {
+        **SAMPLE_ITEM,
+        "rdptMthd": "원&#40;리&#41;금균등분할상환",
+        "jnMthd": "안내 &amp; 신청",
+    }
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(200, json=provider_payload(item=escaped_item))
+    )
+    with httpx.Client(transport=transport) as http_client:
+        service = ProductCatalogService(
+            PublicDataProductClient("test-key", client=http_client),
+            start_month_provider=lambda: "202202",
+        )
+        product = service.list_products(page_no=1, page_size=20).items[0]
+
+    assert product.repayment_method_text == "원(리)금균등분할상환"
+    assert product.application_method_text == "안내 & 신청"
+
+
 @pytest.mark.parametrize(
     "payload",
     [

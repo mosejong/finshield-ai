@@ -349,20 +349,41 @@ export const ProductMatchStatusSchema = z.enum([
 ]);
 export type ProductMatchStatus = z.infer<typeof ProductMatchStatusSchema>;
 
-const BackendProductSchema = z.object({
-  source_product_id: z.string(),
+export const ProductSourceIdSchema = z.string().regex(/^\d{6}:\d+$/).max(100);
+
+export const BackendProductSchema = z.object({
+  provider: z.string(),
+  source_product_id: ProductSourceIdSchema,
   name: z.string(),
+  category: z.string().nullable(),
+  category_detail: z.string().nullable(),
   loan_limit_text: z.string().nullable(),
+  interest_rate_type: z.string().nullable(),
   interest_rate_text: z.string().nullable(),
+  max_total_term_text: z.string().nullable(),
+  max_grace_term_text: z.string().nullable(),
+  max_repayment_term_text: z.string().nullable(),
+  repayment_method_text: z.string().nullable(),
   purpose_text: z.string().nullable(),
   offering_institution: z.string().nullable(),
   handling_institution_text: z.string().nullable(),
+  application_method_text: z.string().nullable(),
+  active: z.boolean().nullable(),
   source_reference: z.string().url(),
   eligibility: z.object({
     target_text: z.string().nullable(),
     detailed_conditions_text: z.string().nullable(),
-  }),
-});
+    age_text: z.string().nullable(),
+    income_text: z.string().nullable(),
+    annual_income_text: z.string().nullable(),
+    credit_score_text: z.string().nullable(),
+    region_text: z.string().nullable(),
+  }).strict(),
+  source_base_month: z.string().regex(/^\d{6}$/).nullable(),
+  source_file_written_at: z.string().regex(/^\d{12}$/).nullable(),
+  fetched_at: z.string().datetime({ offset: true }),
+}).strict();
+export type BackendProduct = z.infer<typeof BackendProductSchema>;
 
 const ProductMatchReasonSchema = z.object({
   rule: z.enum(["goal_purpose", "eligibility_manual_review"]),
@@ -390,6 +411,25 @@ export const ProductRecommendationResponseSchema = z.object({
   })),
 });
 export type ProductRecommendationResponse = z.infer<typeof ProductRecommendationResponseSchema>;
+
+export const ProductComparisonRequestSchema = z.object({
+  product_ids: z.array(ProductSourceIdSchema).length(2),
+}).strict().refine(
+  ({ product_ids }) => new Set(product_ids).size === 2,
+  { message: "서로 다른 상품 2개를 선택해야 합니다.", path: ["product_ids"] },
+);
+
+export const ProductComparisonResponseSchema = z.object({
+  provider: z.string(),
+  source_base_month: z.string().regex(/^\d{6}$/),
+  fetched_at: z.string().datetime({ offset: true }),
+  source_reference: z.string().url(),
+  items: z.array(BackendProductSchema).length(2),
+  disclaimer: z.string(),
+}).strict();
+export type ProductComparisonResponse = z.infer<
+  typeof ProductComparisonResponseSchema
+>;
 
 /* ------------------------------------------------------------------ */
 /* 대출 What-if 시뮬레이션                                             */
