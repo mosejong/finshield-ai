@@ -4,7 +4,8 @@
 - [ ] FinancialProfile CRUD
 - [x] 공식 금융상품 API adapter (live 검증 2026-08-12)
 - [x] 최신월 공식 상품 live data profile (325건, 2026-08-12)
-- [ ] Product normalization/cache
+- [x] Product normalization + latest-month in-memory cache
+- [ ] source identity integrity / conservative duplicate policy
 - [ ] 사용자 조건 기반 deterministic filtering
 - [x] 원리금균등/원금균등 대출 시뮬레이터
 - [x] Fraud text risk-signal extraction

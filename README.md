@@ -11,8 +11,9 @@ Fraud Scenario Engine v0.1 백엔드가 `main`에 병합됐다. 현재 분석은
 런타임 웹 검색 없이 결정론적 규칙, 사용자 상태, 정적 공식 근거로 동작한다.
 Next.js 프론트엔드 MVP도 `main`에 병합되어 실제 분석 API의 위험 유형 후보,
 요약, 행동과 공식 근거를 live로 표시한다.
-공식 금융상품은 최신 활성 기준월을 재현 가능하게 수집·분석하는 1단계를 마쳤고,
-다음 구현은 최신월 snapshot의 메모리 TTL cache다.
+공식 금융상품은 최신 활성 기준월 전체를 process-local TTL cache로 재사용하며,
+요청 pagination은 같은 snapshot에서 처리한다. 다음 단계는 source identity 무결성과
+보수적 중복 정책이다.
 
 ## Problem
 
@@ -156,7 +157,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **97 passed**, frontend adapter **3 passed**, Next build,
+현재 `main` 기준: Python **111 passed**, frontend adapter **3 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -198,11 +199,16 @@ source product ID, 기준월, 조회 시각과 데이터셋 URL을 포함한다.
 않는다. 금리 등 누락 필드는 추정하지 않으며, 상세 품질 기준은
 `docs/15-product-catalog-live-profile.md`에 기록했다.
 
+최신월 325건은 기본 300초 동안 process-local cache에서 재사용한다. 응답 최상위의
+`source_base_month`와 `fetched_at`으로 빈 페이지에서도 기준월과 수집 시각을 확인할
+수 있다. cache 만료 후 갱신 실패는 빈 목록이나 stale data로 숨기지 않고 502를
+유지한다. 설정과 한계는 `docs/16-product-catalog-cache.md`에 기록했다.
+
 ## Next priorities
 
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
-- 최신월 공식 상품 snapshot의 in-memory TTL cache
+- source product ID 무결성 검증과 보수적 duplicate 정책
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
 - 금융 프로필 API와 session-only 프론트 연결 교체
