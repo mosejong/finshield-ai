@@ -9,7 +9,8 @@
 - 기준 병합 커밋: `f9c121295481ca9d0c1db0c432ecf0dfefc96625`
 - 로컬 문서 반영·검증 완료: 18:52 KST
 - Draft PR 생성: 18:53 KST
-- 상태: Draft PR #30, GitHub Actions CI 진행 중
+- Ready 전환·병합: 18:55 KST
+- 상태: PR #30 PM 검수·CI 통과 후 `main` 병합 완료
 
 ## 목표
 
@@ -69,3 +70,7 @@ PostgreSQL·인증 우선순위를 잘못 판단하게 된다.
 - Draft PR #30: `https://github.com/mosejong/finshield-ai/pull/30`
 - PR 생성: `2026-08-12 18:53:02 KST`
 - 생성 직후 상태: backend `test`, frontend `web` GitHub Actions 진행 중
+- 최종 PR head: `c3eae1c34f2e449fcc09690f8d0a830160b8dc96`
+- 최종 GitHub Actions: backend `test` 2건, frontend `web` 2건 모두 성공
+- 병합 시각: `2026-08-12 18:55:26 KST`
+- 병합 커밋: `3326405a16cb24e3fd38650bb45f3ff44d7ea6ef`
