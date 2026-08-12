@@ -61,6 +61,15 @@
 - 외부 링크는 자료 제목으로 구분되고 새 탭·`noreferrer` 경계를 유지
 - `git diff --check`: 통과
 
+## PR 및 PM 검수
+
+- Draft PR: [#34 feat: add evidence-backed wealth guidance](https://github.com/mosejong/finshield-ai/pull/34)
+- GitHub Actions backend `test`, frontend `web`: 통과
+- PM 근거 검수: 교육 문장별 source 지지와 원금손실·비용 직접 근거 확인
+- PM 안전 검수: 개인 데이터 입력 없음, 투자상품·매매·수익률 추천 없음
+- PM 접근성 검수: 동일 기관의 여러 링크를 공식 자료 제목으로 구분
+- 차단 이슈: 없음
+
 ## 구현 중 수정
 
 - 금지 문구 회귀 테스트의 module별 문자열 목록을 바로 `join`해 TypeError가 발생했다.
