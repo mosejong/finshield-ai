@@ -57,7 +57,13 @@ class PublicDataProductClient:
         self._client = client
         self._timeout = httpx.Timeout(timeout_seconds)
 
-    def fetch_products(self, *, page_no: int, page_size: int) -> ProviderProductPage:
+    def fetch_products(
+        self,
+        *,
+        page_no: int,
+        page_size: int,
+        base_month: str | None = None,
+    ) -> ProviderProductPage:
         params = {
             "serviceKey": self._service_key,
             "pageNo": page_no,
@@ -65,6 +71,8 @@ class PublicDataProductClient:
             "resultType": "json",
             "prdExisYn": "Y",
         }
+        if base_month is not None:
+            params["basYm"] = base_month
 
         try:
             if self._client is not None:

@@ -75,6 +75,18 @@ def test_client_sends_fixed_official_endpoint_and_required_parameters() -> None:
     assert page.fetched_at.tzinfo is timezone.utc
 
 
+def test_client_passes_optional_base_month_to_provider() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["basYm"] == "202607"
+        return httpx.Response(200, json=provider_payload())
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http_client:
+        PublicDataProductClient(
+            "test-key",
+            client=http_client,
+        ).fetch_products(page_no=1, page_size=20, base_month="202607")
+
+
 def test_client_accepts_url_encoded_general_service_key() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.params["serviceKey"] == "abc+def/ghi="
