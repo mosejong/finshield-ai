@@ -9,7 +9,8 @@
 목표 대회: **2026 금융 AI Challenge**  
 Fraud Scenario Engine v0.1 백엔드가 `main`에 병합됐다. 현재 분석은 LLM이나
 런타임 웹 검색 없이 결정론적 규칙, 사용자 상태, 정적 공식 근거로 동작한다.
-프론트엔드 MVP는 `feature/frontend-mvp` 브랜치에서 별도로 개발 중이다.
+Next.js 프론트엔드 MVP도 `main`에 병합되어 실제 분석 API의 위험 유형 후보,
+요약, 행동과 공식 근거를 live로 표시한다.
 
 ## Problem
 
@@ -109,6 +110,7 @@ docs/
   06-roadmap.md
   devlog/           date- and branch-based development history
 tests/
+web/                Next.js frontend MVP
 .github/workflows/
 ```
 
@@ -124,14 +126,31 @@ uvicorn app.main:app --reload
 
 Then open `/docs`.
 
+프론트엔드는 별도 터미널에서 실행한다.
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Then open `http://localhost:3000`. 기본 live 모드는 실행 중인 FastAPI를 Next
+서버사이드 프록시로 호출한다.
+
 ## Test
 
 ```bash
 pytest -q
+cd web
+npm run build
+npx tsc --noEmit
+npm run lint
+npm test
 ```
 
-현재 `main` 기준: **75 passed**. Starlette `TestClient` 사용 중단 예정 경고 1건은
-별도 유지보수 항목으로 관리한다.
+현재 `main` 기준: Python **75 passed**, frontend adapter **3 passed**, Next build,
+TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
+유지보수 항목으로 관리한다.
 
 ## Backend v0.1 API
 
@@ -162,10 +181,11 @@ FinancialProfile의 최소 입력 스키마는 `app/schemas/financial_profile.py
 
 ## Next priorities
 
-- 프론트엔드 MVP 브랜치 검수 및 API 계약 통합
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - 공식 금융상품 API adapter와 deterministic filtering 구현
+- 금융 프로필 API와 session-only 프론트 연결 교체
+- 상품 탐색·비교·What-if 화면 구현 및 대출 시뮬레이터 연결
 - Starlette `TestClient` 사용 중단 예정 경고 대응
 
 ## Verified official-data direction (2026-08-11)

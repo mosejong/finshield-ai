@@ -7,7 +7,7 @@
 - PM 검수 시작: 15:00 KST
 - 담당 영역: 프론트엔드 및 API 표시 어댑터
 - 작업 브랜치: `feature/frontend-mvp`
-- 상태: Draft PR #4 PM 검수 및 GitHub Actions CI 완료
+- 상태: PR #4 PM 검수·CI 통과 후 `main` 병합 완료
 
 ## 목표
 
@@ -104,6 +104,19 @@
 - `web` 완료: 15:28:22, 15:28:26 KST
 - GitHub가 PR을 `MERGEABLE`로 판정했다.
 
+### 15:30 — 최종 head CI 재검증
+
+- 개발일지 기록 후 최종 PR head는 `1b392ca18b5f5a8088b4836e0b71471a863a19c5`가 됐다.
+- Python `test` 2건과 frontend `web` 2건이 최종 head에서도 모두 성공했다.
+- 완료 시각: `test` 15:29:42·15:29:50 KST, `web` 15:30:04·15:30:14 KST
+
+### 15:31 — Ready 전환 및 main 병합
+
+- Draft PR #4를 Ready for review로 전환했다.
+- PM이 최종 파일 범위에서 루트 미추적 에이전트 파일과 백엔드 코드가 제외됐음을 확인했다.
+- 병합 시각: `2026-08-12T06:31:09Z` (`2026-08-12 15:31:09 KST`)
+- 병합 커밋: `b8331d6bf88c2677bbebd2829141a781456505a3`
+
 ## 범위 통제
 
 - 백엔드 `app/`, `tests/`, `requirements.txt` 수정 없음
@@ -141,5 +154,6 @@
 - PR 방향: `feature/frontend-mvp` → `main`
 - Draft PR: `https://github.com/mosejong/finshield-ai/pull/4`
 - PR 생성: `2026-08-12 15:26:56 KST`
-- 검증된 PR head: `498747133ac46c2277e1db67b2c61dff5b064457`
-- 현재 단계: Ready 전환 및 PM 최종 병합
+- 검증된 최종 PR head: `1b392ca18b5f5a8088b4836e0b71471a863a19c5`
+- 병합 커밋: `b8331d6bf88c2677bbebd2829141a781456505a3`
+- 최종 상태: `main` 병합 완료
