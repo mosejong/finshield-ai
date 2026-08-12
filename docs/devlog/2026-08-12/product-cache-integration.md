@@ -59,3 +59,5 @@ TTL cache의 공개 응답·운영 설정·검증 수치를 README, 문서 색�
 - Ready 전환: 2026-08-12 17:15 KST
 - 병합: 2026-08-12 17:15:21 KST
 - 병합 커밋: `d510cc0c3cba71fbba0d3c78d0e1dabfb766c53a`
+- 마감 기록 PR: [#18 docs: finalize product cache integration](https://github.com/mosejong/finshield-ai/pull/18)
+- 마감 기록 PR 생성: 2026-08-12 17:16:14 KST (Draft)
