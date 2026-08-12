@@ -4,7 +4,7 @@
 01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog
 
 ## Architecture / engineering
-04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · `adr/`
+04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · `adr/`
 
 ## Security
 08 AI security alignment · 12 security threat model
@@ -27,3 +27,5 @@ Date- and branch-based logs: `devlog/README.md`
 - `devlog/2026-08-12/public-data-key-integration.md` — 인증키 수정 병합 후 README·백로그 반영
 - `devlog/2026-08-12/product-catalog-v0.2-profile.md` — 최신월 상품 live 품질 측정·PM 검수·PR 병합
 - `devlog/2026-08-12/product-profile-integration.md` — 상품 profile 병합 후 README·색인·백로그 반영
+- `devlog/2026-08-12/product-catalog-cache-v0.3.md` — 최신월 snapshot TTL cache 구현·검수·병합
+- `devlog/2026-08-12/product-cache-integration.md` — cache 병합 후 README·색인·백로그 반영

@@ -110,7 +110,7 @@
 - 구현 커밋: `09a7880787503d206b733e03b5a828f3903b7a8c`
 - PR: [#16 feat: cache latest product catalog snapshot](https://github.com/mosejong/finshield-ai/pull/16)
 - PR 생성: 2026-08-12 17:05:58 KST (Draft)
-- 상태: PM 검수·GitHub CI 통과, Ready 전환 대기
+- 상태: 완료 — PR #16 병합 및 PM 문서 통합
 
 ## PM 최종 검수
 
@@ -120,3 +120,6 @@
 - provider 실패 502, 구성 실패 503, cache miss 단일 갱신 경계를 재확인
 - 실제 secret, 사용자 개인정보, 임의 URL fetch, frontend 계산 로직 추가 없음
 - 차단 이슈 없음
+- Ready 전환: 2026-08-12 17:09 KST
+- 병합: 2026-08-12 17:10:08 KST
+- 병합 커밋: `f395edf620f45f5a6bf70b0667bfd43c7be16e0a`
