@@ -59,3 +59,5 @@
 - Ready 전환: 2026-08-12 16:50 KST
 - 병합: 2026-08-12 16:51:06 KST
 - 병합 커밋: `eacf78039b8f8b774ac3a1fb0aa24999282b1c43`
+- 마감 기록 PR: [#15 docs: finalize product profile integration](https://github.com/mosejong/finshield-ai/pull/15)
+- 마감 기록 PR 생성: 2026-08-12 16:52:16 KST (Draft)
