@@ -77,4 +77,13 @@
 - 구현 커밋: `e4b76809334e75bf3edfba3bb9292ee330006270`
 - PR: [#21 feat: add conservative product filtering](https://github.com/mosejong/finshield-ai/pull/21)
 - PR 생성: 2026-08-12 17:35:19 KST (Draft)
-- 상태: GitHub CI·PM 검수 중
+- 상태: PM 검수·GitHub CI 통과, Ready 전환 대기
+
+## PM 최종 검수
+
+- 계획한 backend·tests·해당 docs 10개 파일만 변경
+- 최신 head: `49b8c3c508b2b61513df03f85119ba30e15bd25e`
+- GitHub CI: backend `test` 2개, frontend `web` 2개 통과
+- `potential_match`가 적격성 보장이 아니며 모든 결과에 상세 자격 확인 reason 존재
+- profile 저장·로그, LLM, 임의 URL fetch, frontend 변경 없음
+- 차단 이슈 없음
