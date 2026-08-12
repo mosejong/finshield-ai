@@ -9,7 +9,8 @@
 - 기준 병합 커밋: `06737507667c566051291092d172e61eaac0bcd0`
 - 로컬 문서 반영·검증 완료: 18:20 KST
 - Draft PR 생성: 18:20 KST
-- 상태: Draft PR #27, GitHub Actions CI 진행 중
+- Ready 전환·병합: 18:21 KST
+- 상태: PR #27 PM 검수·CI 통과 후 `main` 병합 완료
 
 ## 목표
 
@@ -73,3 +74,7 @@ MVP 백로그와 기능 개발일지에 반영한다. 애플리케이션 코드�
 - Draft PR #27: `https://github.com/mosejong/finshield-ai/pull/27`
 - PR 생성: `2026-08-12 18:20:02 KST`
 - 생성 직후 상태: backend `test`, frontend `web` GitHub Actions 진행 중
+- 최종 PR head: `b39756e8b23e5581294e6f951f1b7dbb0819e359`
+- 최종 GitHub Actions: backend `test` 2건, frontend `web` 2건 모두 성공
+- 병합 시각: `2026-08-12 18:21:57 KST`
+- 병합 커밋: `c49e43e8df8abccda86123ec973e607594544dd5`
