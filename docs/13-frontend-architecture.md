@@ -30,7 +30,8 @@ finshield-ai/
 | `/check` | 의심 메시지 입력 + 피해 단계 선택 | 구현 |
 | `/check/result/[id]` | 위험 분석 결과 + 대응 액션 | 구현 |
 | `/products` | 금융 목표 기반 공식 상품 후보 | 구현 |
-| `/products/[id]`, `/products/compare`, `/products/simulate` | 상품 상세·비교·시뮬레이션 | 미구현 |
+| `/products/simulate` | 현재 금리와 변경 금리의 대출 What-if 비교 | 구현 |
+| `/products/[id]`, `/products/compare` | 상품 상세·공식 상품 비교 | 미구현 |
 | `/evidence/[id]` | 근거 상세 | 미구현 (목록 컴포넌트만 존재) |
 
 **`/check` 는 프로필 없이 동작한다.** 의심 문자를 방금 받은 사람에게 온보딩을 먼저 요구하면 이탈한다. 프로필은 개인화 품질만 올리는 선택 요소이며, 있으면 `persona` 만 요청에 실린다.
@@ -146,7 +147,8 @@ lib/store/*.ts         sessionStorage의 분석 결과·profile identity 보관
 | 금융 프로필 CRUD | `/api/v1/profiles` | live, session에는 ID+persona만 보관 |
 | 파생지표 | 없음 | mock 이 계산 완료값 제공 |
 | 상품 후보 | `/api/v1/recommendations` | live, backend 상태·reason 그대로 표시 |
-| 비교 / 시뮬레이션 | 일부 backend 존재 | 화면 미구현 |
+| 대출 What-if 시뮬레이션 | `/api/v1/loans/simulate` | live, 현재·변경 조건을 각각 계산 |
+| 공식 상품 비교 | 없음 | 화면 미구현 |
 
 ### 금융 로직 금지선
 
@@ -186,6 +188,10 @@ FastAPI 에 `CORSMiddleware` 가 없어 브라우저가 `localhost:8000` 을 직
 연령·직업·신용·목표 enum과 일치시키고, adapter가 camelCase를 snake_case로
 변환한다. `persona`는 fraud 입력용 UI 값이므로 FinancialProfile backend 요청에서
 제외하고 profile ID와 함께 session에만 둔다.
+
+대출 What-if는 `/api/proxy/loans/simulate`를 두 번 호출한다. 두 응답을 화면에서
+나란히 표시할 뿐 차액·절감액·상환액을 프론트에서 계산하지 않는다. 한쪽이라도
+실패하면 비교 전체를 실패로 처리하며 빈 값이나 유리한 결과로 대체하지 않는다.
 
 부수 효과로 백엔드 주소가 클라이언트 번들에 노출되지 않는다. 그래서 `FINSHIELD_API_URL` 에는 `NEXT_PUBLIC_` 접두사를 붙이지 않는다.
 
@@ -227,9 +233,9 @@ uvicorn app.main:app --reload
 
 ## 8. 남은 작업
 
-- 상품 탐색 / 비교 / What-if 3화면
+- 상품 상세 / 공식 상품 비교 2화면
+- 재테크 기초 가이드: 현금흐름·비상자금·부채관리·투자위험 교육, 종목 추천 제외
 - profile process-local 저장을 PostgreSQL·인증·소유권 검증으로 교체
-- `/loans/simulate`를 상품 비교·What-if 화면에 연결
 - 경로 불일치: SKILL.md 는 `/api/v1/fraud/analyze`, 실제 구현은 `/api/v1/analyze`
 - 접근성 감사 (스크린리더, 명도대비 AA) — 자동 검사는 아직 돌리지 않았다
 - 실기기 확인 (지금까지는 헤드리스 Chrome 캡처만). iOS Safari 의 `env(safe-area-inset-bottom)` 과 `100dvh` 동작은 시뮬레이터로 재확인 필요

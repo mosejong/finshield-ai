@@ -391,6 +391,59 @@ export const ProductRecommendationResponseSchema = z.object({
 });
 export type ProductRecommendationResponse = z.infer<typeof ProductRecommendationResponseSchema>;
 
+/* ------------------------------------------------------------------ */
+/* 대출 What-if 시뮬레이션                                             */
+/* ------------------------------------------------------------------ */
+
+const DecimalStringSchema = z.string().regex(/^\d+(?:\.\d+)?$/);
+
+export const RepaymentTypeSchema = z.enum([
+  "equal_principal_and_interest",
+  "equal_principal",
+]);
+export type RepaymentType = z.infer<typeof RepaymentTypeSchema>;
+
+export const LoanScenarioInputSchema = z.object({
+  principal: z.number().positive().max(999_999_999_999_999.99),
+  annualInterestRate: z.number().min(0).max(100),
+  months: z.number().int().min(1).max(600),
+  repaymentType: RepaymentTypeSchema,
+}).strict();
+export type LoanScenarioInput = z.infer<typeof LoanScenarioInputSchema>;
+
+export const BackendLoanSimulationRequestSchema = z.object({
+  principal: DecimalStringSchema,
+  annual_interest_rate: DecimalStringSchema,
+  months: z.number().int().min(1).max(600),
+  repayment_type: RepaymentTypeSchema,
+}).strict();
+export type BackendLoanSimulationRequest = z.infer<
+  typeof BackendLoanSimulationRequestSchema
+>;
+
+export const LoanPaymentScheduleItemSchema = z.object({
+  month: z.number().int().min(1),
+  principal_payment: DecimalStringSchema,
+  interest_payment: DecimalStringSchema,
+  payment: DecimalStringSchema,
+  remaining_principal: DecimalStringSchema,
+}).strict();
+
+export const LoanSimulationResponseSchema = z.object({
+  principal: DecimalStringSchema,
+  annual_interest_rate: DecimalStringSchema,
+  months: z.number().int().min(1).max(600),
+  repayment_type: RepaymentTypeSchema,
+  monthly_payment: DecimalStringSchema.nullable(),
+  schedule: z.array(LoanPaymentScheduleItemSchema).min(1).max(600),
+  total_repayment: DecimalStringSchema,
+  total_interest: DecimalStringSchema,
+  assumptions: z.array(z.string()),
+}).strict();
+export type LoanSimulationResponse = z.infer<
+  typeof LoanSimulationResponseSchema
+>;
+
 /**
  * 파생지표.
  *
