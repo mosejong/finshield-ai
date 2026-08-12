@@ -6,18 +6,19 @@
 - [ ] Product normalization/cache
 - [ ] 사용자 조건 기반 deterministic filtering
 - [x] 원리금균등/원금균등 대출 시뮬레이터
-- [ ] Fraud text risk-signal extraction
-- [ ] Scenario Engine
-- [ ] 공식 근거 기반 설명
-- [ ] 분석 결과 provenance/source
-- [ ] pytest + CI
+- [x] Fraud text risk-signal extraction
+- [x] Scenario Engine v0.1
+- [x] 공식 근거 기반 설명
+- [x] 분석 결과 provenance/source
+- [x] pytest + CI
 - [ ] Docker
 - [ ] public MVP deployment
 
 ## P1 — 경쟁력
 - [ ] Rule-only vs LLM-only vs Hybrid benchmark
 - [ ] persona별 scenario golden set
-- [ ] URL lexical/domain feature analysis (safe implementation)
+- [x] URL lexical feature analysis (offline safe implementation)
+- [ ] URL domain/reputation feature analysis (outbound-fetch policy required)
 - [ ] financial profile dashboard
 - [ ] product comparison UI
 - [ ] What-if loan simulation
