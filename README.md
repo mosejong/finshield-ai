@@ -162,7 +162,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **139 passed**, frontend **13 passed**, Next build,
+현재 `main` 기준: Python **139 passed**, frontend **16 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -229,15 +229,21 @@ snapshot 저장 전 공식 source ID와 provider·기준월·수집시각·sourc
 원문을 표시한다. 소득·부채·신용·연령은 상품 요청으로 전송하지 않으며 프론트에서
 적격성이나 금융 수치를 재계산하지 않는다.
 
+`/products/simulate`는 같은 원금·기간·상환방식에 현재 금리와 변경 금리를 넣어
+backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정기 월 납입액,
+원금균등은 첫 달과 마지막 달 납입액을 구분해 보여준다. 브라우저는 이자·차액·
+절감액을 계산하지 않으며 두 요청 중 하나라도 실패하면 비교 전체 실패를 명시한다.
+결과는 공식 상환표가 아니고 수수료·세금·보험료·중도상환수수료를 포함하지 않는다.
+
 ## Next priorities
 
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
-- 상품 상세·비교·What-if 화면과 대출 시뮬레이터 연결
+- 상품 상세·공식 상품 비교 화면
+- 공식 근거 기반 재테크 기초 가이드(현금흐름·비상자금·부채·투자위험, 종목 추천 제외)
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
 - PostgreSQL·SQLAlchemy·Alembic 영구 저장과 인증·소유권 경계
-- 상품 탐색·비교·What-if 화면 구현 및 대출 시뮬레이터 연결
 - Starlette `TestClient` 사용 중단 예정 경고 대응
 
 ## Verified official-data direction (2026-08-11)

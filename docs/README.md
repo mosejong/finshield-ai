@@ -39,3 +39,5 @@ Date- and branch-based logs: `devlog/README.md`
 - `devlog/2026-08-12/financial-profile-crud-integration.md` — 프로필 CRUD 병합 후 PM 문서 반영
 - `devlog/2026-08-12/profile-frontend-integration-v0.1.md` — 프로필 프론트 연결·검수·병합
 - `devlog/2026-08-12/profile-frontend-integration.md` — 프로필 프론트 병합 후 PM 문서 반영
+- `devlog/2026-08-12/loan-what-if-ui-v0.1.md` — 대출 조건 비교 화면 구현·실브라우저 검수·병합
+- `devlog/2026-08-12/loan-what-if-integration.md` — 대출 비교 병합 후 README·백로그 반영

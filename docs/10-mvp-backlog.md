@@ -25,7 +25,8 @@
 - [x] financial profile frontend integration (process-local backend CRUD v0.1)
 - [ ] product comparison UI
 - [x] official product candidate UI (goal-only minimum input)
-- [ ] What-if loan simulation
+- [x] What-if loan simulation (backend-only calculation, current vs alternative UI)
+- [ ] 재테크 기초 가이드 (공식 금융교육 근거, 종목·매매 추천 제외)
 - [ ] API p50/p95 instrumentation
 - [ ] audit log / PII masking
 
