@@ -32,7 +32,7 @@ finshield-ai/
 | `/products` | 금융 목표 기반 공식 상품 후보 | 구현 |
 | `/products/simulate` | 현재 금리와 변경 금리의 대출 What-if 비교 | 구현 |
 | `/learn/wealth` | 공식 근거 기반 재테크 기초 교육 | 구현 |
-| `/products/[id]`, `/products/compare` | 상품 상세·공식 상품 비교 | 미구현 |
+| `/products/[id]`, `/products/compare` | 공식 상품 상세·2개 원문 비교 | 구현 |
 | `/evidence/[id]` | 근거 상세 | 미구현 (목록 컴포넌트만 존재) |
 
 **`/check` 는 프로필 없이 동작한다.** 의심 문자를 방금 받은 사람에게 온보딩을 먼저 요구하면 이탈한다. 프로필은 개인화 품질만 올리는 선택 요소이며, 있으면 `persona` 만 요청에 실린다.
@@ -150,7 +150,7 @@ lib/store/*.ts         sessionStorage의 분석 결과·profile identity 보관
 | 상품 후보 | `/api/v1/recommendations` | live, backend 상태·reason 그대로 표시 |
 | 대출 What-if 시뮬레이션 | `/api/v1/loans/simulate` | live, 현재·변경 조건을 각각 계산 |
 | 재테크 기초 가이드 | `/api/v1/guidance/wealth` | live, 입력 없는 고정 교육 계약 |
-| 공식 상품 비교 | 없음 | 화면 미구현 |
+| 공식 상품 상세·비교 | `/api/v1/products/{id}`, `/api/v1/products/compare` | live, 같은 snapshot 원문 |
 
 ### 금융 로직 금지선
 
@@ -239,7 +239,6 @@ uvicorn app.main:app --reload
 
 ## 8. 남은 작업
 
-- 상품 상세 / 공식 상품 비교 2화면
 - profile process-local 저장을 PostgreSQL·인증·소유권 검증으로 교체
 - 경로 불일치: SKILL.md 는 `/api/v1/fraud/analyze`, 실제 구현은 `/api/v1/analyze`
 - 접근성 감사 (스크린리더, 명도대비 AA) — 자동 검사는 아직 돌리지 않았다

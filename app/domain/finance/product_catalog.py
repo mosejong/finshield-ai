@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 from datetime import datetime
+from html import unescape
 from typing import Any
 
 from app.clients.public_data_products import (
@@ -14,7 +15,7 @@ def _text(row: Mapping[str, Any], key: str) -> str | None:
     value = row.get(key)
     if value is None:
         return None
-    normalized = str(value).strip()
+    normalized = unescape(str(value)).strip()
     return normalized or None
 
 

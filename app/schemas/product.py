@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 
 class ProductEligibility(BaseModel):
@@ -73,3 +73,32 @@ class ProductCatalogResponse(BaseModel):
     source_reference: HttpUrl
     identity: ProductCatalogIdentity
     items: list[FinancialProduct]
+
+
+ProductSourceId = Annotated[
+    str,
+    Field(min_length=8, max_length=100, pattern=r"^\d{6}:\d+$"),
+]
+
+
+class ProductComparisonRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    product_ids: list[ProductSourceId] = Field(min_length=2, max_length=2)
+
+    @model_validator(mode="after")
+    def validate_product_ids(self) -> Self:
+        if len(set(self.product_ids)) != 2:
+            raise ValueError("product_ids must contain two distinct IDs")
+        return self
+
+
+class ProductComparisonResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str = Field(min_length=1)
+    source_base_month: str = Field(pattern=r"^\d{6}$")
+    fetched_at: datetime
+    source_reference: HttpUrl
+    items: list[FinancialProduct] = Field(min_length=2, max_length=2)
+    disclaimer: str = Field(min_length=1)
