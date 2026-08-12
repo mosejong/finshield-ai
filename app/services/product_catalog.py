@@ -7,7 +7,8 @@ from app.clients.public_data_products import (
     ProductProviderConfigurationError,
     PublicDataProductClient,
 )
-from app.schemas.product import ProductCatalogResponse
+from app.domain.finance.product_identity import SNAPSHOT_IDENTITY_POLICY
+from app.schemas.product import ProductCatalogIdentity, ProductCatalogResponse
 from app.services.product_catalog_snapshot import (
     ProductCatalogSnapshotCache,
     current_seoul_month,
@@ -60,6 +61,17 @@ class ProductCatalogService:
             source_base_month=snapshot.key.base_month,
             fetched_at=snapshot.fetched_at,
             source_reference=DATASET_URL,
+            identity=ProductCatalogIdentity(
+                policy=SNAPSHOT_IDENTITY_POLICY,
+                source_id_unique=True,
+                unique_source_id_count=(
+                    snapshot.identity_audit.unique_source_id_count
+                ),
+                normalized_name_duplicate_groups=(
+                    snapshot.identity_audit.normalized_name_duplicate_groups
+                ),
+                name_only_dedup_applied=False,
+            ),
             items=items,
         )
 

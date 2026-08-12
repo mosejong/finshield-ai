@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
@@ -50,6 +51,16 @@ class FinancialProduct(BaseModel):
     source_reference: HttpUrl
 
 
+class ProductCatalogIdentity(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    policy: Literal["provider_base_month_sequence"]
+    source_id_unique: Literal[True]
+    unique_source_id_count: int = Field(ge=0)
+    normalized_name_duplicate_groups: int = Field(ge=0)
+    name_only_dedup_applied: Literal[False]
+
+
 class ProductCatalogResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -60,4 +71,5 @@ class ProductCatalogResponse(BaseModel):
     source_base_month: str = Field(pattern=r"^\d{6}$")
     fetched_at: datetime
     source_reference: HttpUrl
+    identity: ProductCatalogIdentity
     items: list[FinancialProduct]

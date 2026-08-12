@@ -13,6 +13,7 @@ from app.clients.public_data_products import (
     ProductProviderResponseError,
     PublicDataProductClient,
 )
+from app.domain.finance.product_identity import ProductCatalogIdentityAudit
 from app.services.product_catalog import (
     ProductCatalogService,
     build_product_catalog_service,
@@ -73,6 +74,10 @@ def empty_snapshot() -> ProductCatalogSnapshot:
         ),
         fetched_at=datetime.now(timezone.utc),
         items=(),
+        identity_audit=ProductCatalogIdentityAudit(
+            unique_source_id_count=0,
+            normalized_name_duplicate_groups=0,
+        ),
     )
 
 
@@ -133,6 +138,9 @@ def test_service_caches_latest_full_snapshot_and_paginates_locally() -> None:
     ]
     assert first.total_count == second.total_count == 3
     assert first.source_base_month == second.source_base_month == "202607"
+    assert first.identity.source_id_unique is True
+    assert first.identity.unique_source_id_count == 3
+    assert first.identity.name_only_dedup_applied is False
     assert [item.source_product_id for item in first.items] == [
         "202607:1",
         "202607:2",
