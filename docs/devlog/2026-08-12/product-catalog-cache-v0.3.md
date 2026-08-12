@@ -104,3 +104,10 @@
 - provider 장애 시 stale snapshot 자동 반환은 하지 않는다.
 - 다음 단계에서 source ID 유일성, 동일 source ID 충돌과 보수적 duplicate 정책을
   별도 PR로 구현한다.
+
+## 커밋·PR
+
+- 구현 커밋: `09a7880787503d206b733e03b5a828f3903b7a8c`
+- PR: [#16 feat: cache latest product catalog snapshot](https://github.com/mosejong/finshield-ai/pull/16)
+- PR 생성: 2026-08-12 17:05:58 KST (Draft)
+- 상태: GitHub CI·PM 검수 중
