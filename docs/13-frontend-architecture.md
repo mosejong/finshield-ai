@@ -29,7 +29,7 @@ finshield-ai/
 | `/profile` | 내 금융상태 | 구현 |
 | `/check` | 의심 메시지 입력 + 피해 단계 선택 | 구현 |
 | `/check/result/[id]` | 위험 분석 결과 + 대응 액션 | 구현 |
-| `/products` | 금융상품 (준비 중 자리표시) | 자리표시 |
+| `/products` | 금융 목표 기반 공식 상품 후보 | 구현 |
 | `/products/[id]`, `/products/compare`, `/products/simulate` | 상품 상세·비교·시뮬레이션 | 미구현 |
 | `/evidence/[id]` | 근거 상세 | 미구현 (목록 컴포넌트만 존재) |
 
@@ -145,7 +145,8 @@ lib/store/*.ts         sessionStorage 임시 보관
 | 공식 근거 | 있음 | live + 검토일 표시 |
 | 금융 프로필 CRUD | 없음 | sessionStorage |
 | 파생지표 | 없음 | mock 이 계산 완료값 제공 |
-| 상품 / 비교 / 시뮬레이션 | 없음 | 미구현 |
+| 상품 후보 | `/api/v1/recommendations` | live, backend 상태·reason 그대로 표시 |
+| 비교 / 시뮬레이션 | 일부 backend 존재 | 화면 미구현 |
 
 ### 금융 로직 금지선
 
@@ -165,7 +166,8 @@ live 모드는 백엔드 `official_sources`를 `verified: true`로 변환하고
 
 ## 6. 백엔드 연동
 
-현재 백엔드: `GET /health`, `POST /api/v1/analyze`, `POST /api/v1/loans/simulate`
+현재 백엔드: `GET /health`, `POST /api/v1/analyze`, `GET /api/v1/products`,
+`POST /api/v1/recommendations`, `POST /api/v1/loans/simulate`
 
 `analyze`는 기존 필드에 더해 `fraud_types`, `summary`, `actions`,
 `official_sources`를 반환한다. 프론트는 이 값을 mock으로 대체하지 않는다.
@@ -192,6 +194,8 @@ FastAPI 에 `CORSMiddleware` 가 없어 브라우저가 `localhost:8000` 을 직
 - 사용자가 붙여넣은 원문과 분석 결과는 `sessionStorage` 에만 둔다. `localStorage` 가 아니다 — 탭을 닫으면 사라진다.
 - 프록시는 요청 본문을 로그로 남기지 않는다.
 - 프로필은 주민등록번호·계좌번호·실명을 받지 않고, 나이·신용점수는 band 로만 받는다.
+- 상품 후보 요청에는 session profile 전체가 아니라 backend 규칙이 실제 사용하는
+  `goal` 하나만 보낸다. 소득·부채·신용·연령은 전송하지 않는다.
 
 ---
 

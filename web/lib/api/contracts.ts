@@ -263,6 +263,63 @@ export const FinancialProfileSchema = z.object({
 });
 export type FinancialProfile = z.infer<typeof FinancialProfileSchema>;
 
+/* ------------------------------------------------------------------ */
+/* 공식 금융상품 후보                                                  */
+/* ------------------------------------------------------------------ */
+
+export const BackendRecommendationGoalSchema = z.enum([
+  "housing", "emergency_cash", "debt_refinance", "living_expense",
+  "startup_business", "vehicle", "asset_building", "other",
+]);
+export type BackendRecommendationGoal = z.infer<typeof BackendRecommendationGoalSchema>;
+
+export const ProductMatchStatusSchema = z.enum([
+  "potential_match", "mismatch", "needs_review",
+]);
+export type ProductMatchStatus = z.infer<typeof ProductMatchStatusSchema>;
+
+const BackendProductSchema = z.object({
+  source_product_id: z.string(),
+  name: z.string(),
+  loan_limit_text: z.string().nullable(),
+  interest_rate_text: z.string().nullable(),
+  purpose_text: z.string().nullable(),
+  offering_institution: z.string().nullable(),
+  handling_institution_text: z.string().nullable(),
+  source_reference: z.string().url(),
+  eligibility: z.object({
+    target_text: z.string().nullable(),
+    detailed_conditions_text: z.string().nullable(),
+  }),
+});
+
+const ProductMatchReasonSchema = z.object({
+  rule: z.enum(["goal_purpose", "eligibility_manual_review"]),
+  status: ProductMatchStatusSchema,
+  message: z.string(),
+  source_field: z.enum(["purpose_text", "eligibility"]),
+});
+
+export const ProductRecommendationResponseSchema = z.object({
+  provider: z.string(),
+  source_base_month: z.string().regex(/^\d{6}$/),
+  total_count: z.number().int().nonnegative(),
+  page_no: z.number().int().positive(),
+  page_size: z.number().int().positive(),
+  summary: z.object({
+    potential_match: z.number().int().nonnegative(),
+    mismatch: z.number().int().nonnegative(),
+    needs_review: z.number().int().nonnegative(),
+  }),
+  disclaimer: z.string(),
+  results: z.array(z.object({
+    status: ProductMatchStatusSchema,
+    product: BackendProductSchema,
+    reasons: z.array(ProductMatchReasonSchema).min(1),
+  })),
+});
+export type ProductRecommendationResponse = z.infer<typeof ProductRecommendationResponseSchema>;
+
 /**
  * 파생지표.
  *
