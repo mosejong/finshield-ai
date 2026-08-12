@@ -444,6 +444,46 @@ export type LoanSimulationResponse = z.infer<
   typeof LoanSimulationResponseSchema
 >;
 
+/* ------------------------------------------------------------------ */
+/* 재테크 기초 가이드                                                  */
+/* ------------------------------------------------------------------ */
+
+export const WealthModuleCodeSchema = z.enum([
+  "money_flow",
+  "saving_plan",
+  "debt_credit",
+  "investment_risk",
+]);
+
+export const WealthGuidanceSourceSchema = z.object({
+  source_id: z.string().min(1),
+  organization: z.string().min(1),
+  title: z.string().min(1),
+  source_url: z.string().url().startsWith("https://"),
+  retrieved_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  supports: z.array(WealthModuleCodeSchema).min(1),
+}).strict();
+
+export const WealthGuidanceModuleSchema = z.object({
+  code: WealthModuleCodeSchema,
+  order: z.number().int().min(1).max(4),
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  check_questions: z.array(z.string().min(1)).min(1),
+  next_action: z.string().min(1),
+  source_ids: z.array(z.string().min(1)).min(1),
+}).strict();
+
+export const WealthGuidanceResponseSchema = z.object({
+  version: z.literal("0.1"),
+  scope_disclaimer: z.string().min(1),
+  modules: z.array(WealthGuidanceModuleSchema).length(4),
+  official_sources: z.array(WealthGuidanceSourceSchema).min(1),
+}).strict();
+export type WealthGuidanceResponse = z.infer<
+  typeof WealthGuidanceResponseSchema
+>;
+
 /**
  * 파생지표.
  *

@@ -31,6 +31,7 @@ finshield-ai/
 | `/check/result/[id]` | 위험 분석 결과 + 대응 액션 | 구현 |
 | `/products` | 금융 목표 기반 공식 상품 후보 | 구현 |
 | `/products/simulate` | 현재 금리와 변경 금리의 대출 What-if 비교 | 구현 |
+| `/learn/wealth` | 공식 근거 기반 재테크 기초 교육 | 구현 |
 | `/products/[id]`, `/products/compare` | 상품 상세·공식 상품 비교 | 미구현 |
 | `/evidence/[id]` | 근거 상세 | 미구현 (목록 컴포넌트만 존재) |
 
@@ -148,6 +149,7 @@ lib/store/*.ts         sessionStorage의 분석 결과·profile identity 보관
 | 파생지표 | 없음 | mock 이 계산 완료값 제공 |
 | 상품 후보 | `/api/v1/recommendations` | live, backend 상태·reason 그대로 표시 |
 | 대출 What-if 시뮬레이션 | `/api/v1/loans/simulate` | live, 현재·변경 조건을 각각 계산 |
+| 재테크 기초 가이드 | `/api/v1/guidance/wealth` | live, 입력 없는 고정 교육 계약 |
 | 공식 상품 비교 | 없음 | 화면 미구현 |
 
 ### 금융 로직 금지선
@@ -193,6 +195,10 @@ FastAPI 에 `CORSMiddleware` 가 없어 브라우저가 `localhost:8000` 을 직
 나란히 표시할 뿐 차액·절감액·상환액을 프론트에서 계산하지 않는다. 한쪽이라도
 실패하면 비교 전체를 실패로 처리하며 빈 값이나 유리한 결과로 대체하지 않는다.
 
+재테크 기초 가이드는 `/api/proxy/guidance/wealth`를 통해 versioned 정적 교육
+계약을 읽는다. 프로필·계좌·보유종목을 보내지 않고 backend module과 공식 source를
+그대로 표시한다. 프론트는 투자 가능 여부, 상품 선택, 예상수익률을 판정하지 않는다.
+
 부수 효과로 백엔드 주소가 클라이언트 번들에 노출되지 않는다. 그래서 `FINSHIELD_API_URL` 에는 `NEXT_PUBLIC_` 접두사를 붙이지 않는다.
 
 ### 실패를 안전으로 바꾸지 않는다
@@ -234,7 +240,6 @@ uvicorn app.main:app --reload
 ## 8. 남은 작업
 
 - 상품 상세 / 공식 상품 비교 2화면
-- 재테크 기초 가이드: 현금흐름·비상자금·부채관리·투자위험 교육, 종목 추천 제외
 - profile process-local 저장을 PostgreSQL·인증·소유권 검증으로 교체
 - 경로 불일치: SKILL.md 는 `/api/v1/fraud/analyze`, 실제 구현은 `/api/v1/analyze`
 - 접근성 감사 (스크린리더, 명도대비 AA) — 자동 검사는 아직 돌리지 않았다
