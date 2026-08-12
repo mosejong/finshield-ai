@@ -7,7 +7,7 @@
 - PM 검수 시작: 15:00 KST
 - 담당 영역: 프론트엔드 및 API 표시 어댑터
 - 작업 브랜치: `feature/frontend-mvp`
-- 상태: 최신 Scenario Engine 계약 통합 및 PM 검증 완료, push·PR 대기
+- 상태: Draft PR #4 생성, GitHub Actions CI 검증 중
 
 ## 목표
 
@@ -128,6 +128,9 @@
 - Claude Code 원본 커밋: `3713e40cdb65b8024594d82f18820f9a9b17d65b`
 - 통합 수정 커밋: `9fe562c8530fc77c2fba2c959fcc266e5f210552`
 - 통합 커밋 메시지: `fix: integrate frontend with scenario engine`
-- push: 수행 전
+- 기록 커밋 및 PR head: `124641a7cf44fde5dc5091d571aa61e23593b493`
+- push 브랜치: `feature/frontend-mvp`
 - PR 방향: `feature/frontend-mvp` → `main`
-- PR: 생성 전
+- Draft PR: `https://github.com/mosejong/finshield-ai/pull/4`
+- PR 생성: `2026-08-12 15:26:56 KST`
+- 현재 단계: GitHub Actions의 Python `test`와 frontend `web` 확인 후 Ready 전환 및 PM 병합
