@@ -6,6 +6,7 @@
 
 - `project-governance.md` — 역할별 브랜치, worktree, PR 및 문서화 규칙 수립
 - `frontend-mvp.md` — 프론트엔드 MVP 구현, PM 검수, Scenario Engine 통합
+- `frontend-integration.md` — 프론트 PR #4 병합 후 PM 관리 문서 반영
 - `fraud-scenario-engine-v0.1.md` — Fraud Scenario Engine v0.1 구현, PM 검수, PR #2 병합
 - `scenario-engine-integration.md` — Scenario Engine 병합 후 PM 관리 문서 반영
 
