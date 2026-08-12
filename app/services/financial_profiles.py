@@ -1,0 +1,23 @@
+from uuid import UUID
+
+from app.repositories.financial_profiles import InMemoryFinancialProfileRepository
+from app.schemas.financial_profile import FinancialProfile, FinancialProfileResource
+
+
+class FinancialProfileService:
+    def __init__(self, repository: InMemoryFinancialProfileRepository) -> None:
+        self._repository = repository
+
+    def create(self, profile: FinancialProfile) -> FinancialProfileResource:
+        return self._repository.create(profile)
+
+    def get(self, profile_id: UUID) -> FinancialProfileResource:
+        return self._repository.get(profile_id)
+
+    def replace(
+        self, profile_id: UUID, profile: FinancialProfile
+    ) -> FinancialProfileResource:
+        return self._repository.replace(profile_id, profile)
+
+    def delete(self, profile_id: UUID) -> None:
+        self._repository.delete(profile_id)
