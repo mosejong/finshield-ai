@@ -2,7 +2,7 @@
 
 ## P0 — 반드시 구현
 - [ ] FinancialProfile CRUD
-- [x] 공식 금융상품 API adapter (fixture 계약 검증, live 키 검증은 TODO)
+- [x] 공식 금융상품 API adapter (live 검증 2026-08-12)
 - [ ] Product normalization/cache
 - [ ] 사용자 조건 기반 deterministic filtering
 - [x] 원리금균등/원금균등 대출 시뮬레이터

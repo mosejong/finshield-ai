@@ -23,3 +23,5 @@ Date- and branch-based logs: `devlog/README.md`
 - `devlog/2026-08-12/frontend-integration.md` — 프론트 병합 후 README·백로그 반영
 - `devlog/2026-08-12/product-catalog-v0.1.md` — 공식 금융상품 adapter 구현·PM 검수·PR 병합
 - `devlog/2026-08-12/product-catalog-integration.md` — 상품 adapter 병합 후 README·백로그 반영
+- `devlog/2026-08-12/public-data-key-normalization.md` — 일반 인증키 Encoding/Decoding 호환 수정·live 검증
+- `devlog/2026-08-12/public-data-key-integration.md` — 인증키 수정 병합 후 README·백로그 반영
