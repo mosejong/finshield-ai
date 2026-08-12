@@ -8,7 +8,7 @@
 - 담당 영역: PM 관리 문서
 - 작업 브랜치: `docs/scenario-engine-integration`
 - 기준 병합 커밋: `27a45e1d5f4c7eeab084397ec734f62299a318bc`
-- 상태: 로컬 문서 갱신 및 검증 완료, PR 생성 대기
+- 상태: Draft PR #3 생성, CI 검증 중
 
 ## 목표
 
@@ -55,7 +55,10 @@ Scenario Engine은 API 응답, 위험 분석 흐름, 공식 근거 연결, 테�
 
 ## 커밋·PR 정보
 
-- 커밋: 생성 전
-- push: 수행 전
+- 최초 커밋: `78e4cbf1e2b49bac67c1d2df887efa89b967d632`
+- 커밋 메시지: `docs: record scenario engine integration`
+- push 브랜치: `docs/scenario-engine-integration`
 - PR 방향: `docs/scenario-engine-integration` → `main`
-- PR: 생성 전
+- Draft PR: `https://github.com/mosejong/finshield-ai/pull/3`
+- PR 생성: `2026-08-12 14:59:26 KST`
+- 현재 단계: GitHub Actions CI 확인 후 Ready 전환 및 PM 병합
