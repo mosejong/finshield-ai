@@ -4,7 +4,7 @@
 01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog
 
 ## Architecture / engineering
-04 architecture · 11 engineering standards · 14 development workflow · `adr/`
+04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · `adr/`
 
 ## Security
 08 AI security alignment · 12 security threat model

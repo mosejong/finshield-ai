@@ -12,3 +12,11 @@ venv/
 data/raw/
 data/private/
 *.sqlite3
+
+# frontend (web/)
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+.turbo/

@@ -1,0 +1,33 @@
+import type { FinancialSnapshot, HomeView } from "@/lib/api/contracts";
+import { EMPTY_SNAPSHOT, MOCK_SNAPSHOT } from "@/lib/mock/profile";
+import {
+  MOCK_CHECK_ITEMS,
+  MOCK_NEXT_ACTION,
+  ONBOARDING_NEXT_ACTION,
+} from "@/lib/mock/home";
+import { MOCK_RECENT_ANALYSES } from "@/lib/mock/analysis";
+
+/**
+ * 프로필/추천/이력 관련 백엔드는 아직 없다.
+ * (`/api/v1/profiles`, `/api/v1/recommendations` 미구현 — SKILL.md 참고)
+ * 전부 mock 이며 화면에 mock 배지가 붙는다.
+ */
+
+export function getSnapshot(hasProfile = true): FinancialSnapshot {
+  return hasProfile ? MOCK_SNAPSHOT : EMPTY_SNAPSHOT;
+}
+
+export function getHomeView(hasProfile = true): HomeView {
+  const snapshot = getSnapshot(hasProfile);
+
+  return {
+    greetingName: null,
+    snapshot,
+    checkItems: hasProfile ? MOCK_CHECK_ITEMS : [],
+    checkItemsSource: "mock",
+    recentAnalyses: MOCK_RECENT_ANALYSES,
+    recentAnalysesSource: "mock",
+    nextAction: hasProfile ? MOCK_NEXT_ACTION : ONBOARDING_NEXT_ACTION,
+    nextActionSource: "mock",
+  };
+}

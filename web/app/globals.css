@@ -1,0 +1,223 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * FinShield 디자인 토큰
+ *
+ * 규칙: 컴포넌트에서 `dark:` 유틸리티를 쓰지 않는다.
+ * 색은 항상 아래 시맨틱 토큰으로만 참조하고, 다크모드는 토큰 값만 교체한다.
+ * (자세한 근거는 docs/13-frontend-architecture.md)
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* FinShield 확장 토큰 */
+  --color-safe: var(--safe);
+  --color-safe-bg: var(--safe-bg);
+  --color-safe-border: var(--safe-border);
+
+  --color-risk-low: var(--risk-low);
+  --color-risk-low-bg: var(--risk-low-bg);
+  --color-risk-low-border: var(--risk-low-border);
+  --color-risk-medium: var(--risk-medium);
+  --color-risk-medium-bg: var(--risk-medium-bg);
+  --color-risk-medium-border: var(--risk-medium-border);
+  --color-risk-high: var(--risk-high);
+  --color-risk-high-bg: var(--risk-high-bg);
+  --color-risk-high-border: var(--risk-high-border);
+
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.67);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.33);
+  --radius-2xl: calc(var(--radius) * 1.67);
+  --radius-3xl: calc(var(--radius) * 2);
+  --radius-4xl: calc(var(--radius) * 2.33);
+}
+
+:root {
+  /* 웹폰트를 내려받지 않는다. 설치되어 있으면 Pretendard를 쓰고 없으면 시스템 한글 폰트로 떨어진다. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Pretendard,
+    "Noto Sans KR", "Malgun Gothic", "맑은 고딕", system-ui, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius: 0.75rem;
+
+  --background: #ffffff;
+  --foreground: #16191f;
+  --card: #ffffff;
+  --card-foreground: #16191f;
+  --popover: #ffffff;
+  --popover-foreground: #16191f;
+
+  /* 딥 네이비 — 신뢰 */
+  --primary: #1f3a5f;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f7f8fa;
+  --secondary-foreground: #1f3a5f;
+  --muted: #f7f8fa;
+  --muted-foreground: #5a6272;
+
+  /* shadcn의 --accent는 hover 배경용 중립색이다. 브랜드 강조색이 아니다. */
+  --accent: #eff1f4;
+  --accent-foreground: #1f3a5f;
+
+  --border: #e4e7ec;
+  --input: #e4e7ec;
+  --ring: #1f3a5f;
+
+  /* 순빨강 대신 rust. 공포 유발 억제. */
+  --destructive: #b3401f;
+
+  /* 틸 — 안전/확인됨 */
+  --safe: #0e7c6b;
+  --safe-bg: #e8f4f1;
+  --safe-border: #b9ddd6;
+
+  /* 위험 스케일 — 배경은 항상 tint, 전면 채움 금지 */
+  --risk-low: #157347;
+  --risk-low-bg: #ecf7f0;
+  --risk-low-border: #c2e3d1;
+  --risk-medium: #b26b00;
+  --risk-medium-bg: #fdf5e6;
+  --risk-medium-border: #ecd6a8;
+  --risk-high: #b3401f;
+  --risk-high-bg: #fbede8;
+  --risk-high-border: #efc4b5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #101317;
+    --foreground: #e8ebef;
+    --card: #171b21;
+    --card-foreground: #e8ebef;
+    --popover: #171b21;
+    --popover-foreground: #e8ebef;
+
+    --primary: #8fb3da;
+    --primary-foreground: #0e1420;
+
+    --secondary: #1c2128;
+    --secondary-foreground: #e8ebef;
+    --muted: #1c2128;
+    --muted-foreground: #9aa3af;
+
+    --accent: #222932;
+    --accent-foreground: #e8ebef;
+
+    --border: #2a313a;
+    --input: #2a313a;
+    --ring: #8fb3da;
+
+    --destructive: #e8785a;
+
+    --safe: #4bc0a9;
+    --safe-bg: #102b26;
+    --safe-border: #1f4a42;
+
+    --risk-low: #52c08a;
+    --risk-low-bg: #0f2a1d;
+    --risk-low-border: #1e4a33;
+    --risk-medium: #e2a03f;
+    --risk-medium-bg: #2a2010;
+    --risk-medium-border: #4a3a1a;
+    --risk-high: #e8785a;
+    --risk-high-bg: #2e1812;
+    --risk-high-border: #532c22;
+  }
+}
+
+.dark {
+  --background: #101317;
+  --foreground: #e8ebef;
+  --card: #171b21;
+  --card-foreground: #e8ebef;
+  --popover: #171b21;
+  --popover-foreground: #e8ebef;
+  --primary: #8fb3da;
+  --primary-foreground: #0e1420;
+  --secondary: #1c2128;
+  --secondary-foreground: #e8ebef;
+  --muted: #1c2128;
+  --muted-foreground: #9aa3af;
+  --accent: #222932;
+  --accent-foreground: #e8ebef;
+  --border: #2a313a;
+  --input: #2a313a;
+  --ring: #8fb3da;
+  --destructive: #e8785a;
+  --safe: #4bc0a9;
+  --safe-bg: #102b26;
+  --safe-border: #1f4a42;
+  --risk-low: #52c08a;
+  --risk-low-bg: #0f2a1d;
+  --risk-low-border: #1e4a33;
+  --risk-medium: #e2a03f;
+  --risk-medium-bg: #2a2010;
+  --risk-medium-border: #4a3a1a;
+  --risk-high: #e8785a;
+  --risk-high-bg: #2e1812;
+  --risk-high-border: #532c22;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    /* 금액·기간·비율이 세로로 정렬되도록 */
+    font-variant-numeric: tabular-nums;
+  }
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+@utility text-display {
+  /* 화면당 1개만 사용한다 */
+  @apply text-[1.5rem] leading-[1.35] font-semibold tracking-[-0.01em];
+}
+
+@utility text-title {
+  @apply text-[1.0625rem] leading-[1.45] font-semibold;
+}
+
+@utility text-body {
+  @apply text-[0.9375rem] leading-[1.6];
+}
+
+@utility text-caption {
+  @apply text-[0.8125rem] leading-[1.5];
+}

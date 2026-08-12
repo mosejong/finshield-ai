@@ -1,0 +1,175 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import type { UserState } from "@/lib/api/contracts";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { SectionHeading } from "@/components/common/SectionHeading";
+import { DisclaimerNote } from "@/components/common/DisclaimerNote";
+import { StateSelector } from "@/components/safety/StateSelector";
+import { analyzeFromClient } from "@/lib/api/analysis";
+import { saveAnalysis } from "@/lib/store/analysis-store";
+import { useStoredProfile } from "@/lib/store/profile-store";
+
+/**
+ * 의심 메시지 입력 + 피해 단계 선택.
+ *
+ * 이 화면은 프로필 없이 동작한다. 의심 문자를 방금 받은 사람에게 온보딩을
+ * 먼저 요구하면 이탈한다. 프로필이 있으면 persona 만 함께 보낸다.
+ *
+ * 위험 판정은 전부 백엔드가 한다. 여기서는 입력을 모아 보내고 결과를 넘길 뿐,
+ * 키워드 검사나 점수 계산을 하지 않는다.
+ */
+
+const MAX_LENGTH = 10000;
+
+export default function CheckPage() {
+  const router = useRouter();
+
+  const [text, setText] = useState("");
+  const [state, setState] = useState<UserState>("received_only");
+  const [pending, setPending] = useState(false);
+  const [failure, setFailure] = useState<{
+    message: string;
+    hint?: string;
+  } | null>(null);
+
+  // 프로필이 있으면 persona 만 함께 보낸다. 없으면 unknown 으로 그냥 진행한다.
+  const persona = useStoredProfile()?.persona ?? "unknown";
+
+  const trimmed = text.trim();
+  const canSubmit = trimmed.length > 0 && trimmed.length <= MAX_LENGTH;
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!canSubmit || pending) return;
+
+    setPending(true);
+    setFailure(null);
+
+    const response = await analyzeFromClient({
+      text: trimmed,
+      persona,
+      state,
+    });
+
+    if (!response.ok) {
+      setFailure({ message: response.message, hint: response.hint });
+      setPending(false);
+      return;
+    }
+
+    saveAnalysis(response.result);
+    router.push(`/check/result/${response.result.id}`);
+  }
+
+  return (
+    <AppShell>
+      <PageHeader
+        title="위험한 금융 연락 확인"
+        description="받은 문자나 메신저 내용을 그대로 붙여넣으면, 어떤 부분이 정상 절차와 다른지 알려드립니다."
+        backHref="/"
+      />
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-7">
+        <section aria-labelledby="check-input">
+          <SectionHeading>
+            <span id="check-input">받은 내용</span>
+          </SectionHeading>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="sr-only">받은 메시지 내용</span>
+            <textarea
+              value={text}
+              onChange={(event) => setText(event.target.value.slice(0, MAX_LENGTH))}
+              rows={7}
+              placeholder="예) 급여 계좌 등록이 필요합니다. 오늘 안에 체크카드를 아래 주소로 보내주세요."
+              className="w-full resize-y rounded-md border border-input bg-background p-3 text-body text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+            />
+            <span className="flex items-center justify-between gap-2 text-caption text-muted-foreground">
+              <span>
+                링크가 있어도 지우지 말고 그대로 붙여넣으세요. 저희가 그 링크를
+                열어보지는 않습니다.
+              </span>
+              <span className="shrink-0 tabular-nums">
+                {text.length.toLocaleString("ko-KR")} / {MAX_LENGTH.toLocaleString("ko-KR")}
+              </span>
+            </span>
+          </label>
+
+          <p className="mt-2 text-caption text-muted-foreground">
+            주민등록번호, 계좌 비밀번호, 인증번호는 붙여넣지 마세요. 분석에 필요하지
+            않습니다.
+          </p>
+        </section>
+
+        <section aria-labelledby="check-state">
+          <SectionHeading>
+            <span id="check-state">이미 하신 행동</span>
+          </SectionHeading>
+          <p className="mb-3 text-caption text-muted-foreground">
+            무엇을 했는지에 따라 지금 해야 할 조치가 달라집니다. 이미 넘어간 것이
+            있어도 늦지 않았습니다.
+          </p>
+
+          <StateSelector value={state} onChange={setState} />
+        </section>
+
+        {failure ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-risk-medium-border bg-risk-medium-bg p-4"
+          >
+            <p className="text-body font-medium text-risk-medium">
+              {failure.message}
+            </p>
+            {failure.hint ? (
+              <p className="mt-1 text-caption text-muted-foreground">
+                {failure.hint}
+              </p>
+            ) : null}
+            <p className="mt-2 text-caption text-muted-foreground">
+              결과를 확인하지 못했다고 해서 안전하다는 뜻은 아닙니다. 판단이 서지
+              않으면 상대가 말한 기관의 공식 대표번호로 직접 확인하세요.
+            </p>
+          </div>
+        ) : null}
+
+        <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] flex flex-col gap-2 border-t border-border bg-background py-3 lg:static lg:border-0 lg:py-0">
+          <button
+            type="submit"
+            disabled={!canSubmit || pending}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-body font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-45"
+          >
+            {pending ? (
+              <>
+                <Loader2 aria-hidden className="size-4 animate-spin" />
+                확인하는 중…
+              </>
+            ) : (
+              "확인하기"
+            )}
+          </button>
+
+          <p className="text-center text-caption text-muted-foreground">
+            붙여넣은 내용은 분석에만 쓰이고 저장하지 않습니다.{" "}
+            <Link
+              href="/check/result/demo"
+              className="font-medium text-primary underline underline-offset-2"
+            >
+              예시 결과 보기
+            </Link>
+          </p>
+        </div>
+      </form>
+
+      <DisclaimerNote>
+        이 확인은 위험 신호를 찾아주는 보조 도구이며 금융·법률 판단을 대신하지
+        않습니다. 이미 피해가 발생했다면 경찰(112)과 거래 은행에 먼저 연락하세요.
+      </DisclaimerNote>
+    </AppShell>
+  );
+}
