@@ -60,6 +60,12 @@
 - async 응답 상태에 요청 goal을 태그하고 현재 session goal과 다르면 loading으로 처리
 - 이전 goal 결과를 현재 goal 결과로 오인 표시하지 않도록 교정
 
+## 병합
+
+- PR: [#24 feat: connect official product recommendations UI](https://github.com/mosejong/finshield-ai/pull/24)
+- 병합 커밋: `6b10ab754fa6f1a0258c4009b79be1fd0c2db772`
+- 상태: 완료 — main 병합 및 PM 문서 통합
+
 ## 변경 파일
 
 - `web/app/products/page.tsx`
