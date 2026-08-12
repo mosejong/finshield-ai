@@ -9,7 +9,8 @@
 - 작업 디렉터리: `C:\Users\user\Documents\Codex\finshield-ai-main`
 - 로컬 구현·검증 완료: 18:45 KST
 - Draft PR 생성: 18:46 KST
-- 상태: Draft PR #29, GitHub Actions CI 진행 중
+- PM 검수·초기 CI 완료: 18:48 KST
+- 상태: 최종 문서 기록 후 Ready 전환 예정
 
 ## 목표
 
@@ -116,6 +117,17 @@ enum과 필수 필드 계약을 정확히 일치시켜야 한다.
   local URL인 `localhost:3002`로 재검증해 정상 동작을 확인했다. 제품 코드 오류나
   CORS 우회가 아니므로 `allowedDevOrigins` 완화는 추가하지 않았다.
 
+### 18:48 — Draft PR CI·PM 독립 검수
+
+- PR #29의 push·pull request 실행에서 backend `test` 2건과 frontend `web`
+  2건이 모두 성공했다.
+- PM이 `main...HEAD`의 21개 파일과 backend 비변경 범위를 확인했다.
+- 입력 strict 검증, persona 제외, Decimal 변환, UUID path 검증, POST/GET/PUT/DELETE
+  실패 처리, session 최소 저장과 legacy 제거 순서를 재검토했다.
+- profile loading 중 상품·fraud 화면이 빈 profile을 확정하지 않고, 400/404에서는
+  재입력을 안내하며 502/503은 저장 성공으로 바꾸지 않음을 확인했다.
+- PR은 `MERGEABLE`, merge state `CLEAN`이며 차단 이슈는 발견하지 않았다.
+
 ## 변경 파일
 
 - `web/lib/api/contracts.ts`: backend profile strict 계약과 frontend enum 정렬
@@ -183,3 +195,6 @@ enum과 필수 필드 계약을 정확히 일치시켜야 한다.
 - Draft PR #29: `https://github.com/mosejong/finshield-ai/pull/29`
 - PR 생성: `2026-08-12 18:46:16 KST`
 - 생성 직후 상태: backend `test`, frontend `web` GitHub Actions 진행 중
+- 검수한 PR head: `8c587780639460df6ef15463c40d3b90bb94c91d`
+- 초기 GitHub Actions: backend `test` 2건, frontend `web` 2건 모두 성공
+- PM 리뷰: 차단 이슈 없음, 최종 문서 커밋 CI 확인 후 Ready 전환 예정
