@@ -25,6 +25,8 @@
 - `product-ui-integration.md` — 상품 UI 병합 후 PM 관리 문서 반영
 - `financial-profile-crud-v0.1.md` — process-local FinancialProfile CRUD와 PR #26 병합
 - `financial-profile-crud-integration.md` — 프로필 CRUD 병합 후 PM 관리 문서 반영
+- `profile-frontend-integration-v0.1.md` — backend profile CRUD 프론트 연결과 PR #29 병합
+- `profile-frontend-integration.md` — 프로필 프론트 병합 후 PM 관리 문서 반영
 
 ## 작성 규칙
 

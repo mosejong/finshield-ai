@@ -10,7 +10,8 @@
 - 로컬 구현·검증 완료: 18:45 KST
 - Draft PR 생성: 18:46 KST
 - PM 검수·초기 CI 완료: 18:48 KST
-- 상태: 최종 문서 기록 후 Ready 전환 예정
+- Ready 전환·병합: 18:50 KST
+- 상태: PR #29 PM 검수·CI 통과 후 `main` 병합 완료
 
 ## 목표
 
@@ -198,3 +199,8 @@ enum과 필수 필드 계약을 정확히 일치시켜야 한다.
 - 검수한 PR head: `8c587780639460df6ef15463c40d3b90bb94c91d`
 - 초기 GitHub Actions: backend `test` 2건, frontend `web` 2건 모두 성공
 - PM 리뷰: 차단 이슈 없음, 최종 문서 커밋 CI 확인 후 Ready 전환 예정
+- 최종 PR head: `7d9979b8b6d484a28df9870277f56f023307518c`
+- 최종 GitHub Actions: backend `test` 2건, frontend `web` 2건 모두 성공
+- Ready 전환 후 squash merge 완료
+- 병합 시각: `2026-08-12 18:50:31 KST`
+- 병합 커밋: `f9c121295481ca9d0c1db0c432ecf0dfefc96625`

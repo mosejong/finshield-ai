@@ -16,7 +16,8 @@ Next.js 프론트엔드 MVP도 `main`에 병합되어 실제 분석 API의 위�
 보수적 중복 정책, goal 기반 filtering과 공식 상품 후보 UI까지 완료했다.
 FinancialProfile CRUD v0.1도 백엔드에 추가되어 생성·단건 조회·전체 교체·삭제가
 가능하다. 현재 profile 저장은 로컬 프로토타입용 process-local 방식이며 다음 단계는
-프론트 연결과 PostgreSQL·인증 경계다.
+PostgreSQL·인증 경계다. 온보딩·프로필 화면은 이 API와 연결됐고 브라우저에는
+profile UUID와 fraud persona만 보관한다.
 
 ## Problem
 
@@ -161,7 +162,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **139 passed**, frontend adapter **5 passed**, Next build,
+현재 `main` 기준: Python **139 passed**, frontend **13 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -196,6 +197,9 @@ FinancialProfile의 최소 입력 스키마는 `app/schemas/financial_profile.py
 endpoint는 제공하지 않는다. 현재 저장소는 기본 최대 1,000개의 process-local
 메모리 저장이므로 재시작·다중 worker에서 유지되지 않는다. UUID는 인증이 아니며,
 인증·소유권 검증과 PostgreSQL 전환 전에는 공개 배포에 사용하면 안 된다.
+프론트는 동일 오리진 Next proxy로 생성·조회·교체·삭제하고 profile 원문을
+`sessionStorage`에 저장하지 않는다. backend enum과 UI 계약은 일치시키며 UI 전용
+persona는 FinancialProfile 요청에서 제외한다.
 
 `GET /api/v1/products`는 금융위원회 `서민금융상품기본정보`의 고정 HTTPS
 endpoint를 호출하고 공식 응답을 내부 상품 계약으로 정규화한다. 금리·한도·기간과
@@ -221,7 +225,7 @@ snapshot 저장 전 공식 source ID와 provider·기준월·수집시각·sourc
 `POST /api/v1/recommendations`는 FinancialProfile의 goal과 공식 `purpose_text`만
 비교해 `potential_match`, `mismatch`, `needs_review`를 반환한다. 상세 자격은 항상
 공식 원문과 취급기관 확인 대상으로 남기며 적격성·승인·금리를 보장하지 않는다.
-`/products`는 session profile에서 goal 하나만 전송해 이 상태·근거와 공식 상품
+`/products`는 backend에서 다시 읽은 profile의 goal 하나만 전송해 이 상태·근거와 공식 상품
 원문을 표시한다. 소득·부채·신용·연령은 상품 요청으로 전송하지 않으며 프론트에서
 적격성이나 금융 수치를 재계산하지 않는다.
 
@@ -232,7 +236,6 @@ snapshot 저장 전 공식 source ID와 provider·기준월·수집시각·sourc
 - 상품 상세·비교·What-if 화면과 대출 시뮬레이터 연결
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
-- FinancialProfile CRUD와 session-only 프론트 연결 교체
 - PostgreSQL·SQLAlchemy·Alembic 영구 저장과 인증·소유권 경계
 - 상품 탐색·비교·What-if 화면 구현 및 대출 시뮬레이터 연결
 - Starlette `TestClient` 사용 중단 예정 경고 대응

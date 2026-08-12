@@ -21,8 +21,8 @@
 - [ ] persona별 scenario golden set
 - [x] URL lexical feature analysis (offline safe implementation)
 - [ ] URL domain/reputation feature analysis (outbound-fetch policy required)
-- [x] financial profile dashboard shell (session-only)
-- [ ] financial profile frontend integration (backend CRUD v0.1 complete)
+- [x] financial profile dashboard shell
+- [x] financial profile frontend integration (process-local backend CRUD v0.1)
 - [ ] product comparison UI
 - [x] official product candidate UI (goal-only minimum input)
 - [ ] What-if loan simulation
