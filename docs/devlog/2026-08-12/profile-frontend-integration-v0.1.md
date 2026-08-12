@@ -8,7 +8,8 @@
 - 작업 브랜치: `feature/profile-frontend-integration-v01`
 - 작업 디렉터리: `C:\Users\user\Documents\Codex\finshield-ai-main`
 - 로컬 구현·검증 완료: 18:45 KST
-- 상태: PM 코드 검수 중
+- Draft PR 생성: 18:46 KST
+- 상태: Draft PR #29, GitHub Actions CI 진행 중
 
 ## 목표
 
@@ -175,5 +176,10 @@ enum과 필수 필드 계약을 정확히 일치시켜야 한다.
 
 ## 커밋·PR 정보
 
-- 커밋 SHA: 검수 후 기록 예정
-- PR: 검수 후 Draft로 생성 예정
+- 기능 커밋: `6cba4c69366d9f9aca9b9d0bc8e08c71d5a589ab`
+- 커밋 메시지: `feat: connect financial profile frontend`
+- push 브랜치: `feature/profile-frontend-integration-v01`
+- PR 방향: `feature/profile-frontend-integration-v01` → `main`
+- Draft PR #29: `https://github.com/mosejong/finshield-ai/pull/29`
+- PR 생성: `2026-08-12 18:46:16 KST`
+- 생성 직후 상태: backend `test`, frontend `web` GitHub Actions 진행 중
