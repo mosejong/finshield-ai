@@ -8,7 +8,7 @@
 - 브랜치: `docs/product-catalog-integration`
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-main`
 - 기준 병합 커밋: `1f614ee1c7558c83d986b08b423bbd0fc4e6c927`
-- 상태: Draft PR 생성, CI 검증 중
+- 상태: `main` 병합 완료
 
 ## 목표
 
@@ -49,3 +49,9 @@ live 상품 데이터가 검증되지 않았으므로 fixture 계약 완료와 l
 - push: `docs/product-catalog-integration`
 - PR: [#8 docs: record product catalog integration](https://github.com/mosejong/finshield-ai/pull/8)
 - PR 생성: 2026-08-12 16:01:45 KST (Draft)
+- 16:03 KST: Python `test` 2개와 frontend `web` 2개 모두 통과
+- 최종 head: `a8ac713283fc06ddc967fd1e11c20cf8056d2522`
+- 16:03:45 KST: Ready 상태와 변경 문서 6개를 확인한 뒤 `main` 병합
+- 병합 커밋: `443d3bfb0ffd350451663e62d2e5f55a2c6da6a1`
+- 병합 후 사용자 원본에서 Python **85 passed**, Next build·TypeScript·lint,
+  frontend **3 passed** 재검증
