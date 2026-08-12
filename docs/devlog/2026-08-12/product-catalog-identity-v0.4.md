@@ -100,3 +100,10 @@
 - Python compile (`app`, `tests`, `scripts`): 통과
 - `git diff --check`: 통과
 - 개인정보·secret·임의 URL fetch 추가 없음
+
+## 커밋·PR
+
+- 구현 커밋: `c66c8d395b3a31692829f5ede52a02bbc0d5fcf9`
+- PR: [#19 feat: enforce product source identity](https://github.com/mosejong/finshield-ai/pull/19)
+- PR 생성: 2026-08-12 17:23:42 KST (Draft)
+- 상태: GitHub CI·PM 검수 중
