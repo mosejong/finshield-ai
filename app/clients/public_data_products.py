@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import unquote
 
 import httpx
 
@@ -49,7 +50,10 @@ class PublicDataProductClient:
                 "PUBLIC_DATA_SERVICE_KEY is not configured"
             )
 
-        self._service_key = normalized_key
+        # The public-data portal may expose the general key in either encoded or
+        # decoded form. Decode exactly once; httpx then performs the one required
+        # query-string encoding when it builds the request.
+        self._service_key = unquote(normalized_key)
         self._client = client
         self._timeout = httpx.Timeout(timeout_seconds)
 
