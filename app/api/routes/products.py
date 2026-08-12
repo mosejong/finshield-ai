@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -16,6 +17,7 @@ from app.services.product_catalog import (
 router = APIRouter(prefix="/products", tags=["products"])
 
 
+@lru_cache(maxsize=1)
 def get_product_catalog_service() -> ProductCatalogService:
     try:
         return build_product_catalog_service()

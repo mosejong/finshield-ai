@@ -57,6 +57,7 @@ class ProductCatalogResponse(BaseModel):
     page_no: int = Field(ge=1)
     page_size: int = Field(ge=1)
     total_count: int = Field(ge=0)
+    source_base_month: str = Field(pattern=r"^\d{6}$")
     fetched_at: datetime
     source_reference: HttpUrl
     items: list[FinancialProduct]
