@@ -64,6 +64,9 @@
   `ZoneInfo("Asia/Seoul")` 로딩 실패
 - 한국은 DST가 없으므로 추가 의존성을 설치하지 않고 표준 라이브러리 고정
   `UTC+09:00` timezone으로 교정
+- 16:37 KST: 첫 커밋 직전 `git diff --cached --check`가 품질 보고서의 Markdown
+  강제 줄바꿈 공백 2줄을 지적했으나 PowerShell 명령 연결로 커밋이 계속 진행됨
+- 해당 2줄을 일반 blockquote 문단으로 즉시 교정하고 별도 수정 커밋으로 추적
 
 ## 보안·개인정보
 
