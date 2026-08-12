@@ -48,7 +48,7 @@
 - 문서 통합 커밋: `1cbc33e6aee3743bbbff2b10bf0e2f876c43fb96`
 - PR: [#14 docs: integrate product catalog profile](https://github.com/mosejong/finshield-ai/pull/14)
 - PR 생성: 2026-08-12 16:47:52 KST (Draft)
-- 상태: PM 검수 및 GitHub CI 통과, Ready 전환 대기
+- 상태: 완료 — PR #14 병합 및 main 통합
 
 ## 최종 검증 결과
 
@@ -56,3 +56,6 @@
 - `git diff --check`: 통과
 - GitHub CI: backend `test` 2개, frontend `web` 2개 통과
 - 애플리케이션 코드, 캐시, 필터링, frontend 변경 없음
+- Ready 전환: 2026-08-12 16:50 KST
+- 병합: 2026-08-12 16:51:06 KST
+- 병합 커밋: `eacf78039b8f8b774ac3a1fb0aa24999282b1c43`
