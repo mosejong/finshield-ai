@@ -10,9 +10,14 @@ from time import monotonic
 from pydantic import ValidationError
 
 from app.clients.public_data_products import (
+    DATASET_URL,
     PROVIDER_NAME,
     ProductProviderResponseError,
     PublicDataProductClient,
+)
+from app.domain.finance.product_identity import (
+    ProductCatalogIdentityAudit,
+    audit_product_catalog_identity,
 )
 from app.domain.finance.product_catalog import normalize_public_data_product
 from app.schemas.product import FinancialProduct
@@ -35,6 +40,7 @@ class ProductCatalogSnapshot:
     key: ProductCatalogSnapshotKey
     fetched_at: datetime
     items: tuple[FinancialProduct, ...]
+    identity_audit: ProductCatalogIdentityAudit
 
 
 @dataclass(frozen=True)
@@ -166,10 +172,13 @@ def load_latest_product_snapshot(
             "provider product fields are invalid"
         ) from exc
 
-    if any(item.source_base_month != base_month for item in items):
-        raise ProductProviderResponseError(
-            "provider product base month does not match the requested snapshot"
-        )
+    identity_audit = audit_product_catalog_identity(
+        items,
+        provider=PROVIDER_NAME,
+        base_month=base_month,
+        fetched_at=fetched_at,
+        source_reference=DATASET_URL,
+    )
 
     return ProductCatalogSnapshot(
         key=ProductCatalogSnapshotKey(
@@ -180,4 +189,5 @@ def load_latest_product_snapshot(
         ),
         fetched_at=fetched_at,
         items=items,
+        identity_audit=identity_audit,
     )

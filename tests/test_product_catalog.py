@@ -177,6 +177,13 @@ def test_products_endpoint_returns_normalized_official_contract() -> None:
     body = response.json()
     assert body["provider"] == "financial_services_commission"
     assert body["source_base_month"] == "202202"
+    assert body["identity"] == {
+        "policy": "provider_base_month_sequence",
+        "source_id_unique": True,
+        "unique_source_id_count": 1,
+        "normalized_name_duplicate_groups": 0,
+        "name_only_dedup_applied": False,
+    }
     assert body["items"][0]["source_product_id"] == "202202:1"
     assert body["items"][0]["interest_rate_text"] == "4.5%"
     assert body["items"][0]["source_reference"] == DATASET_URL
@@ -239,6 +246,7 @@ def test_products_openapi_contract_is_published() -> None:
     assert operation["responses"]["200"]["content"]["application/json"]["schema"]
     response_schema = schema["components"]["schemas"]["ProductCatalogResponse"]
     assert "source_base_month" in response_schema["required"]
+    assert "identity" in response_schema["required"]
     assert {parameter["name"] for parameter in operation["parameters"]} == {
         "page_no",
         "page_size",
