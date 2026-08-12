@@ -8,8 +8,8 @@
 - 브랜치: `feature/product-catalog-v02`
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-backend`
 - 기준 `main`: `54923f52be629e05d7a7f19f34a3a56c28000f19`
-- 종료: 16:36 KST
-- 상태: 1단계 Draft PR 생성, CI·PM 리뷰 중
+- 종료: 16:43 KST
+- 상태: 1단계 구현·PM 검수·Draft PR CI 통과, Ready 전환 대기
 
 ## 단계 목표
 
@@ -69,6 +69,10 @@
 - 해당 2줄을 일반 blockquote 문단으로 즉시 교정하고 별도 수정 커밋으로 추적
 - 16:41 KST PM 리뷰: `--base-month`가 6자리만 검사해 `202699`도 허용하는 문제 발견
 - API 호출 전에 실제 월 범위 01~12를 검증하도록 교정하고 5개 회귀 테스트 추가
+- 16:43 KST: PM 재검수에서 변경 범위가 계획한 7개 파일로 한정되고 공개 API route와
+  frontend가 변경되지 않았음을 확인
+- 최신 head `1d121be0a01a12a880cf6da4e0fe728a9b66a05b` 기준 GitHub CI의
+  backend `test` 2개와 frontend `web` 2개가 모두 통과
 
 ## 보안·개인정보
 
@@ -110,3 +114,5 @@
 - push: `feature/product-catalog-v02`
 - PR: [#13 feat: add product catalog live profiler](https://github.com/mosejong/finshield-ai/pull/13)
 - PR 생성: 2026-08-12 16:38:59 KST (Draft)
+- PM 검수 시점 head: `1d121be0a01a12a880cf6da4e0fe728a9b66a05b`
+- GitHub CI: `test` 2개, `web` 2개 통과
