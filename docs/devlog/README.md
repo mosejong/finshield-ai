@@ -19,6 +19,8 @@
 - `product-cache-integration.md` — cache 병합 후 PM 관리 문서 반영
 - `product-catalog-identity-v0.4.md` — source identity 무결성과 PR #19 병합
 - `product-identity-integration.md` — identity 병합 후 PM 관리 문서 반영
+- `product-filtering-v0.1.md` — deterministic filtering과 PR #21 병합
+- `product-filtering-integration.md` — filtering 병합 후 PM 관리 문서 반영
 
 ## 작성 규칙
 
