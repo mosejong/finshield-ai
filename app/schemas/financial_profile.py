@@ -1,5 +1,7 @@
+from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -139,3 +141,14 @@ class FinancialProfile(BaseModel):
             raise ValueError("business details require business_owner=true")
 
         return self
+
+
+class FinancialProfileResource(BaseModel):
+    """Server-managed wrapper around the validated minimum profile."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    profile_id: UUID
+    profile: FinancialProfile
+    created_at: datetime
+    updated_at: datetime
