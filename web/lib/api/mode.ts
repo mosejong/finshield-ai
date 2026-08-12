@@ -1,7 +1,7 @@
 export type ApiMode = "live" | "mock";
 
 /**
- * live  — 위험 신호/점수는 FastAPI 백엔드에서 받고, 아직 없는 필드만 mock 으로 채운다.
+ * live  — 판정·설명·행동·공식 근거를 FastAPI Scenario Engine에서 받는다.
  * mock  — 백엔드를 부르지 않고 예시 결과를 보여준다. 서버 없이 화면을 볼 때 쓴다.
  *
  * 기본값은 live 다. 백엔드가 꺼져 있으면 가짜 결과로 조용히 대체하지 않고

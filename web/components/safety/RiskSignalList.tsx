@@ -4,8 +4,8 @@ import { MockBadge } from "@/components/common/MockBadge";
 /**
  * 감지된 위험 신호.
  *
- * 신호 자체(label)는 백엔드 규칙 엔진이 찾아낸 것이고, 설명(why)은 아직 프론트가
- * 채우는 임시 문구다. 둘의 출처가 다르므로 설명 쪽에만 배지를 단다.
+ * live 신호는 Scenario Engine 응답을 그대로 표시한다. mock 모드에서만
+ * 예시 설명이 붙으므로 그 경우에 한해 배지를 표시한다.
  */
 export function RiskSignalList({ signals }: { signals: RiskSignal[] }) {
   if (signals.length === 0) {
@@ -47,6 +47,8 @@ export function RiskSignalList({ signals }: { signals: RiskSignal[] }) {
 }
 
 export function SignalExplanationBadge({ signals }: { signals: RiskSignal[] }) {
-  const hasExplanation = signals.some((signal) => signal.why);
-  return hasExplanation ? <MockBadge source="mock" label="설명 준비 중" /> : null;
+  const hasMockExplanation = signals.some(
+    (signal) => signal.why && signal.source === "mock",
+  );
+  return hasMockExplanation ? <MockBadge source="mock" label="예시" /> : null;
 }

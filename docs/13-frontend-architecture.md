@@ -54,16 +54,19 @@ finshield-ai/
 
 숫자 점수는 **`AnalysisDetails` 안에서만** 노출된다. 화면 첫 진입에 점수를 보여주면 사용자가 "87점이 얼마나 위험한가"를 해석하느라 정작 읽어야 할 행동 지시를 지나친다.
 
-### 등급의 범위를 문구로 한정한다
+### 등급은 문구와 현재 상태를 함께 설명한다
 
-최상단 라벨은 "위험 수준"이 아니라 **"메시지 위험 신호 낮음/주의/높음"** 이다.
+최상단 라벨은 **"현재 상황 위험도 낮음/주의/높음"** 이다.
 
-백엔드 `analyze` 는 붙여넣은 **문구만** 채점한다. 사용자가 이미 계좌를 넘겼는지는 등급에 들어가 있지 않다. 그런데 "위험 수준 낮음"이라고 적으면 상황 전체가 안전하다는 뜻으로 읽힌다. 실제로 `state=shared_account_access` + 점잖은 문구 조합에서 초록색 "낮음" 배지 옆에 지급정지·112 안내가 붙는 화면이 나왔다.
+Scenario Engine v0.1은 legacy 텍스트 점수와 별도로 canonical 위험 신호, 고위험 조합,
+사용자가 선택한 `UserState`의 최소 위험도를 결합해 최종 `risk_level`을 정한다.
+따라서 계좌 접근수단 공유, 앱 설치, 출처 불명 자금 수취, 송금 상태는 문구 신호가
+낮아도 `high`가 된다.
 
 대응:
-- 라벨을 "메시지 위험 신호"로 좁혀 채점 대상이 문구임을 밝힌다
-- `level === "low"` 이면서 이미 넘어간 상태(`isRecoveryState`)면 초록 tint 를 중립색으로 낮추고, "이 등급은 붙여넣은 문구만 본 결과입니다"를 덧붙인다
-- **등급 자체는 프론트에서 다시 계산하지 않는다.** 표현만 바꾼다
+- `risk_level`은 백엔드 값을 그대로 사용한다
+- recovery state를 프론트에서 다시 승격하거나 낮추지 않는다
+- `risk_score`는 legacy baseline, `risk_level`은 현재 상태를 포함한 최종 등급이라는 차이를 분석 상세에 설명한다
 
 ### 공포 유발 방지 (강제)
 
@@ -120,9 +123,9 @@ finshield-ai/
 ## 5. 데이터 레이어
 
 ```
-lib/api/contracts.ts   zod — 프론트가 기대하는 계약 (백엔드보다 넓다)
+lib/api/contracts.ts   zod — Scenario Engine과 프론트 화면 계약
 lib/api/client.ts      fetch 래퍼 (타임아웃 8초, ApiError)
-lib/api/analysis.ts    어댑터: live 응답 + mock 보강, 필드별 source 태깅
+lib/api/analysis.ts    어댑터: live 응답 변환, 필드별 source 태깅
 lib/api/mode.ts        NEXT_PUBLIC_API_MODE=mock|live
 lib/mock/*.ts          백엔드 미구현 영역의 임시 데이터
 lib/format/*.ts        표시 포맷팅만
@@ -131,14 +134,15 @@ lib/store/*.ts         sessionStorage 임시 보관
 
 ### 하이브리드 모드
 
-백엔드가 주는 것과 아직 없는 것을 한 화면에서 섞어 쓰되, **필드마다 `source: "live" | "mock"` 을 붙여** 화면이 `MockBadge` 로 구분해 보여준다.
+**필드마다 `source: "live" | "mock"` 을 붙여** 실제 Scenario Engine 결과와
+백엔드 없이 보는 고정 예시를 구분한다.
 
 | 화면 요소 | 백엔드 | 처리 |
 | --- | --- | --- |
 | 위험 수준 / 점수 / 신호 / scenario | 있음 | live |
-| 왜 위험한지 | 없음 | mock + 배지 |
-| 대응 액션 | 없음 | mock + 배지 |
-| 공식 근거 | 없음 | mock + 배지 (전부 "공식 확인 전") |
+| 위험 유형 후보 / 결정론적 요약 | 있음 | live |
+| 대응 액션 | 있음 | live |
+| 공식 근거 | 있음 | live + 검토일 표시 |
 | 금융 프로필 CRUD | 없음 | sessionStorage |
 | 파생지표 | 없음 | mock 이 계산 완료값 제공 |
 | 상품 / 비교 / 시뮬레이션 | 없음 | 미구현 |
@@ -153,13 +157,18 @@ lib/store/*.ts         sessionStorage 임시 보관
 
 ### 근거를 지어내지 않는다
 
-`lib/mock/evidence.ts` 항목은 모두 실재하는 기관(금융감독원 1332, 경찰 112, KISA 118, 계좌정보통합관리, 명의도용방지)만 가리키며, 전부 `verified: false` 로 두고 화면에 "공식 확인 전"으로 표시한다. 백엔드 근거 API 연동 시 `fetchedAt` 과 함께 검증 항목으로 교체된다.
+`lib/mock/evidence.ts`는 백엔드 없이 화면을 보는 mock 모드에서만 사용한다.
+live 모드는 백엔드 `official_sources`를 `verified: true`로 변환하고
+`retrieved_at`을 확인일로 표시한다.
 
 ---
 
 ## 6. 백엔드 연동
 
-현재 백엔드: `GET /health`, `POST /api/v1/analyze`
+현재 백엔드: `GET /health`, `POST /api/v1/analyze`, `POST /api/v1/loans/simulate`
+
+`analyze`는 기존 필드에 더해 `fraud_types`, `summary`, `actions`,
+`official_sources`를 반환한다. 프론트는 이 값을 mock으로 대체하지 않는다.
 
 ### CORS — 백엔드 수정 없이
 
@@ -206,9 +215,8 @@ uvicorn app.main:app --reload
 ## 8. 남은 작업
 
 - 상품 탐색 / 비교 / What-if 3화면
-- 백엔드 `/profiles`, `/evidence`, `/loans/simulate` 구현 후 mock 어댑터 제거
-- 백엔드 `analyze` 응답에 설명·액션·근거 추가 → `MockBadge` 소멸
+- 백엔드 `/profiles` 구현 후 금융 프로필 session mock 제거
+- `/loans/simulate`를 상품 비교·What-if 화면에 연결
 - 경로 불일치: SKILL.md 는 `/api/v1/fraud/analyze`, 실제 구현은 `/api/v1/analyze`
-- 대응 액션의 공식 절차 검증 (현재 전부 "공식 확인 전")
 - 접근성 감사 (스크린리더, 명도대비 AA) — 자동 검사는 아직 돌리지 않았다
 - 실기기 확인 (지금까지는 헤드리스 Chrome 캡처만). iOS Safari 의 `env(safe-area-inset-bottom)` 과 `100dvh` 동작은 시뮬레이터로 재확인 필요

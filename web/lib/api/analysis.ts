@@ -1,6 +1,7 @@
 import {
   AnalysisResultSchema,
   BackendAnalyzeResponseSchema,
+  type BackendAction,
   type AnalysisResult,
   type AnalyzeRequest,
   type RiskLevel,
@@ -8,24 +9,13 @@ import {
 } from "@/lib/api/contracts";
 import { ApiError, postJson } from "@/lib/api/client";
 import { apiMode } from "@/lib/api/mode";
-import {
-  buildActions,
-  buildWhy,
-  collectEvidence,
-  demoAnalysis,
-  headline,
-  signalWhy,
-  stateSummary,
-} from "@/lib/mock/analysis";
+import { demoAnalysis, headline, stateSummary } from "@/lib/mock/analysis";
 
 /**
  * 사기 분석 서비스.
  *
- * 백엔드가 주는 것: risk_score, risk_level, signals, scenario, disclaimer
- * 백엔드에 없는 것: 설명(why), 대응 행동(actions), 근거(evidence), 헤드라인
- *
- * 없는 것은 mock 으로 채우되 `source: "mock"` 으로 표시해서 화면이 구분할 수 있게 한다.
- * 실제 판정에 해당하는 값(level, score, signals)은 절대 프론트에서 만들어내지 않는다.
+ * Scenario Engine v0.1의 판정, 요약, 행동, 공식 근거를 화면 계약으로 변환한다.
+ * 프론트는 위험도를 재계산하지 않고 행동 코드의 표시 그룹과 연락처 링크만 매핑한다.
  */
 
 function toRiskLevel(value: string): RiskLevel {
@@ -36,6 +26,22 @@ function toRiskLevel(value: string): RiskLevel {
 
 function newAnalysisId(): string {
   return `a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+const CONTACTS: Partial<
+  Record<BackendAction["code"], { phone: string; label: string }>
+> = {
+  CONTACT_112: { phone: "112", label: "경찰 112" },
+  CONTACT_1394: {
+    phone: "1394",
+    label: "보이스피싱 통합신고대응센터 1394",
+  },
+  CONTACT_KISA_118: { phone: "118", label: "KISA 118" },
+};
+
+function actionKind(action: BackendAction): "immediate" | "soon" | "avoid" {
+  if (action.code.startsWith("DO_NOT_")) return "avoid";
+  return action.priority === 1 ? "immediate" : "soon";
 }
 
 /** 백엔드 응답 + mock 보강 → 화면이 쓰는 AnalysisResult */
@@ -49,14 +55,32 @@ export function adaptBackendAnalysis(
   const signals: RiskSignal[] = parsed.signals.map((signal) => ({
     code: signal.code,
     label: signal.label,
-    // 신호 자체는 live, 설명 문구만 mock 이다.
-    why: signalWhy(signal.code),
     weight: signal.weight,
     source: "live",
   }));
 
   const state = parsed.scenario ?? request.state;
-  const actions = buildActions(state, level);
+  const actions = parsed.actions.map((action) => {
+    const contact = CONTACTS[action.code];
+    return {
+      id: action.code,
+      title: action.title,
+      detail: action.reason,
+      kind: actionKind(action),
+      contactPhone: contact?.phone,
+      contactLabel: contact?.label,
+      evidenceIds: action.source_ids,
+    };
+  });
+
+  const evidence = parsed.official_sources.map((source) => ({
+    id: source.source_id,
+    title: source.title,
+    publisher: source.organization,
+    url: source.source_url,
+    verified: true,
+    fetchedAt: source.retrieved_at,
+  }));
 
   return AnalysisResultSchema.parse({
     id: newAnalysisId(),
@@ -64,29 +88,27 @@ export function adaptBackendAnalysis(
 
     level,
     headline: headline(level, state),
-    headlineSource: "mock",
+    headlineSource: "live",
 
     signals,
+    fraudTypes: parsed.fraud_types,
 
-    why: buildWhy(
-      level,
-      signals.map((signal) => signal.code),
-    ),
-    whySource: "mock",
+    why: [parsed.summary],
+    whySource: "live",
 
     state,
     stateSummary: stateSummary(state),
-    stateSource: "mock",
+    stateSource: "live",
 
     actions,
-    actionsSource: "mock",
+    actionsSource: "live",
 
-    evidence: collectEvidence(actions),
-    evidenceSource: "mock",
+    evidence,
+    evidenceSource: "live",
 
     score: parsed.risk_score,
     scoreSource: "live",
-    engine: "규칙 기반 baseline (app/core/risk_engine.py)",
+    engine: "Scenario Engine v0.1 (결정론적 규칙·상태 정책)",
 
     disclaimer: parsed.disclaimer,
   });

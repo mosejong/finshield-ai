@@ -88,7 +88,6 @@ export default function CheckResultPage({
         <RiskLevelHeader
           level={result.level}
           headline={result.headline}
-          state={result.state}
           source={result.headlineSource}
         />
 

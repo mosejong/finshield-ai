@@ -9,10 +9,10 @@ import { evidenceByIds } from "@/lib/mock/evidence";
 import { isRecoveryState } from "@/lib/format/risk";
 
 /**
- * 백엔드 Scenario Engine / 설명 레이어가 아직 없어서 프론트가 임시로 채우는 부분.
+ * 백엔드 없이 화면을 확인하는 mock 모드 전용 예시 데이터.
  *
  * 여기 있는 내용은 전부 `source: "mock"` 으로 표시되고 화면에 mock 배지가 붙는다.
- * 백엔드 구현 후에는 이 파일을 통째로 지우고 어댑터만 실제 응답에 연결한다.
+ * live 모드의 설명·행동·근거는 Scenario Engine v0.1 응답을 사용한다.
  *
  * 주의: 백엔드 risk_engine 의 키워드 규칙을 여기에 복제하지 않는다.
  * 위험 신호 탐지와 점수 판정은 항상 백엔드 몫이다.
@@ -364,6 +364,7 @@ export function demoAnalysis(id: string, state: UserState): AnalysisResult {
         source: "mock",
       },
     ],
+    fraudTypes: ["account_access_request", "money_mule_transfer"],
     why: buildWhy("high", codes),
     whySource: "mock",
     state,
@@ -392,6 +393,7 @@ function demoLowAnalysis(id: string, createdAt: string): AnalysisResult {
     headline: headline("low", "received_only"),
     headlineSource: "mock",
     signals: [],
+    fraudTypes: [],
     why: buildWhy("low", []),
     whySource: "mock",
     state: "received_only",

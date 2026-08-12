@@ -1,4 +1,4 @@
-import type { FinancialProfile } from "@/lib/api/contracts";
+import type { FinancialProfile, FraudType } from "@/lib/api/contracts";
 
 /** enum 값 → 화면 문구. 매핑만 하고 판단하지 않는다. */
 
@@ -48,6 +48,15 @@ export const PERSONA_LABEL: Record<FinancialProfile["persona"], string> = {
   early_career: "사회초년생",
   small_business: "소상공인",
   unknown: "선택 안 함",
+};
+
+export const FRAUD_TYPE_LABEL: Record<FraudType, string> = {
+  authority_impersonation: "기관 사칭",
+  loan_policy_impersonation: "대출·정책자금 사칭",
+  account_access_request: "계좌·인증수단 접근 요구",
+  money_mule_transfer: "자금 수취·재전달 요구",
+  smishing_malware: "스미싱·악성 앱 유도",
+  card_delivery_impersonation: "카드 배송 사칭",
 };
 
 export function optionsOf<T extends string>(

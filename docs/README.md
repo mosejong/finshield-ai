@@ -19,3 +19,4 @@ Date- and branch-based logs: `devlog/README.md`
 - `devlog/2026-08-12/project-governance.md` — 역할별 브랜치·worktree·PR 규칙
 - `devlog/2026-08-12/fraud-scenario-engine-v0.1.md` — Scenario Engine 구현·PM 검수·PR 병합
 - `devlog/2026-08-12/scenario-engine-integration.md` — 병합 후 README·색인·백로그 반영
+- `devlog/2026-08-12/frontend-mvp.md` — 프론트 MVP 구현·PM 검수·Scenario Engine 통합

@@ -43,8 +43,7 @@ export function riskStyle(level: RiskLevel): RiskStyle {
 }
 
 /**
- * "메시지 위험 신호 ___" 처럼 앞말이 이미 '위험'을 말한 자리에 붙는 라벨.
- * riskStyle().label 을 그대로 쓰면 "위험 신호 위험"이 되어 읽히지 않는다.
+ * "현재 상황 위험도 ___"처럼 세기를 설명하는 자리에 붙는 라벨.
  * 여기서는 세기만 말한다.
  */
 const RISK_STRENGTH_LABEL: Record<RiskLevel, string> = {

@@ -3,9 +3,9 @@ import { z } from "zod";
 /**
  * 프론트엔드가 기대하는 데이터 계약.
  *
- * 백엔드가 아직 제공하지 않는 필드가 포함되어 있다. 그런 필드는 mock 어댑터가
- * 채우고 `source: "mock"` 으로 표시되며, 화면에서 MockBadge 로 노출된다.
- * 백엔드 구현이 끝나면 어댑터만 교체하고 이 파일은 그대로 둔다.
+ * 금융 프로필·상품처럼 백엔드가 아직 제공하지 않는 영역은 mock 어댑터가
+ * 채우고 `source: "mock"` 으로 표시한다. 사기 분석의 설명·행동·공식 근거는
+ * Scenario Engine v0.1 응답을 그대로 변환한다.
  *
  * 백엔드 실제 응답 스키마는 BackendAnalyzeResponseSchema 하나뿐이다.
  */
@@ -68,12 +68,56 @@ export const BackendRiskSignalSchema = z.object({
   weight: z.number().int(),
 });
 
+export const FraudTypeSchema = z.enum([
+  "authority_impersonation",
+  "loan_policy_impersonation",
+  "account_access_request",
+  "money_mule_transfer",
+  "smishing_malware",
+  "card_delivery_impersonation",
+]);
+export type FraudType = z.infer<typeof FraudTypeSchema>;
+
+export const BackendActionSchema = z.object({
+  code: z.enum([
+    "STOP_CONTACT",
+    "DO_NOT_CLICK",
+    "DO_NOT_INSTALL",
+    "DO_NOT_SHARE_ACCESS",
+    "DO_NOT_FORWARD_MONEY",
+    "VERIFY_OFFICIAL_CHANNEL",
+    "CONTACT_FINANCIAL_INSTITUTION",
+    "CONTACT_1394",
+    "CONTACT_112",
+    "CONTACT_KISA_118",
+    "PRESERVE_EVIDENCE",
+  ]),
+  priority: z.number().int().min(1).max(3),
+  title: z.string(),
+  reason: z.string(),
+  source_ids: z.array(z.string()),
+});
+export type BackendAction = z.infer<typeof BackendActionSchema>;
+
+export const BackendOfficialSourceSchema = z.object({
+  source_id: z.string(),
+  organization: z.string(),
+  title: z.string(),
+  source_url: z.string().url(),
+  retrieved_at: z.string(),
+  supports: z.array(z.string()),
+});
+
 export const BackendAnalyzeResponseSchema = z.object({
   risk_score: z.number().int().min(0).max(100),
   risk_level: z.string(),
   signals: z.array(BackendRiskSignalSchema),
   scenario: UserStateSchema,
   disclaimer: z.string(),
+  fraud_types: z.array(FraudTypeSchema),
+  summary: z.string(),
+  actions: z.array(BackendActionSchema),
+  official_sources: z.array(BackendOfficialSourceSchema),
 });
 export type BackendAnalyzeResponse = z.infer<
   typeof BackendAnalyzeResponseSchema
@@ -127,6 +171,7 @@ export const AnalysisResultSchema = z.object({
   headlineSource: SourceKindSchema,
 
   signals: z.array(RiskSignalSchema),
+  fraudTypes: z.array(FraudTypeSchema),
 
   /** 왜 위험한지 — 문단 단위 */
   why: z.array(z.string()),

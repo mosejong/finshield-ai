@@ -2,6 +2,7 @@ import { ChevronDown } from "lucide-react";
 import type { AnalysisResult } from "@/lib/api/contracts";
 import { MockBadge } from "@/components/common/MockBadge";
 import { formatDateTime } from "@/lib/format/risk";
+import { FRAUD_TYPE_LABEL } from "@/lib/format/labels";
 
 /**
  * 분석 상세 — 기본 접힘.
@@ -49,7 +50,7 @@ export function AnalysisDetails({ result }: { result: AnalysisResult }) {
         {result.signals.length > 0 ? (
           <div className="mt-4">
             <p className="mb-1.5 text-caption text-muted-foreground">
-              점수에 반영된 신호
+              감지 신호와 참고 가중치
             </p>
             <ul className="flex flex-col gap-1">
               {result.signals.map((signal) => (
@@ -67,10 +68,28 @@ export function AnalysisDetails({ result }: { result: AnalysisResult }) {
           </div>
         ) : null}
 
+        {result.fraudTypes.length > 0 ? (
+          <div className="mt-4">
+            <p className="mb-1.5 text-caption text-muted-foreground">
+              위험 유형 후보
+            </p>
+            <ul className="flex flex-wrap gap-1.5">
+              {result.fraudTypes.map((fraudType) => (
+                <li
+                  key={fraudType}
+                  className="rounded-sm border border-border bg-secondary px-2 py-1 text-caption text-foreground"
+                >
+                  {FRAUD_TYPE_LABEL[fraudType]}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         <p className="mt-4 text-caption text-muted-foreground">
-          점수는 규칙에 걸린 신호의 가중치를 합한 값입니다. 점수가 낮다고 안전이
-          보장되지는 않으며, 판단이 서지 않을 때는 해당 기관 공식 번호로 직접
-          확인하세요.
+          점수는 기존 다섯 규칙의 비교용 baseline이며 확률이 아닙니다. 최종 등급은
+          추가 위험 신호와 사용자가 선택한 현재 상태도 함께 반영하므로, 표시된 모든
+          가중치의 단순 합과 다를 수 있습니다.
         </p>
       </div>
     </details>
