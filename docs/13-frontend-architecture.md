@@ -129,7 +129,7 @@ lib/api/analysis.ts    어댑터: live 응답 변환, 필드별 source 태깅
 lib/api/mode.ts        NEXT_PUBLIC_API_MODE=mock|live
 lib/mock/*.ts          백엔드 미구현 영역의 임시 데이터
 lib/format/*.ts        표시 포맷팅만
-lib/store/*.ts         sessionStorage 임시 보관
+lib/store/*.ts         sessionStorage의 분석 결과·profile identity 보관
 ```
 
 ### 하이브리드 모드
@@ -143,7 +143,7 @@ lib/store/*.ts         sessionStorage 임시 보관
 | 위험 유형 후보 / 결정론적 요약 | 있음 | live |
 | 대응 액션 | 있음 | live |
 | 공식 근거 | 있음 | live + 검토일 표시 |
-| 금융 프로필 CRUD | 없음 | sessionStorage |
+| 금융 프로필 CRUD | `/api/v1/profiles` | live, session에는 ID+persona만 보관 |
 | 파생지표 | 없음 | mock 이 계산 완료값 제공 |
 | 상품 후보 | `/api/v1/recommendations` | live, backend 상태·reason 그대로 표시 |
 | 비교 / 시뮬레이션 | 일부 backend 존재 | 화면 미구현 |
@@ -167,7 +167,8 @@ live 모드는 백엔드 `official_sources`를 `verified: true`로 변환하고
 ## 6. 백엔드 연동
 
 현재 백엔드: `GET /health`, `POST /api/v1/analyze`, `GET /api/v1/products`,
-`POST /api/v1/recommendations`, `POST /api/v1/loans/simulate`
+`POST /api/v1/recommendations`, `POST /api/v1/loans/simulate`,
+`POST/GET/PUT/DELETE /api/v1/profiles`
 
 `analyze`는 기존 필드에 더해 `fraud_types`, `summary`, `actions`,
 `official_sources`를 반환한다. 프론트는 이 값을 mock으로 대체하지 않는다.
@@ -180,6 +181,11 @@ FastAPI 에 `CORSMiddleware` 가 없어 브라우저가 `localhost:8000` 을 직
 브라우저 → POST /api/proxy/analyze (Next, 같은 오리진)
          → POST /api/v1/analyze     (FastAPI, 서버-서버)
 ```
+
+프로필도 같은 구조로 `/api/proxy/profiles`를 거친다. 프론트 enum은 backend의
+연령·직업·신용·목표 enum과 일치시키고, adapter가 camelCase를 snake_case로
+변환한다. `persona`는 fraud 입력용 UI 값이므로 FinancialProfile backend 요청에서
+제외하고 profile ID와 함께 session에만 둔다.
 
 부수 효과로 백엔드 주소가 클라이언트 번들에 노출되지 않는다. 그래서 `FINSHIELD_API_URL` 에는 `NEXT_PUBLIC_` 접두사를 붙이지 않는다.
 
@@ -194,6 +200,9 @@ FastAPI 에 `CORSMiddleware` 가 없어 브라우저가 `localhost:8000` 을 직
 - 사용자가 붙여넣은 원문과 분석 결과는 `sessionStorage` 에만 둔다. `localStorage` 가 아니다 — 탭을 닫으면 사라진다.
 - 프록시는 요청 본문을 로그로 남기지 않는다.
 - 프로필은 주민등록번호·계좌번호·실명을 받지 않고, 나이·신용점수는 band 로만 받는다.
+- 프로필 원문은 `sessionStorage`에 저장하지 않는다. process-local backend가 원본을
+  보관하고 브라우저에는 profile UUID와 persona만 둔다. 서버 재시작으로 404가 되면
+  재입력을 안내하며 빈 프로필이나 저장 성공으로 바꾸지 않는다.
 - 상품 후보 요청에는 session profile 전체가 아니라 backend 규칙이 실제 사용하는
   `goal` 하나만 보낸다. 소득·부채·신용·연령은 전송하지 않는다.
 
@@ -219,7 +228,7 @@ uvicorn app.main:app --reload
 ## 8. 남은 작업
 
 - 상품 탐색 / 비교 / What-if 3화면
-- 백엔드 `/profiles` 구현 후 금융 프로필 session mock 제거
+- profile process-local 저장을 PostgreSQL·인증·소유권 검증으로 교체
 - `/loans/simulate`를 상품 비교·What-if 화면에 연결
 - 경로 불일치: SKILL.md 는 `/api/v1/fraud/analyze`, 실제 구현은 `/api/v1/analyze`
 - 접근성 감사 (스크린리더, 명도대비 AA) — 자동 검사는 아직 돌리지 않았다

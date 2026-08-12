@@ -24,7 +24,7 @@ describe("fetchProductRecommendations", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await fetchProductRecommendations("business");
+    await fetchProductRecommendations("startup_business");
 
     const options = fetchMock.mock.calls[0][1] as RequestInit;
     expect(JSON.parse(options.body as string)).toEqual({

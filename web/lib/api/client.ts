@@ -37,15 +37,25 @@ export async function postJson<T>(
   schema: z.ZodType<T>,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<T> {
+  return requestJson("POST", path, body, schema, timeoutMs);
+}
+
+export async function requestJson<T>(
+  method: "GET" | "POST" | "PUT",
+  path: string,
+  body: unknown,
+  schema: z.ZodType<T>,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let response: Response;
   try {
     response = await fetch(`${backendBaseUrl()}${path}`, {
-      method: "POST",
+      method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: method === "GET" ? undefined : JSON.stringify(body),
       signal: controller.signal,
       cache: "no-store",
     });
@@ -83,4 +93,39 @@ export async function postJson<T>(
   }
 
   return parsed.data;
+}
+
+export async function requestNoContent(
+  method: "DELETE",
+  path: string,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(`${backendBaseUrl()}${path}`, {
+      method,
+      signal: controller.signal,
+      cache: "no-store",
+    });
+  } catch (cause) {
+    throw new ApiError(
+      controller.signal.aborted ? "timeout" : "network",
+      "서버에 연결하지 못했습니다.",
+      0,
+      { cause },
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    throw new ApiError(
+      "http",
+      `서버가 오류를 반환했습니다. (${response.status})`,
+      response.status,
+    );
+  }
 }

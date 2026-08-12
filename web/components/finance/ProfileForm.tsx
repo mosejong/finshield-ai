@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   FinancialProfileSchema,
@@ -25,7 +26,7 @@ import {
  */
 
 const DEFAULTS: FinancialProfile = {
-  ageBand: "25-29",
+  ageBand: "20_29",
   employmentStatus: "employed",
   householdSize: 1,
   dependentsCount: 0,
@@ -33,9 +34,11 @@ const DEFAULTS: FinancialProfile = {
   monthlyFixedExpenses: 0,
   monthlyVariableExpenses: 0,
   liquidAssets: 0,
+  emergencyFundTargetMonths: 3,
   totalDebt: 0,
   monthlyDebtPayment: 0,
   creditScoreBand: "unknown",
+  businessOwner: false,
   goal: "emergency_cash",
   persona: "early_career",
 };
@@ -132,10 +135,12 @@ function CountField({
   label,
   value,
   onChange,
+  max = 10,
 }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
+  max?: number;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
@@ -144,7 +149,7 @@ function CountField({
         type="number"
         inputMode="numeric"
         min={0}
-        max={10}
+        max={max}
         value={value}
         onChange={(event) => onChange(Number(event.target.value) || 0)}
         className="min-h-11 w-24 rounded-md border border-input bg-background px-3 text-body tabular-nums text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
@@ -157,6 +162,7 @@ export function ProfileForm({ initial }: { initial: FinancialProfile | null }) {
   const router = useRouter();
   const [draft, setDraft] = useState<FinancialProfile>(initial ?? DEFAULTS);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   function set<K extends keyof FinancialProfile>(
     key: K,
@@ -165,12 +171,13 @@ export function ProfileForm({ initial }: { initial: FinancialProfile | null }) {
     setDraft((previous) => ({ ...previous, [key]: value }));
   }
 
-  function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (pending) return;
 
     const parsed = FinancialProfileSchema.safeParse(draft);
     if (!parsed.success) {
-      setError("입력한 값 중 확인이 필요한 항목이 있습니다.");
+      setError(parsed.error.issues[0]?.message ?? "입력한 값 중 확인이 필요한 항목이 있습니다.");
       return;
     }
     if (parsed.data.householdSize < 1) {
@@ -178,8 +185,17 @@ export function ProfileForm({ initial }: { initial: FinancialProfile | null }) {
       return;
     }
 
-    saveProfile(parsed.data);
-    router.push("/profile");
+    setPending(true);
+    setError(null);
+    try {
+      await saveProfile(parsed.data);
+      router.push("/profile");
+    } catch {
+      setError(
+        "금융상태를 저장하지 못했습니다. 서버 연결을 확인한 뒤 다시 시도해 주세요.",
+      );
+      setPending(false);
+    }
   }
 
   return (
@@ -216,6 +232,12 @@ export function ProfileForm({ initial }: { initial: FinancialProfile | null }) {
           value={draft.monthlyNetIncome}
           onChange={(value) => set("monthlyNetIncome", value)}
           hint="세금을 뗀 실수령액입니다"
+        />
+        <CountField
+          label="비상금으로 준비하고 싶은 기간 (개월)"
+          value={draft.emergencyFundTargetMonths}
+          onChange={(value) => set("emergencyFundTargetMonths", value)}
+          max={60}
         />
       </Step>
 
@@ -262,6 +284,15 @@ export function ProfileForm({ initial }: { initial: FinancialProfile | null }) {
           options={optionsOf(GOAL_LABEL)}
           onChange={(value) => set("goal", value)}
         />
+        <label className="flex min-h-11 items-center gap-3 text-body text-foreground">
+          <input
+            type="checkbox"
+            checked={draft.businessOwner}
+            onChange={(event) => set("businessOwner", event.target.checked)}
+            className="size-5 rounded border-input"
+          />
+          현재 사업체를 운영하고 있어요
+        </label>
         <SelectField
           label="신용점수 구간"
           value={draft.creditScoreBand}
@@ -282,12 +313,20 @@ export function ProfileForm({ initial }: { initial: FinancialProfile | null }) {
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] flex flex-col gap-2 border-t border-border bg-background py-3 lg:static lg:border-0 lg:py-0">
         <button
           type="submit"
-          className="min-h-12 w-full rounded-md bg-primary px-4 text-body font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          disabled={pending}
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-body font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-45"
         >
-          저장하기
+          {pending ? (
+            <>
+              <Loader2 aria-hidden className="size-4 animate-spin" />
+              저장하는 중…
+            </>
+          ) : (
+            "저장하기"
+          )}
         </button>
         <p className="text-center text-caption text-muted-foreground">
-          금액 정보는 브라우저 세션에만 남습니다. 상품 확인 시 금융 목표만 서버로 보냅니다.
+          서버에는 최소 금융정보만 저장하고, 브라우저에는 프로필 식별자만 남깁니다.
         </p>
       </div>
     </form>

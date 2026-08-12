@@ -12,7 +12,7 @@ import { DisclaimerNote } from "@/components/common/DisclaimerNote";
 import { StateSelector } from "@/components/safety/StateSelector";
 import { analyzeFromClient } from "@/lib/api/analysis";
 import { saveAnalysis } from "@/lib/store/analysis-store";
-import { useStoredProfile } from "@/lib/store/profile-store";
+import { useProfileStore } from "@/lib/store/profile-store";
 
 /**
  * 의심 메시지 입력 + 피해 단계 선택.
@@ -38,7 +38,7 @@ export default function CheckPage() {
   } | null>(null);
 
   // 프로필이 있으면 persona 만 함께 보낸다. 없으면 unknown 으로 그냥 진행한다.
-  const persona = useStoredProfile()?.persona ?? "unknown";
+  const persona = useProfileStore().profile?.persona ?? "unknown";
 
   const trimmed = text.trim();
   const canSubmit = trimmed.length > 0 && trimmed.length <= MAX_LENGTH;

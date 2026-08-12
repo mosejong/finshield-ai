@@ -1,10 +1,15 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { z } from "zod";
+import { PersonaSchema, type FinancialProfile, type Persona } from "@/lib/api/contracts";
 import {
-  FinancialProfileSchema,
-  type FinancialProfile,
-} from "@/lib/api/contracts";
+  createProfile,
+  deleteProfile,
+  fetchProfile,
+  replaceProfile,
+  type ProfileRequestError,
+} from "@/lib/api/profiles";
 import {
   readSession,
   removeSession,
@@ -13,51 +18,178 @@ import {
 } from "@/lib/store/session-store";
 
 /**
- * 온보딩에서 입력한 금융 프로필의 임시 보관소.
+ * 서버 profile의 브라우저 측 식별자 저장소.
  *
- * 백엔드 `/api/v1/profiles` 가 없어서 브라우저 세션에만 둔다.
- * localStorage 가 아니라 sessionStorage 를 쓰는 이유는 소득·부채 정보를
- * 기기에 남기지 않기 위해서다. (docs/09 — 최소 수집 원칙)
+ * 소득·부채를 포함한 profile 원문은 sessionStorage에 저장하지 않는다. 브라우저에는
+ * 불투명 UUID와 fraud 분석에만 쓰는 persona를 두고, profile은 서버에서 다시 읽는다.
  */
 
-const KEY = "finshield:profile";
+const IDENTITY_KEY = "finshield:profile-identity:v1";
+const LEGACY_PROFILE_KEY = "finshield:profile";
 
-export function saveProfile(profile: FinancialProfile): void {
-  writeSession(KEY, JSON.stringify(profile));
-}
+type ProfileIdentity = { profileId: string; persona: Persona };
+export type ProfileStoreState = {
+  profileId: string | null;
+  profile: FinancialProfile | null;
+  status: "empty" | "idle" | "loading" | "ready" | "error";
+  error: string | null;
+};
 
-export function clearProfile(): void {
-  removeSession(KEY);
-}
+const listeners = new Set<() => void>();
+let identityRaw: string | null = null;
+let state: ProfileStoreState = {
+  profileId: null,
+  profile: null,
+  status: "empty",
+  error: null,
+};
 
-/**
- * useSyncExternalStore 는 값이 바뀌지 않았으면 같은 참조를 돌려받아야 한다.
- * 매번 JSON.parse 하면 새 객체가 나와 렌더가 끝없이 돈다. 원문 문자열로 캐시한다.
- */
-let cachedRaw: string | null = null;
-let cachedProfile: FinancialProfile | null = null;
-
-function snapshot(): FinancialProfile | null {
-  const raw = readSession(KEY);
-  if (raw === cachedRaw) return cachedProfile;
-
-  cachedRaw = raw;
-  cachedProfile = null;
-
-  if (raw) {
-    try {
-      const parsed = FinancialProfileSchema.safeParse(JSON.parse(raw));
-      if (parsed.success) cachedProfile = parsed.data;
-    } catch {
-      // 손상된 값은 없는 것으로 본다.
-    }
+function parseIdentity(raw: string | null): ProfileIdentity | null {
+  if (!raw) return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== "object" || value === null) return null;
+    const profileId = "profileId" in value ? value.profileId : null;
+    const persona = "persona" in value ? value.persona : null;
+    const parsedId = z.string().uuid().safeParse(profileId);
+    if (!parsedId.success) return null;
+    const parsedPersona = PersonaSchema.safeParse(persona);
+    if (!parsedPersona.success) return null;
+    return { profileId: parsedId.data, persona: parsedPersona.data };
+  } catch {
+    return null;
   }
-
-  return cachedProfile;
 }
 
-const serverSnapshot = () => null;
+function reconcileIdentity(): ProfileIdentity | null {
+  const raw = readSession(IDENTITY_KEY);
+  const identity = parseIdentity(raw);
+  if (raw !== identityRaw) {
+    identityRaw = raw;
+    state = identity
+      ? {
+          profileId: identity.profileId,
+          profile: null,
+          status: "idle",
+          error: null,
+        }
+      : {
+          profileId: null,
+          profile: null,
+          status: "empty",
+          error: null,
+        };
+  }
+  return identity;
+}
+
+function emit(next: ProfileStoreState): void {
+  state = next;
+  for (const listener of listeners) listener();
+}
+
+function snapshot(): ProfileStoreState {
+  reconcileIdentity();
+  return state;
+}
+
+const serverSnapshot: ProfileStoreState = {
+  profileId: null,
+  profile: null,
+  status: "empty",
+  error: null,
+};
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  const unsubscribeSession = subscribeSession(() => {
+    reconcileIdentity();
+    listener();
+  });
+  return () => {
+    listeners.delete(listener);
+    unsubscribeSession();
+  };
+}
+
+async function loadStoredProfile(): Promise<void> {
+  const identity = reconcileIdentity();
+  if (!identity || state.status !== "idle") return;
+
+  emit({ ...state, status: "loading", error: null });
+  try {
+    const resource = await fetchProfile(identity.profileId, identity.persona);
+    if (parseIdentity(readSession(IDENTITY_KEY))?.profileId !== identity.profileId) return;
+    emit({
+      profileId: resource.profileId,
+      profile: resource.profile,
+      status: "ready",
+      error: null,
+    });
+  } catch (error) {
+    const status = (error as ProfileRequestError).status;
+    if (status === 400 || status === 404) {
+      identityRaw = null;
+      removeSession(IDENTITY_KEY);
+      emit({
+        profileId: null,
+        profile: null,
+        status: "error",
+        error: "서버가 다시 시작되어 저장한 금융상태를 찾지 못했습니다. 다시 입력해 주세요.",
+      });
+      return;
+    }
+    emit({
+      ...state,
+      status: "error",
+      error: "금융상태를 불러오지 못했습니다. 서버 연결을 확인해 주세요.",
+    });
+  }
+}
+
+export async function saveProfile(profile: FinancialProfile): Promise<void> {
+  const identity = reconcileIdentity();
+  const resource = identity
+    ? await replaceProfile(identity.profileId, profile)
+    : await createProfile(profile);
+
+  const raw = JSON.stringify({
+    profileId: resource.profileId,
+    persona: profile.persona,
+  } satisfies ProfileIdentity);
+  identityRaw = raw;
+  writeSession(IDENTITY_KEY, raw);
+  removeSession(LEGACY_PROFILE_KEY);
+  emit({
+    profileId: resource.profileId,
+    profile: resource.profile,
+    status: "ready",
+    error: null,
+  });
+}
+
+export async function clearProfile(): Promise<void> {
+  const identity = reconcileIdentity();
+  if (identity) await deleteProfile(identity.profileId);
+  identityRaw = null;
+  removeSession(IDENTITY_KEY);
+  removeSession(LEGACY_PROFILE_KEY);
+  emit({
+    profileId: null,
+    profile: null,
+    status: "empty",
+    error: null,
+  });
+}
+
+export function useProfileStore(): ProfileStoreState {
+  const current = useSyncExternalStore(subscribe, snapshot, () => serverSnapshot);
+  useEffect(() => {
+    if (current.status === "idle") void loadStoredProfile();
+  }, [current.profileId, current.status]);
+  return current;
+}
 
 export function useStoredProfile(): FinancialProfile | null {
-  return useSyncExternalStore(subscribeSession, snapshot, serverSnapshot);
+  return useProfileStore().profile;
 }

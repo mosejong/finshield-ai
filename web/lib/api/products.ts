@@ -10,7 +10,7 @@ const GOAL_MAP: Record<FinancialProfile["goal"], string> = {
   emergency_cash: "emergency_cash",
   debt_refinance: "debt_refinance",
   living_expense: "living_expense",
-  business: "startup_business",
+  startup_business: "startup_business",
   vehicle: "vehicle",
   asset_building: "asset_building",
   other: "other",

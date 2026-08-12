@@ -3,11 +3,11 @@ import { z } from "zod";
 /**
  * 프론트엔드가 기대하는 데이터 계약.
  *
- * 금융 프로필·상품처럼 백엔드가 아직 제공하지 않는 영역은 mock 어댑터가
- * 채우고 `source: "mock"` 으로 표시한다. 사기 분석의 설명·행동·공식 근거는
- * Scenario Engine v0.1 응답을 그대로 변환한다.
+ * 금융 파생지표처럼 백엔드가 아직 제공하지 않는 영역은 mock 어댑터가 채우고
+ * `source: "mock"` 으로 표시한다. 프로필 CRUD, 상품 후보, 사기 분석은 실제
+ * backend 응답을 검증해 사용한다.
  *
- * 백엔드 실제 응답 스키마는 BackendAnalyzeResponseSchema 하나뿐이다.
+ * backend enum과 snake_case 계약을 화면용 camelCase 계약과 분리한다.
  */
 
 /** 값의 출처. 화면은 이 값을 보고 mock 배지를 붙일지 결정한다. */
@@ -212,28 +212,35 @@ export type AnalysisSummary = z.infer<typeof AnalysisSummarySchema>;
 /* 금융 프로필                                                          */
 /* ------------------------------------------------------------------ */
 
-export const AgeBandSchema = z.enum(["19-24", "25-29", "30-34", "35-39", "40+"]);
+export const AgeBandSchema = z.enum([
+  "under_20",
+  "20_29",
+  "30_39",
+  "40_49",
+  "50_59",
+  "60_plus",
+]);
 export const EmploymentStatusSchema = z.enum([
   "employed",
-  "probation",
-  "freelance",
   "self_employed",
-  "job_seeking",
+  "unemployed",
   "student",
+  "retired",
+  "other",
 ]);
 export const CreditScoreBandSchema = z.enum([
+  "excellent",
+  "good",
+  "fair",
+  "poor",
   "unknown",
-  "very_high",
-  "high",
-  "medium",
-  "low",
 ]);
 export const FinancialGoalSchema = z.enum([
   "housing",
   "emergency_cash",
   "debt_refinance",
   "living_expense",
-  "business",
+  "startup_business",
   "vehicle",
   "asset_building",
   "other",
@@ -253,15 +260,79 @@ export const FinancialProfileSchema = z.object({
   monthlyFixedExpenses: z.number().int().min(0),
   monthlyVariableExpenses: z.number().int().min(0),
   liquidAssets: z.number().int().min(0),
+  emergencyFundTargetMonths: z.number().int().min(0).max(60),
 
   totalDebt: z.number().int().min(0),
   monthlyDebtPayment: z.number().int().min(0),
 
   creditScoreBand: CreditScoreBandSchema,
+  businessOwner: z.boolean(),
   goal: FinancialGoalSchema,
   persona: PersonaSchema,
+}).strict().superRefine((profile, context) => {
+  if (profile.dependentsCount >= profile.householdSize) {
+    context.addIssue({
+      code: "custom",
+      path: ["dependentsCount"],
+      message: "부양가족 수는 가구원 수보다 작아야 합니다.",
+    });
+  }
+  if (profile.totalDebt === 0 && profile.monthlyDebtPayment !== 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["monthlyDebtPayment"],
+      message: "남은 대출이 없으면 매달 갚는 돈은 0원이어야 합니다.",
+    });
+  }
 });
 export type FinancialProfile = z.infer<typeof FinancialProfileSchema>;
+
+const BackendMoneySchema = z
+  .union([z.number().nonnegative(), z.string().regex(/^\d+(?:\.\d+)?$/)])
+  .transform(Number);
+
+/** app/schemas/financial_profile.py 와 1:1로 검증하는 서버 계약. */
+export const BackendFinancialProfileSchema = z.object({
+  age_band: AgeBandSchema,
+  employment_status: EmploymentStatusSchema,
+  household_size: z.number().int().min(1).max(20),
+  dependents_count: z.number().int().min(0).max(19),
+  marital_status: z.string().nullable(),
+  region: z.string().nullable(),
+  monthly_net_income: BackendMoneySchema,
+  monthly_fixed_expenses: BackendMoneySchema,
+  monthly_variable_expenses: BackendMoneySchema,
+  liquid_assets: BackendMoneySchema,
+  emergency_fund_target_months: z.number().int().min(0).max(60),
+  total_debt: BackendMoneySchema,
+  monthly_debt_payment: BackendMoneySchema,
+  loan_items: z.array(z.unknown()),
+  credit_score_band: CreditScoreBandSchema,
+  business_owner: z.boolean(),
+  business_age_months: z.number().int().nullable(),
+  annual_business_revenue_band: z.string().nullable(),
+  goal: FinancialGoalSchema,
+}).strict();
+export type BackendFinancialProfile = z.infer<
+  typeof BackendFinancialProfileSchema
+>;
+
+export const BackendFinancialProfileResourceSchema = z.object({
+  profile_id: z.string().uuid(),
+  profile: BackendFinancialProfileSchema,
+  created_at: z.string().datetime({ offset: true }),
+  updated_at: z.string().datetime({ offset: true }),
+}).strict();
+export type BackendFinancialProfileResource = z.infer<
+  typeof BackendFinancialProfileResourceSchema
+>;
+
+export type FinancialProfileResource = {
+  profileId: string;
+  profile: FinancialProfile;
+  createdAt: string;
+  updatedAt: string;
+};
 
 /* ------------------------------------------------------------------ */
 /* 공식 금융상품 후보                                                  */

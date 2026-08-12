@@ -8,7 +8,8 @@ import {
 import { MOCK_RECENT_ANALYSES } from "@/lib/mock/analysis";
 
 /**
- * 프로필/추천/이력 관련 백엔드는 아직 없다.
+ * 파생지표와 최근 분석 이력은 아직 mock이다. 저장된 profile 자체는 별도
+ * `/api/v1/profiles` adapter가 관리한다.
  * (`/api/v1/profiles`, `/api/v1/recommendations` 미구현 — SKILL.md 참고)
  * 전부 mock 이며 화면에 mock 배지가 붙는다.
  */
