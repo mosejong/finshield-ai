@@ -8,7 +8,7 @@
 - 브랜치: `fix/public-data-key-normalization`
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-backend`
 - 기준 `main`: `0e3b514d1f2d2f161578695be0c687f2c7dc8183`
-- 상태: 로컬 구현·검증 완료, PM 리뷰 대기
+- 상태: Draft PR 생성, CI·PM 리뷰 중
 
 ## 문제
 
@@ -63,6 +63,8 @@ HTTP 403과 `SERVICE_KEY_IS_NOT_REGISTERED_ERROR`를 반환했다.
 
 ## 커밋·PR
 
-- 커밋: 생성 전
-- push: 수행 전
-- PR: 생성 전
+- 16:19 KST: 수정·테스트·개발일지 커밋 및 push
+- 커밋: `c8fdcdf618b7cf9ae1eee3b0aedba0ad3765780e`
+- push: `fix/public-data-key-normalization`
+- PR: [#10 fix: accept encoded public data service keys](https://github.com/mosejong/finshield-ai/pull/10)
+- PR 생성: 2026-08-12 16:19:48 KST (Draft)
