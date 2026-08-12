@@ -10,9 +10,9 @@ FinancialProfile의 `goal`과 공식 상품의 `purpose_text`를 결정론적으
 
 `POST /api/v1/recommendations?page_no=1&page_size=20`
 
-- request: 기존 최소수집 `FinancialProfile`
+- request: filtering에 실제 사용하는 `goal` 하나만 전송
 - response: snapshot provider·기준월, 전체 상태 집계, 페이지 결과, disclaimer
-- profile은 요청 중 계산에만 사용하고 저장·로그하지 않는다.
+- 소득·부채·신용·연령 등 사용하지 않는 profile 정보는 서버로 전송하지 않는다.
 
 ## v0.1 규칙
 

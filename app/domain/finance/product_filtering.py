@@ -1,4 +1,4 @@
-from app.schemas.financial_profile import FinancialGoal, FinancialProfile
+from app.schemas.financial_profile import FinancialGoal
 from app.schemas.product import FinancialProduct
 from app.schemas.recommendation import ProductMatchReason, ProductMatchResult
 
@@ -17,9 +17,9 @@ GOAL_PURPOSE_TOKENS: dict[FinancialGoal, tuple[str, ...]] = {
 
 def filter_product_for_profile(
     product: FinancialProduct,
-    profile: FinancialProfile,
+    goal: FinancialGoal,
 ) -> ProductMatchResult:
-    tokens = GOAL_PURPOSE_TOKENS[profile.goal]
+    tokens = GOAL_PURPOSE_TOKENS[goal]
     purpose = product.purpose_text
 
     if not tokens or not purpose:

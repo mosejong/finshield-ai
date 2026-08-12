@@ -26,7 +26,7 @@ def recommend_products(
 ) -> ProductRecommendationResponse:
     try:
         return ProductRecommendationService(catalog_service).recommend(
-            request.profile,
+            request.goal,
             page_no=page_no,
             page_size=page_size,
         )

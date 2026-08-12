@@ -1,7 +1,7 @@
 from collections import Counter
 
 from app.domain.finance.product_filtering import filter_product_for_profile
-from app.schemas.financial_profile import FinancialProfile
+from app.schemas.financial_profile import FinancialGoal
 from app.schemas.recommendation import (
     ProductRecommendationResponse,
     ProductRecommendationSummary,
@@ -21,14 +21,14 @@ class ProductRecommendationService:
 
     def recommend(
         self,
-        profile: FinancialProfile,
+        goal: FinancialGoal,
         *,
         page_no: int,
         page_size: int,
     ) -> ProductRecommendationResponse:
         snapshot = self._catalog_service.get_snapshot()
         results = [
-            filter_product_for_profile(product, profile) for product in snapshot.items
+            filter_product_for_profile(product, goal) for product in snapshot.items
         ]
         order = {"potential_match": 0, "needs_review": 1, "mismatch": 2}
         results.sort(key=lambda result: (order[result.status], result.product.source_product_id))

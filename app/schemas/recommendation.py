@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.financial_profile import FinancialProfile
+from app.schemas.financial_profile import FinancialGoal
 from app.schemas.product import FinancialProduct
 
 
@@ -12,7 +12,7 @@ MatchStatus = Literal["potential_match", "mismatch", "needs_review"]
 class ProductRecommendationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    profile: FinancialProfile
+    goal: FinancialGoal
 
 
 class ProductMatchReason(BaseModel):
