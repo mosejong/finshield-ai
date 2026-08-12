@@ -71,3 +71,10 @@
 - compile, `git diff --check`: 통과
 - OpenAPI request/response 계약: 통과
 - 개인정보 저장·로그, LLM, 임의 URL fetch, frontend 변경 없음
+
+## 커밋·PR
+
+- 구현 커밋: `e4b76809334e75bf3edfba3bb9292ee330006270`
+- PR: [#21 feat: add conservative product filtering](https://github.com/mosejong/finshield-ai/pull/21)
+- PR 생성: 2026-08-12 17:35:19 KST (Draft)
+- 상태: GitHub CI·PM 검수 중
