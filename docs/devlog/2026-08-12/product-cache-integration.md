@@ -42,3 +42,10 @@ TTL cache의 공개 응답·운영 설정·검증 수치를 README, 문서 색�
 - 문서 수치·링크·상태 일치 확인
 - `git diff --check`
 - GitHub CI 통과 후 병합
+
+## 커밋·PR
+
+- 문서 통합 커밋: `a4b9ada3af690b2547650ca6d5c5c7eff9b78239`
+- PR: [#17 docs: integrate product catalog cache](https://github.com/mosejong/finshield-ai/pull/17)
+- PR 생성: 2026-08-12 17:12:00 KST (Draft)
+- 상태: GitHub CI·PM 검수 중
