@@ -64,6 +64,15 @@
 - 375px full-page 캡처는 글자가 세로로 보이는 캡처 아티팩트가 있었으나 같은 상태의
   viewport 캡처와 DOM 실제 폭(본문 343px, document 375px)으로 정상 레이아웃 확인
 
+## PR 및 PM 검수
+
+- Draft PR: [#32 feat: add loan what-if comparison UI](https://github.com/mosejong/finshield-ai/pull/32)
+- GitHub Actions backend `test`, frontend `web`: 통과
+- PM 계약 검수: 프론트 이자·차액 계산 없음, request 최소 필드, 양쪽 실패 비은폐 확인
+- PM 표현 검수: 원금균등의 `monthly_payment=null`을 첫 달 납입액으로 정확히 표시
+- PM 사용성 검수: 브라우저에서 발견한 원금 step 불일치를 병합 전 교정
+- 차단 이슈: 없음
+
 ## 후속 요구사항: 재테크 기초 가이드
 
 사용자 요청으로 재테크 관심 사용자를 위한 교육 기능을 다음 단계 후보로 등록한다.
