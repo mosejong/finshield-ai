@@ -7,7 +7,7 @@
 - PM 검수 시작: 15:00 KST
 - 담당 영역: 프론트엔드 및 API 표시 어댑터
 - 작업 브랜치: `feature/frontend-mvp`
-- 상태: 최신 Scenario Engine 계약 통합 및 PM 검증 완료, 커밋 대기
+- 상태: 최신 Scenario Engine 계약 통합 및 PM 검증 완료, push·PR 대기
 
 ## 목표
 
@@ -125,8 +125,9 @@
 
 ## 커밋·PR 정보
 
-- Claude Code 원본 커밋: `3713e40` (rebase 후 SHA)
-- 통합 수정 커밋: 생성 전
+- Claude Code 원본 커밋: `3713e40cdb65b8024594d82f18820f9a9b17d65b`
+- 통합 수정 커밋: `9fe562c8530fc77c2fba2c959fcc266e5f210552`
+- 통합 커밋 메시지: `fix: integrate frontend with scenario engine`
 - push: 수행 전
 - PR 방향: `feature/frontend-mvp` → `main`
 - PR: 생성 전
