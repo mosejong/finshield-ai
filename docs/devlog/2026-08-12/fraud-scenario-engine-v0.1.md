@@ -4,11 +4,11 @@
 
 - 작업일: 2026-08-12 (KST)
 - 시작: 14:27 KST
-- 종료: 14:55 KST
+- 종료: 14:56 KST
 - 담당 영역: 백엔드
 - 작업 브랜치: `feature/fraud-scenario-engine`
 - 작업 디렉터리: `C:\Users\user\Documents\Codex\finshield-ai-backend`
-- 상태: PM 검수 및 Draft PR #2 CI 검증 완료
+- 상태: PR #2 PM 검수·CI 통과 후 `main` 병합 완료
 
 ## 목표
 
@@ -262,6 +262,14 @@ PM이 내부 판단을 위해 함께 반환하던 canonical/legacy 신호가 프
 - 완료 시각은 각각 `2026-08-12 14:54:09 KST`, `2026-08-12 14:54:13 KST`이다.
 - GitHub가 PR을 `MERGEABLE`로 판정했으며 PM의 로컬·원격 검증이 모두 완료됐다.
 
+### 14:56 — Ready 전환 및 main 병합
+
+- 최종 PR head `ec749efb85a0ba900a3a8e72057598d30d673f4d`에서 GitHub Actions `test` 2건이 다시 통과했다.
+- Draft PR #2를 Ready for review로 전환했다.
+- PM이 변경 파일 범위와 병합 가능 상태를 최종 확인한 뒤 `main`에 병합했다.
+- 병합 시각: `2026-08-12T05:56:34Z` (`2026-08-12 14:56:34 KST`)
+- 병합 커밋: `27a45e1d5f4c7eeab084397ec734f62299a318bc`
+
 ## 설계 흐름
 
 1. `AnalyzeRequest`가 입력 길이, persona, 상태, URL 길이를 검증한다.
@@ -383,5 +391,6 @@ PM이 내부 판단을 위해 함께 반환하던 canonical/legacy 신호가 프
 - Draft PR: `https://github.com/mosejong/finshield-ai/pull/2`
 - PR 방향: `feature/fraud-scenario-engine` → `main`
 - PR 생성: `2026-08-12 14:52:49 KST`
-- 검증된 PR head: `0a13963a27180e6607179a07f132714277d586ae`
-- 현재 단계: Ready 전환 및 PM 최종 병합
+- 검증된 최종 PR head: `ec749efb85a0ba900a3a8e72057598d30d673f4d`
+- 병합 커밋: `27a45e1d5f4c7eeab084397ec734f62299a318bc`
+- 최종 상태: `main` 병합 완료

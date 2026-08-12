@@ -4,10 +4,12 @@
 
 ## Status
 
-**Planning / Research — 2026-08-11**
+**MVP implementation — 2026-08-12**
 
 목표 대회: **2026 금융 AI Challenge**  
-현재 방향은 확정안이 아니라 연구 가설이며, 공식 통계·기존 서비스·데이터 가용성을 검증한 뒤 MVP 범위를 확정한다.
+Fraud Scenario Engine v0.1 백엔드가 `main`에 병합됐다. 현재 분석은 LLM이나
+런타임 웹 검색 없이 결정론적 규칙, 사용자 상태, 정적 공식 근거로 동작한다.
+프론트엔드 MVP는 `feature/frontend-mvp` 브랜치에서 별도로 개발 중이다.
 
 ## Problem
 
@@ -84,13 +86,20 @@ LLM은 최종 금융·법률 판단자가 아니다. 가능한 범위에서 규�
 5. 현재 단계에 맞는 안전 행동 체크리스트 제공
 6. 공식 근거 출처 표시
 
+현재 백엔드 v0.1은 위 흐름을 `POST /api/v1/analyze`로 제공한다. 결과는 범죄
+확정이나 법률 판단이 아니라 비교·의사결정을 돕는 위험 유형 후보와 행동
+안내다.
+
 ## Repository
 
 ```text
 app/
   api/routes/       API endpoints
-  core/             risk/scenario engine
+  core/             legacy-compatible risk interface
+  data/fraud/       reviewed static official sources
+  domain/fraud/     detection, classification, policy, provenance
   schemas/          request/response schemas
+  services/         application orchestration
 docs/
   01-problem-definition.md
   02-research-plan.md
@@ -98,6 +107,7 @@ docs/
   04-architecture.md
   05-data-and-evaluation.md
   06-roadmap.md
+  devlog/           date- and branch-based development history
 tests/
 .github/workflows/
 ```
@@ -117,10 +127,24 @@ Then open `/docs`.
 ## Test
 
 ```bash
-pytest
+pytest -q
 ```
 
+현재 `main` 기준: **75 passed**. Starlette `TestClient` 사용 중단 예정 경고 1건은
+별도 유지보수 항목으로 관리한다.
+
 ## Backend v0.1 API
+
+`POST /api/v1/analyze`는 입력 문구와 사용자가 이미 취한 행동을 바탕으로
+다음의 결정론적 흐름을 수행한다.
+
+`risk signals → fraud types → UserState → risk level → actions → official sources`
+
+기존 `risk_score`, `risk_level`, `signals`, `scenario`, `disclaimer` 필드를
+유지하면서 `fraud_types`, `summary`, `actions`, `official_sources`를 추가했다.
+기존 다섯 신호 코드와 점수 규칙도 그대로 유지한다. URL은 외부로 요청하지
+않으며 비암호화 HTTP, localhost/IP literal, userinfo, shortener, punycode,
+malformed 구조 같은 최소 lexical 특성만 오프라인으로 검사한다.
 
 `POST /api/v1/loans/simulate`는 LLM 없이 원리금균등상환 또는
 원금균등상환 월별 일정을 계산한다. 월 단위 명목금리(`연이율 / 12`)를
@@ -136,18 +160,13 @@ TODO: 현재 최대 600개월의 전체 schedule을 반환한다. 실제 사용�
 FinancialProfile의 최소 입력 스키마는 `app/schemas/financial_profile.py`에
 정의되어 있으며, 정의되지 않은 필드와 민감정보 입력을 허용하지 않는다.
 
-## Tomorrow first
+## Next priorities
 
-**코딩보다 먼저 `docs/02-research-plan.md`의 근거 조사를 수행한다.**
-
-특히:
-- 사회초년생 vs 소상공인 중 어느 타깃의 문제가 더 강한가?
-- 대포통장/계좌양도/구직·대출 사기의 실제 규모는?
-- 생성형 AI가 금융 사회공학 공격을 어떻게 변화시키는가?
-- 이미 금융권/KISA/보안업계가 해결한 기능은 무엇인가?
-- 공개 학습/평가 데이터는 확보 가능한가?
-
-조사 결과에 따라 MVP를 줄이거나 바꾼다.
+- 프론트엔드 MVP 브랜치 검수 및 API 계약 통합
+- 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
+- 사회초년생과 소상공인 중 Primary Persona 확정
+- 공식 금융상품 API adapter와 deterministic filtering 구현
+- Starlette `TestClient` 사용 중단 예정 경고 대응
 
 ## Verified official-data direction (2026-08-11)
 
