@@ -67,6 +67,8 @@
 - 16:37 KST: 첫 커밋 직전 `git diff --cached --check`가 품질 보고서의 Markdown
   강제 줄바꿈 공백 2줄을 지적했으나 PowerShell 명령 연결로 커밋이 계속 진행됨
 - 해당 2줄을 일반 blockquote 문단으로 즉시 교정하고 별도 수정 커밋으로 추적
+- 16:41 KST PM 리뷰: `--base-month`가 6자리만 검사해 `202699`도 허용하는 문제 발견
+- API 호출 전에 실제 월 범위 01~12를 검증하도록 교정하고 5개 회귀 테스트 추가
 
 ## 보안·개인정보
 
@@ -93,8 +95,8 @@
 
 ## 최종 검증 결과
 
-- 프로파일러·client 관련 테스트: **17 passed**
-- 전체 `pytest -q -p no:cacheprovider`: **92 passed**
+- 프로파일러·client 관련 테스트: **22 passed**
+- 전체 `pytest -q -p no:cacheprovider`: **97 passed**
 - 알려진 경고: 기존 Starlette `TestClient` 사용 중단 예정 경고 1건
 - Python compile (`app`, `tests`, `scripts`): 통과
 - `git diff --check`: 통과

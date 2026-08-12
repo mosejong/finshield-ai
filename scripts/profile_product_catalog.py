@@ -61,6 +61,12 @@ def previous_month(value: str) -> str:
     return f"{year:04d}{month - 1:02d}"
 
 
+def parse_base_month(value: str) -> str:
+    if not re.fullmatch(r"\d{6}", value) or not 1 <= int(value[4:]) <= 12:
+        raise argparse.ArgumentTypeError("base month must use a valid YYYYMM")
+    return value
+
+
 def discover_latest_month(
     client: PublicDataProductClient,
     *,
@@ -241,7 +247,7 @@ def build_profile(rows: list[dict[str, Any]], *, base_month: str) -> dict[str, A
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--env-file", type=Path)
-    parser.add_argument("--base-month")
+    parser.add_argument("--base-month", type=parse_base_month)
     parser.add_argument("--page-size", type=int, default=100, choices=range(1, 101))
     parser.add_argument("--lookback-months", type=int, default=36)
     return parser.parse_args()
@@ -249,8 +255,6 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    if args.base_month is not None and not re.fullmatch(r"\d{6}", args.base_month):
-        raise SystemExit("--base-month must use YYYYMM")
     if args.lookback_months < 0 or args.lookback_months > 120:
         raise SystemExit("--lookback-months must be between 0 and 120")
 

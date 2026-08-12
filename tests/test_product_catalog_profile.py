@@ -1,8 +1,13 @@
+import argparse
+
+import pytest
+
 from app.clients.public_data_products import ProviderProductPage
 from scripts.profile_product_catalog import (
     build_profile,
     discover_latest_month,
     fetch_month_rows,
+    parse_base_month,
     previous_month,
 )
 
@@ -39,6 +44,16 @@ class FakeClient:
 def test_previous_month_crosses_year_boundary() -> None:
     assert previous_month("202601") == "202512"
     assert previous_month("202608") == "202607"
+
+
+@pytest.mark.parametrize("value", ["202613", "202600", "20261", "abcdef"])
+def test_parse_base_month_rejects_invalid_values(value: str) -> None:
+    with pytest.raises(argparse.ArgumentTypeError):
+        parse_base_month(value)
+
+
+def test_parse_base_month_accepts_valid_value() -> None:
+    assert parse_base_month("202607") == "202607"
 
 
 def test_discover_latest_month_stops_at_first_non_empty_month() -> None:
