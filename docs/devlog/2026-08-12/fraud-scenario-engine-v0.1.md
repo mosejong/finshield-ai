@@ -4,11 +4,11 @@
 
 - 작업일: 2026-08-12 (KST)
 - 시작: 14:27 KST
-- 종료: 14:50 KST
+- 종료: 14:53 KST
 - 담당 영역: 백엔드
 - 작업 브랜치: `feature/fraud-scenario-engine`
 - 작업 디렉터리: `C:\Users\user\Documents\Codex\finshield-ai-backend`
-- 상태: 구현 및 로컬 검증 완료, PM 검수 대기
+- 상태: PM 검수 완료, Draft PR #2 CI 검증 중
 
 ## 목표
 
@@ -239,6 +239,22 @@ PM이 내부 판단을 위해 함께 반환하던 canonical/legacy 신호가 프
 - URL 알려진 위험 설명을 현재 offline lexical 정책과 일치하도록 수정했다.
 - 전체 테스트: **75 passed**, 경고 1건
 
+### 14:51 — PM 승인 커밋과 최신 main 동기화
+
+- PM이 변경 파일 11개의 범위와 전체 diff를 확인했다.
+- `feat: add fraud scenario engine v0.1` 커밋을 생성했다.
+- 개발 규칙 PR #1이 병합된 최신 `origin/main` 위로 rebase했다.
+- rebase 후 커밋 SHA는 `a7bab2f126dbf3b0996d0268b2d84dcbe6acf58a`이다.
+- rebase 후 전체 테스트 **75 passed**, Python compile, `git diff --check`를 다시 통과했다.
+
+### 14:52 — 원격 push와 Draft PR 생성
+
+- `feature/fraud-scenario-engine` 브랜치를 `origin`에 최초 push했다.
+- `main` 대상 Draft PR #2를 생성했다.
+- PR URL: `https://github.com/mosejong/finshield-ai/pull/2`
+- GitHub 생성 시각: `2026-08-12T05:52:49Z` (`2026-08-12 14:52:49 KST`)
+- PR 생성 직후 GitHub Actions CI가 시작됐다. 최종 결과는 PM이 별도로 확인한 뒤 Ready 전환과 병합 여부를 결정한다.
+
 ## 설계 흐름
 
 1. `AnalyzeRequest`가 입력 길이, persona, 상태, URL 길이를 검증한다.
@@ -354,8 +370,10 @@ PM이 내부 판단을 위해 함께 반환하던 canonical/legacy 신호가 프
 
 ## 커밋·PR 정보
 
-- 커밋: 생성하지 않음 — PM 검수 대기
-- push: 수행하지 않음
-- PR: 생성하지 않음
-- 예정 PR 방향: `feature/fraud-scenario-engine` → `main`
-- PM 승인 후 권장 커밋 메시지: `feat: add fraud scenario engine v0.1`
+- 기능 커밋: `a7bab2f126dbf3b0996d0268b2d84dcbe6acf58a`
+- 커밋 메시지: `feat: add fraud scenario engine v0.1`
+- push 브랜치: `feature/fraud-scenario-engine`
+- Draft PR: `https://github.com/mosejong/finshield-ai/pull/2`
+- PR 방향: `feature/fraud-scenario-engine` → `main`
+- PR 생성: `2026-08-12 14:52:49 KST`
+- 현재 단계: GitHub Actions CI 확인 후 Ready 전환 및 PM 최종 병합 검토
