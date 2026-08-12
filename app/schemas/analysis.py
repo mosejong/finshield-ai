@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -23,7 +24,7 @@ class AnalyzeRequest(BaseModel):
     text: str = Field(min_length=1, max_length=10000)
     persona: Persona = Persona.UNKNOWN
     state: UserState = UserState.RECEIVED_ONLY
-    url: str | None = None
+    url: str | None = Field(default=None, max_length=2048)
 
 
 class RiskSignal(BaseModel):
@@ -32,9 +33,51 @@ class RiskSignal(BaseModel):
     weight: int
 
 
+class Action(BaseModel):
+    code: Literal[
+        "STOP_CONTACT",
+        "DO_NOT_CLICK",
+        "DO_NOT_INSTALL",
+        "DO_NOT_SHARE_ACCESS",
+        "DO_NOT_FORWARD_MONEY",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "CONTACT_1394",
+        "CONTACT_112",
+        "CONTACT_KISA_118",
+        "PRESERVE_EVIDENCE",
+    ]
+    priority: int = Field(ge=1, le=3)
+    title: str
+    reason: str
+    source_ids: list[str]
+
+
+class OfficialSource(BaseModel):
+    source_id: str
+    organization: str
+    title: str
+    source_url: str
+    retrieved_at: str
+    supports: list[str]
+
+
 class AnalyzeResponse(BaseModel):
     risk_score: int = Field(ge=0, le=100)
-    risk_level: str
+    risk_level: Literal["low", "medium", "high"]
     signals: list[RiskSignal]
     scenario: UserState
     disclaimer: str
+    fraud_types: list[
+        Literal[
+            "authority_impersonation",
+            "loan_policy_impersonation",
+            "account_access_request",
+            "money_mule_transfer",
+            "smishing_malware",
+            "card_delivery_impersonation",
+        ]
+    ]
+    summary: str
+    actions: list[Action]
+    official_sources: list[OfficialSource]

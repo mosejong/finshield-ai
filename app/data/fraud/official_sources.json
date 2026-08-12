@@ -1,0 +1,75 @@
+[
+  {
+    "source_id": "fsec_finance_ai_challenge",
+    "organization": "금융보안원",
+    "title": "2026 금융 AI Challenge",
+    "source_url": "https://www.fsec.or.kr/bbs/detail?bbsNo=11997&menuNo=66",
+    "retrieved_at": "2026-08-12",
+    "supports": ["CONTEXT_CHALLENGE"]
+  },
+  {
+    "source_id": "fsec_ai_strategy",
+    "organization": "금융보안원",
+    "title": "금융보안원 AI 보안 전략",
+    "source_url": "https://www.fsec.or.kr/bbs/detail?bbsNo=11872&menuNo=69",
+    "retrieved_at": "2026-08-12",
+    "supports": ["CONTEXT_AI_SECURITY"]
+  },
+  {
+    "source_id": "police_1394",
+    "organization": "경찰청",
+    "title": "보이스피싱 통합신고대응센터 1394 안내",
+    "source_url": "https://www.police.go.kr/user/bbs/BD_selectBbs.do?q_bbsCode=1007&q_bbscttSn=20260209152732394",
+    "retrieved_at": "2026-08-12",
+    "supports": [
+      "STOP_CONTACT",
+      "DO_NOT_FORWARD_MONEY",
+      "VERIFY_OFFICIAL_CHANNEL",
+      "CONTACT_1394"
+    ]
+  },
+  {
+    "source_id": "police_ecrm_victim_help",
+    "organization": "경찰청 사이버범죄 신고시스템",
+    "title": "피해자 구제·신고 안내",
+    "source_url": "https://ecrm.police.go.kr/minwon/crs/quick/vichelp",
+    "retrieved_at": "2026-08-12",
+    "supports": [
+      "CONTACT_FINANCIAL_INSTITUTION",
+      "CONTACT_112",
+      "PRESERVE_EVIDENCE"
+    ]
+  },
+  {
+    "source_id": "kisa_118",
+    "organization": "한국인터넷진흥원",
+    "title": "KISA 118 상담 안내",
+    "source_url": "https://www.kisa.or.kr/118/",
+    "retrieved_at": "2026-08-12",
+    "supports": ["CONTACT_KISA_118"]
+  },
+  {
+    "source_id": "kisa_smishing",
+    "organization": "한국인터넷진흥원",
+    "title": "스미싱 확인 및 대응 안내",
+    "source_url": "https://www.kisa.or.kr/1020601",
+    "retrieved_at": "2026-08-12",
+    "supports": ["DO_NOT_CLICK", "DO_NOT_INSTALL", "CONTACT_KISA_118"]
+  },
+  {
+    "source_id": "electronic_financial_transactions_act",
+    "organization": "국가법령정보센터",
+    "title": "전자금융거래법 제6조 접근매체의 선정과 사용 및 관리",
+    "source_url": "https://law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1025295481",
+    "retrieved_at": "2026-08-12",
+    "supports": ["DO_NOT_SHARE_ACCESS"]
+  },
+  {
+    "source_id": "fraud_refund_act",
+    "organization": "국가법령정보센터",
+    "title": "전기통신금융사기 피해 방지 및 피해금 환급에 관한 특별법",
+    "source_url": "https://www.law.go.kr/LSW/lsInfoP.do?ancNo=21320&ancYd=20260203&efYd=20260804&lsiSeq=283199",
+    "retrieved_at": "2026-08-12",
+    "supports": ["DO_NOT_FORWARD_MONEY", "CONTACT_FINANCIAL_INSTITUTION"]
+  }
+]
