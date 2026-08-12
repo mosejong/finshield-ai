@@ -8,7 +8,7 @@
 - 브랜치: `fix/public-data-key-normalization`
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-backend`
 - 기준 `main`: `0e3b514d1f2d2f161578695be0c687f2c7dc8183`
-- 상태: Draft PR 생성, CI·PM 리뷰 중
+- 상태: `main` 병합 완료
 
 ## 문제
 
@@ -68,3 +68,9 @@ HTTP 403과 `SERVICE_KEY_IS_NOT_REGISTERED_ERROR`를 반환했다.
 - push: `fix/public-data-key-normalization`
 - PR: [#10 fix: accept encoded public data service keys](https://github.com/mosejong/finshield-ai/pull/10)
 - PR 생성: 2026-08-12 16:19:48 KST (Draft)
+- 16:21 KST: 최종 head `c78d5b943f700b6ee36ed501b5a393c06aa6aa8a`에서
+  Python `test` 2개와 frontend `web` 2개 모두 통과, 변경 4개 파일 확인
+- 16:22:03 KST: Ready 전환 후 `main` 병합
+- 병합 커밋: `a6c68320781a227ff1b9dd1370371c4b808b7603`
+- 병합 후 사용자 원본 `/api/v1/products?page_size=3` 재검증:
+  HTTP 200, 9,316건, 기준월 `202607`, UTF-8 상품명 정상
