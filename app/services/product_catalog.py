@@ -102,7 +102,7 @@ class ProductCatalogService:
             for source_product_id in product_ids
         ]
         return ProductComparisonResponse(
-            provider=PROVIDER_NAME,
+            provider=snapshot.key.provider,
             source_base_month=snapshot.key.base_month,
             fetched_at=snapshot.fetched_at,
             source_reference=DATASET_URL,

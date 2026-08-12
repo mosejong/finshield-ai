@@ -56,3 +56,10 @@
 - 없는 source ID: 명시적 404 안내, 빈 결과나 부적격 판정으로 대체하지 않음
 - 반응형: 375 / 768 / 1280px 가로 overflow 없음, 모바일 하단 navigation과 desktop side navigation 정상
 - `git diff --check`: 통과
+
+## PM 리뷰
+
+- 20:18 PR #36 CI 4개(test 2, web 2) 통과 후 변경 계약과 전환 경계를 재검수했다.
+- 같은 client page에서 다른 상품 ID로 이동할 때 이전 상세·비교 데이터가 잠깐 남지 않도록
+  route 식별자를 component key로 사용해 새 로딩 상태로 remount하도록 보완했다.
+- 비교 응답 provider는 상수 대신 실제 snapshot key에서 가져오도록 메타데이터 경계를 정리했다.

@@ -27,7 +27,7 @@ export default async function ProductDetailPage({
         description="금리·한도·대상 조건을 공식 API 원문 그대로 확인합니다."
         backHref="/products"
       />
-      <ProductDetail productId={productId} />
+      <ProductDetail key={productId} productId={productId} />
     </AppShell>
   );
 }
