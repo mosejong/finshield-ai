@@ -8,7 +8,8 @@
 - 작업 브랜치: `docs/profile-frontend-integration`
 - 기준 병합 커밋: `f9c121295481ca9d0c1db0c432ecf0dfefc96625`
 - 로컬 문서 반영·검증 완료: 18:52 KST
-- 상태: Draft PR 생성 준비
+- Draft PR 생성: 18:53 KST
+- 상태: Draft PR #30, GitHub Actions CI 진행 중
 
 ## 목표
 
@@ -61,5 +62,10 @@ PostgreSQL·인증 우선순위를 잘못 판단하게 된다.
 
 ## 커밋·PR 정보
 
-- 커밋 SHA: 검증 후 기록 예정
-- PR: 검증 후 Draft로 생성 예정
+- 문서 통합 커밋: `d60466e2ae7ca76c05301bfb5254713023294e18`
+- 커밋 메시지: `docs: integrate profile frontend`
+- push 브랜치: `docs/profile-frontend-integration`
+- PR 방향: `docs/profile-frontend-integration` → `main`
+- Draft PR #30: `https://github.com/mosejong/finshield-ai/pull/30`
+- PR 생성: `2026-08-12 18:53:02 KST`
+- 생성 직후 상태: backend `test`, frontend `web` GitHub Actions 진행 중
