@@ -23,7 +23,7 @@
 - [ ] URL domain/reputation feature analysis (outbound-fetch policy required)
 - [x] financial profile dashboard shell
 - [x] financial profile frontend integration (process-local backend CRUD v0.1)
-- [ ] product comparison UI
+- [x] official product detail / 2-product comparison UI
 - [x] official product candidate UI (goal-only minimum input)
 - [x] What-if loan simulation (backend-only calculation, current vs alternative UI)
 - [x] 재테크 기초 가이드 v0.1 (공식 금융교육 근거, 입력·종목·매매 추천 없음)

@@ -12,8 +12,8 @@ Fraud Scenario Engine v0.1 백엔드가 `main`에 병합됐다. 현재 분석은
 Next.js 프론트엔드 MVP도 `main`에 병합되어 실제 분석 API의 위험 유형 후보,
 요약, 행동과 공식 근거를 live로 표시한다.
 공식 금융상품은 최신 활성 기준월 전체를 process-local TTL cache로 재사용하며,
-요청 pagination은 같은 snapshot에서 처리한다. 다음 단계는 source identity 무결성과
-보수적 중복 정책, goal 기반 filtering과 공식 상품 후보 UI까지 완료했다.
+요청 pagination은 같은 snapshot에서 처리한다. source identity 무결성, 보수적 중복
+정책, goal 기반 filtering, 공식 상품 후보·상세·2개 비교 UI까지 완료했다.
 FinancialProfile CRUD v0.1도 백엔드에 추가되어 생성·단건 조회·전체 교체·삭제가
 가능하다. 현재 profile 저장은 로컬 프로토타입용 process-local 방식이며 다음 단계는
 PostgreSQL·인증 경계다. 온보딩·프로필 화면은 이 API와 연결됐고 브라우저에는
@@ -162,7 +162,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **143 passed**, frontend **18 passed**, Next build,
+현재 `main` 기준: Python **150 passed**, frontend **21 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -229,6 +229,14 @@ snapshot 저장 전 공식 source ID와 provider·기준월·수집시각·sourc
 원문을 표시한다. 소득·부채·신용·연령은 상품 요청으로 전송하지 않으며 프론트에서
 적격성이나 금융 수치를 재계산하지 않는다.
 
+`GET /api/v1/products/{source_product_id}`와 `POST /api/v1/products/compare`는 최신
+활성 snapshot의 공식 상품 1개 또는 서로 다른 상품 정확히 2개를 반환한다. 비교는
+snapshot을 한 번만 읽어 provider·기준월·수집시각을 고정하고 요청 순서를 보존한다.
+하나라도 없으면 부분 성공 대신 404를 반환하며 옛 ID를 새 상품으로 추정 매핑하지 않는다.
+`/products/[id]`와 `/products/compare`는 금리·한도·상환·지원조건 원문을 표시하고,
+비어 있는 값은 `확인 필요`로 남긴다. 금리 우열·적격성·승인 가능성은 판정하지 않는다.
+상세 계약과 검증 경계는 `docs/20-product-detail-comparison.md`에 기록했다.
+
 `/products/simulate`는 같은 원금·기간·상환방식에 현재 금리와 변경 금리를 넣어
 backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정기 월 납입액,
 원금균등은 첫 달과 마지막 달 납입액을 구분해 보여준다. 브라우저는 이자·차액·
@@ -245,7 +253,6 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
-- 상품 상세·공식 상품 비교 화면
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
 - PostgreSQL·SQLAlchemy·Alembic 영구 저장과 인증·소유권 경계

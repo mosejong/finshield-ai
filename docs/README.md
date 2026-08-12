@@ -4,7 +4,7 @@
 01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog
 
 ## Architecture / engineering
-04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · `adr/`
+04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · `adr/`
 
 ## Security
 08 AI security alignment · 12 security threat model
@@ -43,3 +43,5 @@ Date- and branch-based logs: `devlog/README.md`
 - `devlog/2026-08-12/loan-what-if-integration.md` — 대출 비교 병합 후 README·백로그 반영
 - `devlog/2026-08-12/wealth-guidance-v0.1.md` — 공식 근거 기반 재테크 기초 가이드 구현·검수·병합
 - `devlog/2026-08-12/wealth-guidance-integration.md` — 재테크 가이드 병합 후 README·백로그 반영
+- `devlog/2026-08-12/product-detail-compare-v0.1.md` — 공식 상품 상세·2개 비교 구현·실데이터 검수·병합
+- `devlog/2026-08-12/product-detail-compare-integration.md` — 상품 상세·비교 병합 후 README·백로그 반영
