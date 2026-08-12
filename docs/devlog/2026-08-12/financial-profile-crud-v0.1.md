@@ -8,7 +8,8 @@
 - 작업 브랜치: `feature/financial-profile-crud-v01`
 - 작업 디렉터리: `C:\Users\user\Documents\Codex\finshield-ai-backend`
 - 로컬 구현·검증 완료: 18:11 KST
-- 상태: PM 코드 검수 중
+- Draft PR 생성: 18:13 KST
+- 상태: Draft PR #26, GitHub Actions CI 진행 중
 
 ## 목표
 
@@ -169,5 +170,10 @@
 
 ## 커밋·PR 정보
 
-- 커밋 SHA: 검수 후 기록 예정
-- PR: 검수 후 Draft로 생성 예정
+- 기능 커밋: `97084a09eac6e7075e8805d3e22b89efb9c46a4e`
+- 커밋 메시지: `feat: add financial profile CRUD v0.1`
+- push 브랜치: `feature/financial-profile-crud-v01`
+- PR 방향: `feature/financial-profile-crud-v01` → `main`
+- Draft PR #26: `https://github.com/mosejong/finshield-ai/pull/26`
+- PR 생성: `2026-08-12 18:13:04 KST`
+- 생성 직후 상태: backend `test`, frontend `web` GitHub Actions 실행 중
