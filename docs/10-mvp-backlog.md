@@ -24,6 +24,7 @@
 - [x] financial profile dashboard shell (session-only)
 - [ ] financial profile backend integration
 - [ ] product comparison UI
+- [x] official product candidate UI (goal-only minimum input)
 - [ ] What-if loan simulation
 - [ ] API p50/p95 instrumentation
 - [ ] audit log / PII masking
