@@ -3,11 +3,12 @@ import type { FinancialProfile, FraudType } from "@/lib/api/contracts";
 /** enum 값 → 화면 문구. 매핑만 하고 판단하지 않는다. */
 
 export const AGE_BAND_LABEL: Record<FinancialProfile["ageBand"], string> = {
-  "19-24": "19~24세",
-  "25-29": "25~29세",
-  "30-34": "30~34세",
-  "35-39": "35~39세",
-  "40+": "40세 이상",
+  under_20: "20세 미만",
+  "20_29": "20~29세",
+  "30_39": "30~39세",
+  "40_49": "40~49세",
+  "50_59": "50~59세",
+  "60_plus": "60세 이상",
 };
 
 export const EMPLOYMENT_LABEL: Record<
@@ -15,11 +16,11 @@ export const EMPLOYMENT_LABEL: Record<
   string
 > = {
   employed: "직장인",
-  probation: "수습·계약직",
-  freelance: "프리랜서",
   self_employed: "자영업·소상공인",
-  job_seeking: "구직 중",
+  unemployed: "구직 중·미취업",
   student: "학생",
+  retired: "은퇴",
+  other: "그 외",
 };
 
 export const CREDIT_BAND_LABEL: Record<
@@ -27,10 +28,10 @@ export const CREDIT_BAND_LABEL: Record<
   string
 > = {
   unknown: "모름",
-  very_high: "매우 높음",
-  high: "높음",
-  medium: "보통",
-  low: "낮음",
+  excellent: "매우 양호",
+  good: "양호",
+  fair: "보통",
+  poor: "낮음",
 };
 
 export const GOAL_LABEL: Record<FinancialProfile["goal"], string> = {
@@ -38,7 +39,7 @@ export const GOAL_LABEL: Record<FinancialProfile["goal"], string> = {
   emergency_cash: "비상금 마련",
   debt_refinance: "기존 대출 갈아타기",
   living_expense: "생활비 메우기",
-  business: "사업 자금",
+  startup_business: "사업 자금",
   vehicle: "차량 구입",
   asset_building: "돈 모으기",
   other: "그 외",

@@ -3,12 +3,11 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ProfileForm } from "@/components/finance/ProfileForm";
-import { useStoredProfile } from "@/lib/store/profile-store";
-import { useHydrated } from "@/lib/store/session-store";
+import { useProfileStore } from "@/lib/store/profile-store";
 
 export default function OnboardingPage() {
-  const hydrated = useHydrated();
-  const initial = useStoredProfile();
+  const profileState = useProfileStore();
+  const loading = profileState.status === "idle" || profileState.status === "loading";
 
   return (
     <AppShell>
@@ -18,11 +17,17 @@ export default function OnboardingPage() {
         backHref="/"
       />
 
-      {/* 저장된 값을 읽기 전에 폼을 그리면 빈 값으로 초기화된다 */}
-      {hydrated ? (
-        <ProfileForm initial={initial} />
-      ) : (
+      {loading ? (
         <p className="text-body text-muted-foreground">불러오는 중…</p>
+      ) : (
+        <>
+          {profileState.error ? (
+            <p role="alert" className="mb-4 rounded-lg border border-risk-medium-border bg-risk-medium-bg p-4 text-body text-risk-medium">
+              {profileState.error}
+            </p>
+          ) : null}
+          <ProfileForm initial={profileState.profile} />
+        </>
       )}
     </AppShell>
   );

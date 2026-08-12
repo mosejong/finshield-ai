@@ -14,7 +14,7 @@ import type {
  */
 
 export const MOCK_PROFILE: FinancialProfile = {
-  ageBand: "25-29",
+  ageBand: "20_29",
   employmentStatus: "employed",
   householdSize: 1,
   dependentsCount: 0,
@@ -23,11 +23,13 @@ export const MOCK_PROFILE: FinancialProfile = {
   monthlyFixedExpenses: 1_150_000,
   monthlyVariableExpenses: 620_000,
   liquidAssets: 4_200_000,
+  emergencyFundTargetMonths: 3,
 
   totalDebt: 18_000_000,
   monthlyDebtPayment: 310_000,
 
-  creditScoreBand: "medium",
+  creditScoreBand: "fair",
+  businessOwner: false,
   goal: "debt_refinance",
   persona: "early_career",
 };

@@ -16,9 +16,11 @@ export function ProfileFacts({ profile }: { profile: FinancialProfile }) {
     { label: "매달 나가는 고정지출", value: formatWon(profile.monthlyFixedExpenses) },
     { label: "매달 쓰는 생활비", value: formatWon(profile.monthlyVariableExpenses) },
     { label: "바로 쓸 수 있는 돈", value: formatWon(profile.liquidAssets) },
+    { label: "비상금 목표", value: `${profile.emergencyFundTargetMonths}개월` },
     { label: "남은 대출 총액", value: formatWon(profile.totalDebt) },
     { label: "매달 갚는 돈", value: formatWon(profile.monthlyDebtPayment) },
     { label: "신용점수 구간", value: CREDIT_BAND_LABEL[profile.creditScoreBand] },
+    { label: "사업체 운영", value: profile.businessOwner ? "예" : "아니요" },
     { label: "지금 목표", value: GOAL_LABEL[profile.goal] },
   ];
 
