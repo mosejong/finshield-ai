@@ -27,6 +27,12 @@
 - `financial-profile-crud-integration.md` — 프로필 CRUD 병합 후 PM 관리 문서 반영
 - `profile-frontend-integration-v0.1.md` — backend profile CRUD 프론트 연결과 PR #29 병합
 - `profile-frontend-integration.md` — 프로필 프론트 병합 후 PM 관리 문서 반영
+- `loan-what-if-ui-v0.1.md` — 대출 조건 비교 UI 구현·실브라우저 검수·병합
+- `loan-what-if-integration.md` — 대출 조건 비교 병합 후 PM 관리 문서 반영
+- `wealth-guidance-v0.1.md` — 공식 근거 기반 재테크 기초 가이드 구현·검수·병합
+- `wealth-guidance-integration.md` — 재테크 가이드 병합 후 PM 관리 문서 반영
+- `product-detail-compare-v0.1.md` — 공식 상품 상세·2개 비교 구현·실데이터 검수·PR #36 병합
+- `product-detail-compare-integration.md` — 상품 상세·비교 병합 후 PM 관리 문서 반영
 
 ## 작성 규칙
 
