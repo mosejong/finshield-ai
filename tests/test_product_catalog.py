@@ -75,6 +75,20 @@ def test_client_sends_fixed_official_endpoint_and_required_parameters() -> None:
     assert page.fetched_at.tzinfo is timezone.utc
 
 
+def test_client_accepts_url_encoded_general_service_key() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["serviceKey"] == "abc+def/ghi="
+        return httpx.Response(200, json=provider_payload())
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http_client:
+        page = PublicDataProductClient(
+            "abc%2Bdef%2Fghi%3D",
+            client=http_client,
+        ).fetch_products(page_no=1, page_size=20)
+
+    assert page.total_count == 1
+
+
 def test_service_normalizes_text_without_inventing_numeric_eligibility() -> None:
     transport = httpx.MockTransport(
         lambda _: httpx.Response(200, json=provider_payload())
