@@ -9,6 +9,8 @@
 - `frontend-integration.md` — 프론트 PR #4 병합 후 PM 관리 문서 반영
 - `fraud-scenario-engine-v0.1.md` — Fraud Scenario Engine v0.1 구현, PM 검수, PR #2 병합
 - `scenario-engine-integration.md` — Scenario Engine 병합 후 PM 관리 문서 반영
+- `product-catalog-v0.1.md` — 공식 금융상품 adapter와 정규화 계약 구현, PR #7 병합
+- `product-catalog-integration.md` — 상품 adapter 병합 후 PM 관리 문서 반영
 
 ## 작성 규칙
 

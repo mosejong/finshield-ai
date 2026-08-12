@@ -8,7 +8,7 @@
 - 브랜치: `feature/product-catalog-v01`
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-backend`
 - 기준 `main`: `38110e92d97232d5d023461bf845d8c34e6a61f7`
-- 상태: CI·PM 리뷰 통과, Ready 전환 준비
+- 상태: `main` 병합 완료
 
 ## 목표
 
@@ -105,6 +105,10 @@
 - `web/`, 기존 fraud·loan domain, 기존 테스트 계약 변경 없음
 - 서비스키 미설정 환경에서 503으로 닫히며 기존 endpoint에는 영향 없음
 - live 검증 전에는 실제 상품 제공이 완료된 것으로 표시하지 않는 조건으로 승인
+- 15:58 KST: 최종 head `fd18451b9084de31725882b59ec2ad6a49f4a4e0`에서
+  Python `test` 2개와 frontend `web` 2개 모두 재통과, Ready 전환
+- 15:59:19 KST: `main` 병합
+- 병합 커밋: `1f614ee1c7558c83d986b08b423bbd0fc4e6c927`
 
 ## 남은 위험과 다음 작업
 
