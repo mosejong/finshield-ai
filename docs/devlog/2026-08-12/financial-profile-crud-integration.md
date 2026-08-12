@@ -8,7 +8,8 @@
 - 작업 브랜치: `docs/financial-profile-crud-integration`
 - 기준 병합 커밋: `06737507667c566051291092d172e61eaac0bcd0`
 - 로컬 문서 반영·검증 완료: 18:20 KST
-- 상태: Draft PR 생성 준비
+- Draft PR 생성: 18:20 KST
+- 상태: Draft PR #27, GitHub Actions CI 진행 중
 
 ## 목표
 
@@ -65,5 +66,10 @@ MVP 백로그와 기능 개발일지에 반영한다. 애플리케이션 코드�
 
 ## 커밋·PR 정보
 
-- 커밋 SHA: 검증 후 기록 예정
-- PR: 검증 후 Draft로 생성 예정
+- 문서 통합 커밋: `1a6c510c9d510bb6f0940254b3efbe9ef61e0ff8`
+- 커밋 메시지: `docs: integrate financial profile CRUD`
+- push 브랜치: `docs/financial-profile-crud-integration`
+- PR 방향: `docs/financial-profile-crud-integration` → `main`
+- Draft PR #27: `https://github.com/mosejong/finshield-ai/pull/27`
+- PR 생성: `2026-08-12 18:20:02 KST`
+- 생성 직후 상태: backend `test`, frontend `web` GitHub Actions 진행 중
