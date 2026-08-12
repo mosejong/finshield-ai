@@ -7,7 +7,7 @@
 - 담당 영역: PM 관리 문서
 - 작업 브랜치: `docs/frontend-integration`
 - 기준 병합 커밋: `b8331d6bf88c2677bbebd2829141a781456505a3`
-- 상태: 로컬 검수 완료, PR 준비
+- 상태: Draft PR 생성, CI 검증 중
 
 ## 목표
 
@@ -41,7 +41,9 @@ MVP 백로그, 문서 색인과 개발일지에 반영한다. 애플리케이션
 
 ## 커밋·PR 정보
 
-- 커밋: 생성 전
-- push: 수행 전
+- 15:35 KST: 문서 통합 커밋 및 push 완료
+- 커밋: `1f7073d4665f581f6658a16d6786b003e99872d0`
+- push 브랜치: `docs/frontend-integration`
 - PR 방향: `docs/frontend-integration` → `main`
-- PR: 생성 전
+- PR: [#5 docs: record frontend integration](https://github.com/mosejong/finshield-ai/pull/5)
+- PR 생성: 2026-08-12 15:35:21 KST (Draft)
