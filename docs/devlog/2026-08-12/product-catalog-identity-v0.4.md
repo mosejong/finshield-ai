@@ -106,7 +106,7 @@
 - 구현 커밋: `c66c8d395b3a31692829f5ede52a02bbc0d5fcf9`
 - PR: [#19 feat: enforce product source identity](https://github.com/mosejong/finshield-ai/pull/19)
 - PR 생성: 2026-08-12 17:23:42 KST (Draft)
-- 상태: PM 검수·GitHub CI 통과, Ready 전환 대기
+- 상태: 완료 — PR #19 병합 및 PM 문서 통합
 
 ## PM 최종 검수
 
@@ -117,3 +117,6 @@
 - snapshot-scoped identity를 영구 cross-month ID로 표현하지 않음
 - secret·개인정보·임의 URL fetch·frontend 변경 없음
 - 차단 이슈 없음
+- Ready 전환: 2026-08-12 17:26 KST
+- 병합: 2026-08-12 17:27:05 KST
+- 병합 커밋: `bb55db087e11431f0882ec4a8a652c55453c052f`
