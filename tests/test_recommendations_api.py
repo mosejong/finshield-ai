@@ -14,21 +14,6 @@ from app.services.product_catalog_snapshot import (
 )
 
 
-PROFILE = {
-    "age_band": "20_29",
-    "employment_status": "employed",
-    "household_size": 1,
-    "monthly_net_income": "3000000",
-    "monthly_fixed_expenses": "1000000",
-    "monthly_variable_expenses": "500000",
-    "liquid_assets": "5000000",
-    "emergency_fund_target_months": 3,
-    "total_debt": "0",
-    "monthly_debt_payment": "0",
-    "goal": "housing",
-}
-
-
 class CatalogStub:
     def get_snapshot(self) -> ProductCatalogSnapshot:
         fetched_at = datetime(2026, 8, 12, tzinfo=timezone.utc)
@@ -67,7 +52,7 @@ def test_recommendations_endpoint_returns_conservative_statuses() -> None:
     try:
         response = TestClient(app).post(
             "/api/v1/recommendations?page_size=10",
-            json={"profile": PROFILE},
+            json={"goal": "housing"},
         )
     finally:
         app.dependency_overrides.clear()
@@ -88,12 +73,12 @@ def test_recommendations_endpoint_returns_conservative_statuses() -> None:
 
 
 def test_recommendations_rejects_sensitive_profile_fields() -> None:
-    payload = {**PROFILE, "otp": "123456"}
+    payload = {"goal": "housing", "otp": "123456"}
     app.dependency_overrides[get_product_catalog_service] = CatalogStub
     try:
         response = TestClient(app).post(
             "/api/v1/recommendations",
-            json={"profile": payload},
+            json=payload,
         )
     finally:
         app.dependency_overrides.clear()
