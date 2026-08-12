@@ -10,7 +10,8 @@
 - 로컬 구현·검증 완료: 18:11 KST
 - Draft PR 생성: 18:13 KST
 - PM 검수·초기 CI 완료: 18:15 KST
-- 상태: 최종 문서 기록 후 Ready 전환 예정
+- Ready 전환·병합: 18:17 KST
+- 상태: PR #26 PM 검수·CI 통과 후 `main` 병합 완료
 
 ## 목표
 
@@ -191,3 +192,8 @@
 - 검수한 PR head: `a2810d82abf27514eb94b115ee3ea28ff225189f`
 - 초기 GitHub Actions: backend `test` 2건, frontend `web` 2건 모두 성공
 - PM 리뷰: 차단 이슈 없음, 최종 문서 커밋 CI 확인 후 Ready 전환 예정
+- 최종 PR head: `729ff225bb4ece805c12ea036670e67d384e1d3b`
+- 최종 GitHub Actions: backend `test` 2건, frontend `web` 2건 모두 성공
+- Ready 전환 후 squash merge 완료
+- 병합 시각: `2026-08-12 18:17:20 KST`
+- 병합 커밋: `06737507667c566051291092d172e61eaac0bcd0`

@@ -13,7 +13,10 @@ Next.js 프론트엔드 MVP도 `main`에 병합되어 실제 분석 API의 위�
 요약, 행동과 공식 근거를 live로 표시한다.
 공식 금융상품은 최신 활성 기준월 전체를 process-local TTL cache로 재사용하며,
 요청 pagination은 같은 snapshot에서 처리한다. 다음 단계는 source identity 무결성과
-보수적 중복 정책이다.
+보수적 중복 정책, goal 기반 filtering과 공식 상품 후보 UI까지 완료했다.
+FinancialProfile CRUD v0.1도 백엔드에 추가되어 생성·단건 조회·전체 교체·삭제가
+가능하다. 현재 profile 저장은 로컬 프로토타입용 process-local 방식이며 다음 단계는
+프론트 연결과 PostgreSQL·인증 경계다.
 
 ## Problem
 
@@ -103,6 +106,7 @@ app/
   core/             legacy-compatible risk interface
   data/fraud/       reviewed static official sources
   domain/fraud/     detection, classification, policy, provenance
+  repositories/     process-local prototype persistence boundaries
   schemas/          request/response schemas
   services/         application orchestration
 docs/
@@ -157,7 +161,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **126 passed**, frontend adapter **5 passed**, Next build,
+현재 `main` 기준: Python **139 passed**, frontend adapter **5 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -187,6 +191,11 @@ TODO: 현재 최대 600개월의 전체 schedule을 반환한다. 실제 사용�
 
 FinancialProfile의 최소 입력 스키마는 `app/schemas/financial_profile.py`에
 정의되어 있으며, 정의되지 않은 필드와 민감정보 입력을 허용하지 않는다.
+`POST /api/v1/profiles`, 단건 `GET`, 전체 교체 `PUT`, `DELETE`로 검증된 profile을
+재사용할 수 있다. 응답은 불투명 UUID와 UTC 생성·수정 시각을 포함하며 전체 목록
+endpoint는 제공하지 않는다. 현재 저장소는 기본 최대 1,000개의 process-local
+메모리 저장이므로 재시작·다중 worker에서 유지되지 않는다. UUID는 인증이 아니며,
+인증·소유권 검증과 PostgreSQL 전환 전에는 공개 배포에 사용하면 안 된다.
 
 `GET /api/v1/products`는 금융위원회 `서민금융상품기본정보`의 고정 HTTPS
 endpoint를 호출하고 공식 응답을 내부 상품 계약으로 정규화한다. 금리·한도·기간과
@@ -223,7 +232,8 @@ snapshot 저장 전 공식 source ID와 provider·기준월·수집시각·sourc
 - 상품 상세·비교·What-if 화면과 대출 시뮬레이터 연결
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
-- 금융 프로필 API와 session-only 프론트 연결 교체
+- FinancialProfile CRUD와 session-only 프론트 연결 교체
+- PostgreSQL·SQLAlchemy·Alembic 영구 저장과 인증·소유권 경계
 - 상품 탐색·비교·What-if 화면 구현 및 대출 시뮬레이터 연결
 - Starlette `TestClient` 사용 중단 예정 경고 대응
 
