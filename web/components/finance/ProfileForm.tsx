@@ -287,7 +287,7 @@ export function ProfileForm({ initial }: { initial: FinancialProfile | null }) {
           저장하기
         </button>
         <p className="text-center text-caption text-muted-foreground">
-          입력한 내용은 브라우저 세션에만 남습니다. 서버로 보내지 않습니다.
+          금액 정보는 브라우저 세션에만 남습니다. 상품 확인 시 금융 목표만 서버로 보냅니다.
         </p>
       </div>
     </form>
