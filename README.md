@@ -11,6 +11,8 @@ Fraud Scenario Engine v0.1 백엔드가 `main`에 병합됐다. 현재 분석은
 런타임 웹 검색 없이 결정론적 규칙, 사용자 상태, 정적 공식 근거로 동작한다.
 Next.js 프론트엔드 MVP도 `main`에 병합되어 실제 분석 API의 위험 유형 후보,
 요약, 행동과 공식 근거를 live로 표시한다.
+공식 금융상품은 최신 활성 기준월을 재현 가능하게 수집·분석하는 1단계를 마쳤고,
+다음 구현은 최신월 snapshot의 메모리 TTL cache다.
 
 ## Problem
 
@@ -154,7 +156,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **86 passed**, frontend adapter **3 passed**, Next build,
+현재 `main` 기준: Python **97 passed**, frontend adapter **3 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -191,13 +193,17 @@ endpoint를 호출하고 공식 응답을 내부 상품 계약으로 정규화�
 source product ID, 기준월, 조회 시각과 데이터셋 URL을 포함한다. 키 누락은 503,
 기관·응답 스키마 오류는 502로 명시해 장애를 “적격 상품 없음”으로 오인하지 않는다.
 2026-08-12 live 검증에서 HTTP 200, `NORMAL SERVICE.`, 전체 9,316건과 기준월
-`202607`을 확인했다. 상품 원문은 공식 응답을 그대로 보존한다.
+`202607`을 확인했다. 최신월 활성 상품은 325건이며 source ID 누락·중복은 없었다.
+상품명만 같은 2건은 서로 다른 지역 보증재단 상품이므로 이름만으로 중복 제거하지
+않는다. 금리 등 누락 필드는 추정하지 않으며, 상세 품질 기준은
+`docs/15-product-catalog-live-profile.md`에 기록했다.
 
 ## Next priorities
 
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
-- 공식 상품 API cache와 provider latency·error 계측
+- 최신월 공식 상품 snapshot의 in-memory TTL cache
+- provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
 - 금융 프로필 API와 session-only 프론트 연결 교체
 - 상품 탐색·비교·What-if 화면 구현 및 대출 시뮬레이터 연결

@@ -13,6 +13,8 @@
 - `product-catalog-integration.md` — 상품 adapter 병합 후 PM 관리 문서 반영
 - `public-data-key-normalization.md` — 일반 인증키 호환 수정과 live 상품 API 검증
 - `public-data-key-integration.md` — 인증키 수정 병합 후 PM 관리 문서 반영
+- `product-catalog-v0.2-profile.md` — 최신월 상품 live 품질 측정과 PR #13 병합
+- `product-profile-integration.md` — 상품 profile 병합 후 PM 관리 문서 반영
 
 ## 작성 규칙
 

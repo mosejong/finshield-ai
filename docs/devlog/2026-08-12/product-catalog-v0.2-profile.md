@@ -9,7 +9,7 @@
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-backend`
 - 기준 `main`: `54923f52be629e05d7a7f19f34a3a56c28000f19`
 - 종료: 16:43 KST
-- 상태: 1단계 구현·PM 검수·Draft PR CI 통과, Ready 전환 대기
+- 상태: 완료 — PR #13 병합 및 PM 문서 통합
 
 ## 단계 목표
 
@@ -116,3 +116,6 @@
 - PR 생성: 2026-08-12 16:38:59 KST (Draft)
 - PM 검수 시점 head: `1d121be0a01a12a880cf6da4e0fe728a9b66a05b`
 - GitHub CI: `test` 2개, `web` 2개 통과
+- Ready 전환: 2026-08-12 16:44 KST
+- 병합: 2026-08-12 16:45:16 KST
+- 병합 커밋: `c907e7270aff7924e131ce97da03bf674bc76906`
