@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchProductRecommendations } from "@/lib/api/products";
 import { useStoredProfile } from "@/lib/store/profile-store";
-import type { ProductRecommendationResponse, ProductMatchStatus } from "@/lib/api/contracts";
+import type { FinancialProfile, ProductRecommendationResponse, ProductMatchStatus } from "@/lib/api/contracts";
 import { DisclaimerNote } from "@/components/common/DisclaimerNote";
 
 const STATUS_LABEL: Record<ProductMatchStatus, string> = {
@@ -15,21 +15,26 @@ const STATUS_LABEL: Record<ProductMatchStatus, string> = {
 
 export function ProductRecommendations() {
   const profile = useStoredProfile();
-  const [data, setData] = useState<ProductRecommendationResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [requestState, setRequestState] = useState<{
+    goal: FinancialProfile["goal"];
+    data?: ProductRecommendationResponse;
+    error?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!profile) return;
     let active = true;
     fetchProductRecommendations(profile.goal)
-      .then((result) => { if (active) setData(result); })
-      .catch(() => { if (active) setError("공식 상품 정보를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요."); });
+      .then((result) => { if (active) setRequestState({ goal: profile.goal, data: result }); })
+      .catch(() => { if (active) setRequestState({ goal: profile.goal, error: "공식 상품 정보를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요." }); });
     return () => { active = false; };
   }, [profile]);
 
   if (!profile) return <div className="rounded-lg border border-border bg-card p-5 text-center"><p className="text-title text-foreground">금융 목표를 먼저 알려주세요</p><p className="mt-2 text-body text-muted-foreground">목표 하나만 서버에 보내 공식 상품 용도와 비교합니다.</p><Link href="/onboarding" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-body font-semibold text-primary-foreground">프로필 입력하기</Link></div>;
-  if (error) return <p role="alert" className="rounded-lg border border-risk-medium-border bg-risk-medium-bg p-4 text-body text-risk-medium">{error}<br />결과를 불러오지 못했다고 이용 가능한 상품이 없다는 뜻은 아닙니다.</p>;
-  if (!data) return <p className="text-body text-muted-foreground">공식 상품을 확인하고 있습니다…</p>;
+  const currentState = requestState?.goal === profile.goal ? requestState : null;
+  if (currentState?.error) return <p role="alert" className="rounded-lg border border-risk-medium-border bg-risk-medium-bg p-4 text-body text-risk-medium">{currentState.error}<br />결과를 불러오지 못했다고 이용 가능한 상품이 없다는 뜻은 아닙니다.</p>;
+  if (!currentState?.data) return <p className="text-body text-muted-foreground">공식 상품을 확인하고 있습니다…</p>;
+  const data = currentState.data;
 
   return <>
     <div className="grid grid-cols-3 gap-2" aria-label="상품 후보 분류 요약">

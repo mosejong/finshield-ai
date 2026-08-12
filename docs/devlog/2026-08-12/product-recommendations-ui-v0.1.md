@@ -54,6 +54,12 @@
 - 임시 Next 서버는 검증 직후 종료
 - `git diff --check`: 통과
 
+## PM 리뷰 교정
+
+- 목표 변경 직후 새 응답 전까지 이전 목표 결과가 잠깐 표시될 수 있는 상태 경계 발견
+- async 응답 상태에 요청 goal을 태그하고 현재 session goal과 다르면 loading으로 처리
+- 이전 goal 결과를 현재 goal 결과로 오인 표시하지 않도록 교정
+
 ## 변경 파일
 
 - `web/app/products/page.tsx`
