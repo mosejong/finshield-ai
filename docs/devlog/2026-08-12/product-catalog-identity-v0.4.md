@@ -106,4 +106,14 @@
 - 구현 커밋: `c66c8d395b3a31692829f5ede52a02bbc0d5fcf9`
 - PR: [#19 feat: enforce product source identity](https://github.com/mosejong/finshield-ai/pull/19)
 - PR 생성: 2026-08-12 17:23:42 KST (Draft)
-- 상태: GitHub CI·PM 검수 중
+- 상태: PM 검수·GitHub CI 통과, Ready 전환 대기
+
+## PM 최종 검수
+
+- 계획한 domain·service·schema·tests·해당 docs 9개 파일만 변경
+- 최신 head: `de9e104c3ddb8f429c6d459821f64847c9cd335b`
+- GitHub CI: backend `test` 2개, frontend `web` 2개 통과
+- source ID 중복은 전체 실패, 동명·다른 ID는 보존하는 정책 재확인
+- snapshot-scoped identity를 영구 cross-month ID로 표현하지 않음
+- secret·개인정보·임의 URL fetch·frontend 변경 없음
+- 차단 이슈 없음
