@@ -107,7 +107,8 @@ def test_service_normalizes_text_without_inventing_numeric_eligibility() -> None
     )
     with httpx.Client(transport=transport) as http_client:
         service = ProductCatalogService(
-            PublicDataProductClient("test-key", client=http_client)
+            PublicDataProductClient("test-key", client=http_client),
+            start_month_provider=lambda: "202202",
         )
         result = service.list_products(page_no=1, page_size=20)
 
@@ -132,25 +133,27 @@ def test_provider_errors_are_explicit(payload: dict) -> None:
     transport = httpx.MockTransport(lambda _: httpx.Response(200, json=payload))
     with httpx.Client(transport=transport) as http_client:
         service = ProductCatalogService(
-            PublicDataProductClient("test-key", client=http_client)
+            PublicDataProductClient("test-key", client=http_client),
+            start_month_provider=lambda: "202202",
         )
         with pytest.raises(ProductProviderResponseError):
             service.list_products(page_no=1, page_size=20)
 
 
-def test_empty_provider_items_are_not_misreported_as_an_error() -> None:
+def test_no_active_snapshot_is_an_explicit_provider_error() -> None:
     payload = provider_payload(item=[])
     payload["response"]["body"]["items"] = ""
     payload["response"]["body"]["totalCount"] = 0
     transport = httpx.MockTransport(lambda _: httpx.Response(200, json=payload))
 
     with httpx.Client(transport=transport) as http_client:
-        result = ProductCatalogService(
-            PublicDataProductClient("test-key", client=http_client)
-        ).list_products(page_no=1, page_size=20)
-
-    assert result.total_count == 0
-    assert result.items == []
+        service = ProductCatalogService(
+            PublicDataProductClient("test-key", client=http_client),
+            lookback_months=0,
+            start_month_provider=lambda: "202202",
+        )
+        with pytest.raises(ProductProviderResponseError):
+            service.list_products(page_no=1, page_size=20)
 
 
 def test_products_endpoint_returns_normalized_official_contract() -> None:
@@ -159,7 +162,8 @@ def test_products_endpoint_returns_normalized_official_contract() -> None:
     )
     http_client = httpx.Client(transport=transport)
     service = ProductCatalogService(
-        PublicDataProductClient("test-key", client=http_client)
+        PublicDataProductClient("test-key", client=http_client),
+        start_month_provider=lambda: "202202",
     )
     app.dependency_overrides[get_product_catalog_service] = lambda: service
 
@@ -172,6 +176,7 @@ def test_products_endpoint_returns_normalized_official_contract() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["provider"] == "financial_services_commission"
+    assert body["source_base_month"] == "202202"
     assert body["items"][0]["source_product_id"] == "202202:1"
     assert body["items"][0]["interest_rate_text"] == "4.5%"
     assert body["items"][0]["source_reference"] == DATASET_URL
@@ -180,8 +185,29 @@ def test_products_endpoint_returns_normalized_official_contract() -> None:
 def test_products_endpoint_returns_503_when_service_key_is_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    get_product_catalog_service.cache_clear()
     monkeypatch.delenv("PUBLIC_DATA_SERVICE_KEY", raising=False)
-    response = TestClient(app).get("/api/v1/products")
+    try:
+        response = TestClient(app).get("/api/v1/products")
+    finally:
+        get_product_catalog_service.cache_clear()
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "official product provider is not configured"
+    }
+
+
+def test_products_endpoint_returns_503_for_invalid_cache_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    get_product_catalog_service.cache_clear()
+    monkeypatch.setenv("PUBLIC_DATA_SERVICE_KEY", "test-key")
+    monkeypatch.setenv("PRODUCT_CATALOG_CACHE_TTL_SECONDS", "0")
+    try:
+        response = TestClient(app).get("/api/v1/products")
+    finally:
+        get_product_catalog_service.cache_clear()
 
     assert response.status_code == 503
     assert response.json() == {
@@ -211,6 +237,8 @@ def test_products_openapi_contract_is_published() -> None:
     operation = schema["paths"]["/api/v1/products"]["get"]
 
     assert operation["responses"]["200"]["content"]["application/json"]["schema"]
+    response_schema = schema["components"]["schemas"]["ProductCatalogResponse"]
+    assert "source_base_month" in response_schema["required"]
     assert {parameter["name"] for parameter in operation["parameters"]} == {
         "page_no",
         "page_size",

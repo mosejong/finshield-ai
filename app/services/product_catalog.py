@@ -1,20 +1,41 @@
 import os
-
-from pydantic import ValidationError
+from math import isfinite
 
 from app.clients.public_data_products import (
     DATASET_URL,
     PROVIDER_NAME,
-    ProductProviderResponseError,
+    ProductProviderConfigurationError,
     PublicDataProductClient,
 )
-from app.domain.finance.product_catalog import normalize_public_data_product
 from app.schemas.product import ProductCatalogResponse
+from app.services.product_catalog_snapshot import (
+    ProductCatalogSnapshotCache,
+    current_seoul_month,
+    load_latest_product_snapshot,
+)
+
+
+DEFAULT_CACHE_TTL_SECONDS = 300.0
+DEFAULT_LOOKBACK_MONTHS = 36
 
 
 class ProductCatalogService:
-    def __init__(self, client: PublicDataProductClient) -> None:
+    def __init__(
+        self,
+        client: PublicDataProductClient,
+        *,
+        cache: ProductCatalogSnapshotCache | None = None,
+        lookback_months: int = DEFAULT_LOOKBACK_MONTHS,
+        start_month_provider=current_seoul_month,
+    ) -> None:
+        if lookback_months < 0 or lookback_months > 120:
+            raise ValueError("lookback months must be between 0 and 120")
         self._client = client
+        self._cache = cache or ProductCatalogSnapshotCache(
+            ttl_seconds=DEFAULT_CACHE_TTL_SECONDS
+        )
+        self._lookback_months = lookback_months
+        self._start_month_provider = start_month_provider
 
     def list_products(
         self,
@@ -22,28 +43,22 @@ class ProductCatalogService:
         page_no: int,
         page_size: int,
     ) -> ProductCatalogResponse:
-        provider_page = self._client.fetch_products(
-            page_no=page_no,
-            page_size=page_size,
+        snapshot = self._cache.get_or_load(
+            lambda: load_latest_product_snapshot(
+                self._client,
+                start_month=self._start_month_provider(),
+                lookback_months=self._lookback_months,
+            )
         )
-        try:
-            items = [
-                normalize_public_data_product(
-                    row,
-                    fetched_at=provider_page.fetched_at,
-                )
-                for row in provider_page.rows
-            ]
-        except ValidationError as exc:
-            raise ProductProviderResponseError(
-                "provider product fields are invalid"
-            ) from exc
+        start = (page_no - 1) * page_size
+        items = list(snapshot.items[start : start + page_size])
         return ProductCatalogResponse(
             provider=PROVIDER_NAME,
-            page_no=provider_page.page_no,
-            page_size=provider_page.page_size,
-            total_count=provider_page.total_count,
-            fetched_at=provider_page.fetched_at,
+            page_no=page_no,
+            page_size=page_size,
+            total_count=len(snapshot.items),
+            source_base_month=snapshot.key.base_month,
+            fetched_at=snapshot.fetched_at,
             source_reference=DATASET_URL,
             items=items,
         )
@@ -51,4 +66,54 @@ class ProductCatalogService:
 
 def build_product_catalog_service() -> ProductCatalogService:
     service_key = os.getenv("PUBLIC_DATA_SERVICE_KEY", "")
-    return ProductCatalogService(PublicDataProductClient(service_key))
+    ttl_seconds = _read_float_setting(
+        "PRODUCT_CATALOG_CACHE_TTL_SECONDS",
+        DEFAULT_CACHE_TTL_SECONDS,
+    )
+    lookback_months = _read_int_setting(
+        "PRODUCT_CATALOG_LOOKBACK_MONTHS",
+        DEFAULT_LOOKBACK_MONTHS,
+        minimum=0,
+        maximum=120,
+    )
+    return ProductCatalogService(
+        PublicDataProductClient(service_key),
+        cache=ProductCatalogSnapshotCache(ttl_seconds=ttl_seconds),
+        lookback_months=lookback_months,
+    )
+
+
+def _read_float_setting(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        value = float(raw_value)
+    except ValueError as exc:
+        raise ProductProviderConfigurationError(f"{name} must be a number") from exc
+    if not isfinite(value) or value <= 0:
+        raise ProductProviderConfigurationError(
+            f"{name} must be greater than zero"
+        )
+    return value
+
+
+def _read_int_setting(
+    name: str,
+    default: int,
+    *,
+    minimum: int,
+    maximum: int,
+) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise ProductProviderConfigurationError(f"{name} must be an integer") from exc
+    if value < minimum or value > maximum:
+        raise ProductProviderConfigurationError(
+            f"{name} must be between {minimum} and {maximum}"
+        )
+    return value
