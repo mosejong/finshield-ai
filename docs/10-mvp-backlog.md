@@ -6,7 +6,7 @@
 - [x] 최신월 공식 상품 live data profile (325건, 2026-08-12)
 - [x] Product normalization + latest-month in-memory cache
 - [x] source identity integrity / conservative duplicate policy
-- [ ] 사용자 조건 기반 deterministic filtering
+- [x] 사용자 goal 기반 conservative deterministic filtering v0.1
 - [x] 원리금균등/원금균등 대출 시뮬레이터
 - [x] Fraud text risk-signal extraction
 - [x] Scenario Engine v0.1

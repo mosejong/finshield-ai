@@ -157,7 +157,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **120 passed**, frontend adapter **3 passed**, Next build,
+현재 `main` 기준: Python **126 passed**, frontend adapter **3 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -209,11 +209,15 @@ snapshot 저장 전 공식 source ID와 provider·기준월·수집시각·sourc
 서로 다른 source ID는 병합하지 않는다. 응답의 `identity`가 적용 정책과 동명 그룹
 수를 제공하며 상세 기준은 `docs/17-product-catalog-identity.md`에 기록했다.
 
+`POST /api/v1/recommendations`는 FinancialProfile의 goal과 공식 `purpose_text`만
+비교해 `potential_match`, `mismatch`, `needs_review`를 반환한다. 상세 자격은 항상
+공식 원문과 취급기관 확인 대상으로 남기며 적격성·승인·금리를 보장하지 않는다.
+
 ## Next priorities
 
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
-- FinancialProfile 기반 deterministic filtering (`potential_match` / `mismatch` / `needs_review`)
+- 상품 후보 상태·근거를 products frontend에 연결
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
 - 금융 프로필 API와 session-only 프론트 연결 교체
