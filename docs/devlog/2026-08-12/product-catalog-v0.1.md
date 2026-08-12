@@ -8,7 +8,7 @@
 - 브랜치: `feature/product-catalog-v01`
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-backend`
 - 기준 `main`: `38110e92d97232d5d023461bf845d8c34e6a61f7`
-- 상태: Draft PR 생성, CI·PM 리뷰 중
+- 상태: CI·PM 리뷰 통과, Ready 전환 준비
 
 ## 목표
 
@@ -95,3 +95,20 @@
 - push: `feature/product-catalog-v01`
 - PR: [#7 feat: add official product catalog adapter](https://github.com/mosejong/finshield-ai/pull/7)
 - PR 생성: 2026-08-12 15:55:14 KST (Draft)
+
+## PM 리뷰
+
+- 15:56 KST: GitHub Python `test` 2개와 frontend `web` 2개 모두 통과
+- 15:57 KST: PR 변경 범위 9개 파일 확인
+- `.env.example`, 신규 상품 client/domain/schema/service/route, `app/main.py`,
+  상품 테스트와 본 개발일지만 포함
+- `web/`, 기존 fraud·loan domain, 기존 테스트 계약 변경 없음
+- 서비스키 미설정 환경에서 503으로 닫히며 기존 endpoint에는 영향 없음
+- live 검증 전에는 실제 상품 제공이 완료된 것으로 표시하지 않는 조건으로 승인
+
+## 남은 위험과 다음 작업
+
+- 공공데이터포털 활용신청 후 decoded 서비스키를 안전한 환경변수로 설정
+- live JSON 응답의 필드·기준월·상품 수와 가이드 샘플 간 차이 검증
+- TTL cache와 provider 호출량·latency·error 계측
+- 중복 제거 및 FinancialProfile 기반 deterministic filtering
