@@ -120,6 +120,22 @@ Then open `/docs`.
 pytest
 ```
 
+## Backend v0.1 API
+
+`POST /api/v1/loans/simulate`는 LLM 없이 원리금균등상환 또는
+원금균등상환 월별 일정을 계산한다. 월 단위 명목금리(`연이율 / 12`)를
+사용하며, 금액은 소수 둘째 자리에서 `ROUND_HALF_UP`으로 처리하고 마지막
+회차에 잔여 원금을 조정한다. 실제 금융기관의 일수 계산, 납입일, 거치기간은
+아직 지원하지 않으므로 공식 상환표가 아닌 비교·의사결정 지원용
+시뮬레이션이다. 응답의 `assumptions`에는 월 이율 기준과 제외 비용이 명시된다.
+
+TODO: 현재 최대 600개월의 전체 schedule을 반환한다. 실제 사용량을 측정한 뒤
+응답 크기 최적화가 필요한지 검토하되, pagination 또는 summary-only 정책은
+별도 API 설계로 결정한다.
+
+FinancialProfile의 최소 입력 스키마는 `app/schemas/financial_profile.py`에
+정의되어 있으며, 정의되지 않은 필드와 민감정보 입력을 허용하지 않는다.
+
 ## Tomorrow first
 
 **코딩보다 먼저 `docs/02-research-plan.md`의 근거 조사를 수행한다.**

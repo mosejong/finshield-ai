@@ -5,7 +5,7 @@
 - [ ] 공식 금융상품 API adapter
 - [ ] Product normalization/cache
 - [ ] 사용자 조건 기반 deterministic filtering
-- [ ] 원리금균등/원금균등 대출 시뮬레이터
+- [x] 원리금균등/원금균등 대출 시뮬레이터
 - [ ] Fraud text risk-signal extraction
 - [ ] Scenario Engine
 - [ ] 공식 근거 기반 설명
