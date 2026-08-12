@@ -23,6 +23,8 @@
 - `product-filtering-integration.md` — filtering 병합 후 PM 관리 문서 반영
 - `product-recommendations-ui-v0.1.md` — 공식 상품 후보 UI와 PR #24 병합
 - `product-ui-integration.md` — 상품 UI 병합 후 PM 관리 문서 반영
+- `financial-profile-crud-v0.1.md` — process-local FinancialProfile CRUD와 PR #26 병합
+- `financial-profile-crud-integration.md` — 프로필 CRUD 병합 후 PM 관리 문서 반영
 
 ## 작성 규칙
 

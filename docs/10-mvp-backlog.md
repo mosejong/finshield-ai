@@ -1,7 +1,7 @@
 # 10. MVP Backlog
 
 ## P0 — 반드시 구현
-- [ ] FinancialProfile CRUD
+- [x] FinancialProfile CRUD v0.1 (process-local prototype)
 - [x] 공식 금융상품 API adapter (live 검증 2026-08-12)
 - [x] 최신월 공식 상품 live data profile (325건, 2026-08-12)
 - [x] Product normalization + latest-month in-memory cache
@@ -22,7 +22,7 @@
 - [x] URL lexical feature analysis (offline safe implementation)
 - [ ] URL domain/reputation feature analysis (outbound-fetch policy required)
 - [x] financial profile dashboard shell (session-only)
-- [ ] financial profile backend integration
+- [ ] financial profile frontend integration (backend CRUD v0.1 complete)
 - [ ] product comparison UI
 - [x] official product candidate UI (goal-only minimum input)
 - [ ] What-if loan simulation

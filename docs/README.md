@@ -35,3 +35,5 @@ Date- and branch-based logs: `devlog/README.md`
 - `devlog/2026-08-12/product-filtering-integration.md` — filtering 병합 후 PM 문서 반영
 - `devlog/2026-08-12/product-recommendations-ui-v0.1.md` — 공식 상품 후보 화면 구현·검수·병합
 - `devlog/2026-08-12/product-ui-integration.md` — 상품 화면 병합 후 PM 문서 반영
+- `devlog/2026-08-12/financial-profile-crud-v0.1.md` — FinancialProfile CRUD 구현·검수·병합
+- `devlog/2026-08-12/financial-profile-crud-integration.md` — 프로필 CRUD 병합 후 PM 문서 반영
