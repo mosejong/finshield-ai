@@ -8,7 +8,7 @@
 - 브랜치: `docs/public-data-key-integration`
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-main`
 - 기준 병합 커밋: `a6c68320781a227ff1b9dd1370371c4b808b7603`
-- 상태: Draft PR 생성, CI 검증 중
+- 상태: `main` 병합 완료
 
 ## 목표
 
@@ -48,3 +48,7 @@ README가 Decoding 키만 요구하고 live 검증 전이라고 설명해 실제
 - push: `docs/public-data-key-integration`
 - PR: [#11 docs: record public data key integration](https://github.com/mosejong/finshield-ai/pull/11)
 - PR 생성: 2026-08-12 16:24:36 KST (Draft)
+- 16:26 KST: 최종 head `a9143b99aa46c4c32fb289becb24b84b112b7c34`에서
+  Python `test` 2개와 frontend `web` 2개 모두 통과
+- 16:26:30 KST: Ready 전환 후 문서 6개를 `main` 병합
+- 병합 커밋: `a31f150b3bd7c3aec39179285b3c15241f093ae2`
