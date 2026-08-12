@@ -6,7 +6,7 @@
 - 브랜치: `chore/development-governance`
 - 기준 브랜치: `main`
 - 시작 시각: 2026-08-12 14:20 KST
-- 상태: 진행 중
+- 상태: Draft PR 검수 대기
 
 ## 목표
 
@@ -36,6 +36,16 @@
 - `docs/14-development-workflow.md`에 브랜치, 개발일지, PR, README 갱신 규칙을 정의했다.
 - `docs/devlog/README.md`에 날짜별 인덱스를 만들었다.
 
+### 14:34 KST — 문서 커밋
+
+- 커밋 `645977e` (`docs: define development workflow and daily logs`)를 생성했다.
+- `git diff --check` 경고를 해소한 뒤 커밋을 확정했다.
+
+### 14:35 KST — Draft PR 생성
+
+- `main` 대상 Draft PR #1을 생성했다.
+- PR: https://github.com/mosejong/finshield-ai/pull/1
+
 ## 변경 파일
 
 - `docs/14-development-workflow.md`
@@ -51,9 +61,11 @@
 
 ## PR 기록
 
-- 커밋 SHA: 작업 완료 후 기록
-- PR URL: 생성 후 기록
-- 생성 시각: 생성 후 기록
+- 커밋 SHA: `645977e`
+- PR 번호: #1
+- PR URL: https://github.com/mosejong/finshield-ai/pull/1
+- 생성 시각: 2026-08-12 14:35:37 KST
+- 상태: Draft / Open
 - 병합 시각: 승인 후 기록
 
 ## 남은 작업
