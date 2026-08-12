@@ -96,6 +96,7 @@ LLM은 최종 금융·법률 판단자가 아니다. 가능한 범위에서 규�
 ```text
 app/
   api/routes/       API endpoints
+  clients/          fixed official-provider adapters
   core/             legacy-compatible risk interface
   data/fraud/       reviewed static official sources
   domain/fraud/     detection, classification, policy, provenance
@@ -126,6 +127,10 @@ uvicorn app.main:app --reload
 
 Then open `/docs`.
 
+공식 금융상품 live 조회를 사용하려면 공공데이터포털 활용신청 후 decoded 키를
+환경변수 `PUBLIC_DATA_SERVICE_KEY`에 설정한다. 실제 키는 저장소나 로그에
+남기지 않는다. 키가 없으면 상품 API는 빈 목록 대신 503을 반환한다.
+
 프론트엔드는 별도 터미널에서 실행한다.
 
 ```bash
@@ -148,7 +153,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **75 passed**, frontend adapter **3 passed**, Next build,
+현재 `main` 기준: Python **85 passed**, frontend adapter **3 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -179,11 +184,20 @@ TODO: 현재 최대 600개월의 전체 schedule을 반환한다. 실제 사용�
 FinancialProfile의 최소 입력 스키마는 `app/schemas/financial_profile.py`에
 정의되어 있으며, 정의되지 않은 필드와 민감정보 입력을 허용하지 않는다.
 
+`GET /api/v1/products`는 금융위원회 `서민금융상품기본정보`의 고정 HTTPS
+endpoint를 호출하고 공식 응답을 내부 상품 계약으로 정규화한다. 금리·한도·기간과
+자격조건은 원문 `*_text`로 보존하며 누락값을 추정하지 않는다. 응답에는 provider,
+source product ID, 기준월, 조회 시각과 데이터셋 URL을 포함한다. 키 누락은 503,
+기관·응답 스키마 오류는 502로 명시해 장애를 “적격 상품 없음”으로 오인하지 않는다.
+현재 로컬 서비스키가 없어 fixture 기반 계약까지만 검증했으며 live 응답 검증은
+활용신청 이후 수행한다.
+
 ## Next priorities
 
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
-- 공식 금융상품 API adapter와 deterministic filtering 구현
+- 공식 상품 API live 응답·신선도 검증과 cache 구현
+- FinancialProfile 기반 deterministic filtering 구현
 - 금융 프로필 API와 session-only 프론트 연결 교체
 - 상품 탐색·비교·What-if 화면 구현 및 대출 시뮬레이터 연결
 - Starlette `TestClient` 사용 중단 예정 경고 대응
