@@ -8,7 +8,7 @@
 - 브랜치: `docs/product-catalog-integration`
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-main`
 - 기준 병합 커밋: `1f614ee1c7558c83d986b08b423bbd0fc4e6c927`
-- 상태: 로컬 검수 완료, PR 준비
+- 상태: Draft PR 생성, CI 검증 중
 
 ## 목표
 
@@ -44,6 +44,8 @@ live 상품 데이터가 검증되지 않았으므로 fixture 계약 완료와 l
 
 ## 커밋·PR
 
-- 커밋: 생성 전
-- push: 수행 전
-- PR: 생성 전
+- 16:01 KST: 문서 통합 커밋 및 push
+- 첫 커밋: `f42f3f2ba7a64312a1f166df931b330d46b9c4c6`
+- push: `docs/product-catalog-integration`
+- PR: [#8 docs: record product catalog integration](https://github.com/mosejong/finshield-ai/pull/8)
+- PR 생성: 2026-08-12 16:01:45 KST (Draft)
