@@ -17,6 +17,8 @@
 - `product-profile-integration.md` — 상품 profile 병합 후 PM 관리 문서 반영
 - `product-catalog-cache-v0.3.md` — 최신월 snapshot TTL cache와 PR #16 병합
 - `product-cache-integration.md` — cache 병합 후 PM 관리 문서 반영
+- `product-catalog-identity-v0.4.md` — source identity 무결성과 PR #19 병합
+- `product-identity-integration.md` — identity 병합 후 PM 관리 문서 반영
 
 ## 작성 규칙
 

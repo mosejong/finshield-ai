@@ -157,7 +157,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **111 passed**, frontend adapter **3 passed**, Next build,
+현재 `main` 기준: Python **120 passed**, frontend adapter **3 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -204,11 +204,16 @@ source product ID, 기준월, 조회 시각과 데이터셋 URL을 포함한다.
 수 있다. cache 만료 후 갱신 실패는 빈 목록이나 stale data로 숨기지 않고 502를
 유지한다. 설정과 한계는 `docs/16-product-catalog-cache.md`에 기록했다.
 
+snapshot 저장 전 공식 source ID와 provider·기준월·수집시각·source URL의
+일관성을 검증한다. 동일 source ID는 전체 snapshot 오류로 처리하고, 이름만 같은
+서로 다른 source ID는 병합하지 않는다. 응답의 `identity`가 적용 정책과 동명 그룹
+수를 제공하며 상세 기준은 `docs/17-product-catalog-identity.md`에 기록했다.
+
 ## Next priorities
 
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
-- source product ID 무결성 검증과 보수적 duplicate 정책
+- FinancialProfile 기반 deterministic filtering (`potential_match` / `mismatch` / `needs_review`)
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
 - 금융 프로필 API와 session-only 프론트 연결 교체
