@@ -10,6 +10,7 @@ from app.clients.public_data_products import (
 from app.domain.finance.product_identity import SNAPSHOT_IDENTITY_POLICY
 from app.schemas.product import ProductCatalogIdentity, ProductCatalogResponse
 from app.services.product_catalog_snapshot import (
+    ProductCatalogSnapshot,
     ProductCatalogSnapshotCache,
     current_seoul_month,
     load_latest_product_snapshot,
@@ -44,13 +45,7 @@ class ProductCatalogService:
         page_no: int,
         page_size: int,
     ) -> ProductCatalogResponse:
-        snapshot = self._cache.get_or_load(
-            lambda: load_latest_product_snapshot(
-                self._client,
-                start_month=self._start_month_provider(),
-                lookback_months=self._lookback_months,
-            )
-        )
+        snapshot = self.get_snapshot()
         start = (page_no - 1) * page_size
         items = list(snapshot.items[start : start + page_size])
         return ProductCatalogResponse(
@@ -64,15 +59,20 @@ class ProductCatalogService:
             identity=ProductCatalogIdentity(
                 policy=SNAPSHOT_IDENTITY_POLICY,
                 source_id_unique=True,
-                unique_source_id_count=(
-                    snapshot.identity_audit.unique_source_id_count
-                ),
-                normalized_name_duplicate_groups=(
-                    snapshot.identity_audit.normalized_name_duplicate_groups
-                ),
+                unique_source_id_count=(snapshot.identity_audit.unique_source_id_count),
+                normalized_name_duplicate_groups=(snapshot.identity_audit.normalized_name_duplicate_groups),
                 name_only_dedup_applied=False,
             ),
             items=items,
+        )
+
+    def get_snapshot(self) -> ProductCatalogSnapshot:
+        return self._cache.get_or_load(
+            lambda: load_latest_product_snapshot(
+                self._client,
+                start_month=self._start_month_provider(),
+                lookback_months=self._lookback_months,
+            )
         )
 
 
