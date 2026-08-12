@@ -42,3 +42,10 @@
 - 문서 링크와 수치 일치 확인
 - `git diff --check`
 - GitHub CI 통과 후 병합
+
+## 커밋·PR
+
+- 문서 통합 커밋: `1cbc33e6aee3743bbbff2b10bf0e2f876c43fb96`
+- PR: [#14 docs: integrate product catalog profile](https://github.com/mosejong/finshield-ai/pull/14)
+- PR 생성: 2026-08-12 16:47:52 KST (Draft)
+- 상태: CI·PM 최종 검수 중
