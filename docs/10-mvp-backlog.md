@@ -23,6 +23,7 @@
 - [ ] URL domain/reputation feature analysis (outbound-fetch policy required)
 - [x] financial profile dashboard shell
 - [x] financial profile frontend integration (process-local backend CRUD v0.1)
+- [x] deterministic profile metrics + live profile/Home status v0.1
 - [x] official product detail / 2-product comparison UI
 - [x] official product candidate UI (goal-only minimum input)
 - [x] What-if loan simulation (backend-only calculation, current vs alternative UI)
