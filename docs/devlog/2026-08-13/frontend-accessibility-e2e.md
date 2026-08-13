@@ -123,7 +123,8 @@
 - PR: #56, https://github.com/mosejong/finshield-ai/pull/56
 - 생성: 2026-08-13 18:05:43 KST, draft
 - GitHub Actions Linux CI: test·web·container-runtime 모두 통과
-- 병합 시각·merge commit: PM 승인 후 기록
+- PM 승인·병합: 2026-08-13 18:10:34 KST
+- merge commit: `b9906cd9d5990f50b73f571e49cc3d61ce83f6bf`
 
 ## 변경 파일
 
