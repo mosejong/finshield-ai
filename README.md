@@ -34,6 +34,10 @@ precision 0.973684, recall 0.948718, F1 0.961039, FPR 0.045455이며 action-sour
 성능이나 실서비스 정확도로 주장하지 않는다. LLM-only와 Hybrid 비교도 아직
 수행하지 않았다. 상세 결과와 주장 한계는 `docs/28-fraud-evaluation-benchmark.md`와
 `docs/29-competition-evidence-pack.md`를 따른다.
+프론트 접근성 v0.1은 본문 건너뛰기, 공통 포커스 링, 로딩·비동기 상태 안내,
+움직임 축소 설정과 구조적 회귀 테스트를 포함한다. PM 브라우저 검수에서
+375·768·1280 다크 화면의 가로 overflow·nav 전환과 스킵 링크의 main 포커스를
+확인했다. 실제 스크린리더·정량 AA 대비·라이트 모드·iOS Safari는 후속 검수다.
 
 ## Problem
 

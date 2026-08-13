@@ -32,11 +32,11 @@ export function ProductRecommendations() {
     return () => { active = false; };
   }, [profile]);
 
-  if (profileState.status === "idle" || profileState.status === "loading") return <p className="text-body text-muted-foreground">금융 목표를 불러오고 있습니다…</p>;
+  if (profileState.status === "idle" || profileState.status === "loading") return <p role="status" className="text-body text-muted-foreground">금융 목표를 불러오고 있습니다…</p>;
   if (!profile) return <div className="rounded-lg border border-border bg-card p-5 text-center">{profileState.error ? <p role="alert" className="mb-3 text-body text-risk-medium">{profileState.error}</p> : null}<p className="text-title text-foreground">금융 목표를 먼저 알려주세요</p><p className="mt-2 text-body text-muted-foreground">목표 하나만 서버에 보내 공식 상품 용도와 비교합니다.</p><Link href="/onboarding" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-body font-semibold text-primary-foreground">프로필 입력하기</Link></div>;
   const currentState = requestState?.goal === profile.goal ? requestState : null;
   if (currentState?.error) return <p role="alert" className="rounded-lg border border-risk-medium-border bg-risk-medium-bg p-4 text-body text-risk-medium">{currentState.error}<br />결과를 불러오지 못했다고 이용 가능한 상품이 없다는 뜻은 아닙니다.</p>;
-  if (!currentState?.data) return <p className="text-body text-muted-foreground">공식 상품을 확인하고 있습니다…</p>;
+  if (!currentState?.data) return <p role="status" className="text-body text-muted-foreground">공식 상품을 확인하고 있습니다…</p>;
   const data = currentState.data;
   const visibleIds = new Set(data.results.map(({ product }) => product.source_product_id));
   const activeSelectedIds = selectedIds.filter((id) => visibleIds.has(id));

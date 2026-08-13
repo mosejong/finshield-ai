@@ -83,24 +83,30 @@ export default function CheckPage() {
           <label className="flex flex-col gap-1.5">
             <span className="sr-only">받은 메시지 내용</span>
             <textarea
+              id="check-message"
               value={text}
               onChange={(event) => setText(event.target.value.slice(0, MAX_LENGTH))}
               rows={7}
+              aria-describedby="check-message-help check-message-count check-message-privacy"
               placeholder="예) 급여 계좌 등록이 필요합니다. 오늘 안에 체크카드를 아래 주소로 보내주세요."
               className="w-full resize-y rounded-md border border-input bg-background p-3 text-body text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
             />
             <span className="flex items-center justify-between gap-2 text-caption text-muted-foreground">
-              <span>
+              <span id="check-message-help">
                 링크가 있어도 지우지 말고 그대로 붙여넣으세요. 저희가 그 링크를
                 열어보지는 않습니다.
               </span>
-              <span className="shrink-0 tabular-nums">
+              <span
+                id="check-message-count"
+                className="shrink-0 tabular-nums"
+                aria-label={`입력 글자 수 ${text.length.toLocaleString("ko-KR")}자, 최대 ${MAX_LENGTH.toLocaleString("ko-KR")}자`}
+              >
                 {text.length.toLocaleString("ko-KR")} / {MAX_LENGTH.toLocaleString("ko-KR")}
               </span>
             </span>
           </label>
 
-          <p className="mt-2 text-caption text-muted-foreground">
+          <p id="check-message-privacy" className="mt-2 text-caption text-muted-foreground">
             주민등록번호, 계좌 비밀번호, 인증번호는 붙여넣지 마세요. 분석에 필요하지
             않습니다.
           </p>
@@ -142,6 +148,7 @@ export default function CheckPage() {
           <button
             type="submit"
             disabled={!canSubmit || pending}
+            aria-busy={pending}
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-body font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-45"
           >
             {pending ? (
