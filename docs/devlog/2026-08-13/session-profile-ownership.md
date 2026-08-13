@@ -29,6 +29,8 @@ Fraud Scenario Engine 계산과 계약은 변경하지 않는다.
 - 14:45: frontend 29 passed, TypeScript, lint 통과. 인증 설계·ADR·위협 모델 문서화 시작.
 - 14:48: 인증 테이블만 존재하고 ownership column이 빠진 부분 migration도 시작 시 거부하도록 저장소 검증과
   배포 환경 fail-closed 설정 테스트를 추가. backend 179 passed 재확인.
+- 14:50: Next production build, Python compile, 전체 테스트와 비밀값·diff 검사를 완료.
+- 14:53: 기능 commit을 push하고 Draft PR #43 생성. PM 최종 검수 시작.
 
 ## 구현 흐름
 
@@ -48,7 +50,8 @@ Fraud Scenario Engine 계산과 계약은 변경하지 않는다.
 - migration round-trip: SQLite에서 `20260813_02` upgrade → base downgrade → head upgrade 통과
 - 보안 회귀: 원문 토큰 DB 비저장, Strict/HttpOnly/Secure 쿠키, 만료·폐기, 무인증 401, 교차 사용자
   GET/PUT/DELETE/metrics 404, 다른 브라우저 쿠키 비전달
-- build, 실제 SQLite migration과 live browser E2E: 진행 중
+- Next production build: 통과, 인증 프록시를 포함한 21개 route 생성
+- 실제 SQLite migration과 live browser E2E: 진행 중
 
 ## 개인정보·보안 영향
 
@@ -78,6 +81,6 @@ Fraud Scenario Engine 계산과 계약은 변경하지 않는다.
 
 ## Git/PR
 
-- commit SHA: 대기
-- PR: 대기
+- 기능 commit SHA: `ec28b3d6c768aae8ed03b64d56904a931e188294`
+- PR: #43 `https://github.com/mosejong/finshield-ai/pull/43` (14:53 Draft 생성)
 - 병합 시각: 대기
