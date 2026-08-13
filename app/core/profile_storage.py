@@ -4,6 +4,11 @@ from collections.abc import Mapping
 from sqlalchemy.exc import ArgumentError
 
 from app.db.session import build_engine, build_session_factory
+from app.core.runtime_secrets import (
+    RuntimeSecretConfigurationError,
+    resolve_database_url,
+    resolve_profile_encryption_keys,
+)
 from app.repositories.financial_profiles import (
     FinancialProfileRepository,
     InMemoryFinancialProfileRepository,
@@ -21,8 +26,13 @@ def build_financial_profile_repository(
 ) -> FinancialProfileRepository:
     values = environ if environ is not None else os.environ
     app_env = values.get("APP_ENV", "development").strip().lower()
-    database_url = values.get("DATABASE_URL", "").strip()
-    encryption_keys = values.get("PROFILE_ENCRYPTION_KEYS", "").strip()
+    try:
+        database_url = resolve_database_url(values)
+        encryption_keys = resolve_profile_encryption_keys(values)
+    except RuntimeSecretConfigurationError as exc:
+        raise ProfileStorageConfigurationError(
+            "financial profile secret configuration is invalid"
+        ) from exc
 
     local_environments = {"development", "test"}
 

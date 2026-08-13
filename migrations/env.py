@@ -7,6 +7,10 @@ from sqlalchemy import engine_from_config, pool
 
 from app.db.base import Base
 from app.db import models  # noqa: F401
+from app.core.runtime_secrets import (
+    RuntimeSecretConfigurationError,
+    resolve_database_url,
+)
 
 
 config = context.config
@@ -14,7 +18,10 @@ load_dotenv(override=False)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-database_url = os.getenv("DATABASE_URL", "").strip()
+try:
+    database_url = resolve_database_url(os.environ)
+except RuntimeSecretConfigurationError as exc:
+    raise RuntimeError("database secret configuration is invalid") from exc
 if not database_url:
     raise RuntimeError("DATABASE_URL is required for Alembic migrations")
 config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))

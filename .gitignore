@@ -6,12 +6,16 @@ venv/
 .env
 .env.*
 !.env.example
+!.env.docker.example
 .idea/
 .vscode/
 .DS_Store
 data/raw/
 data/private/
 *.sqlite3
+secrets/*.txt
+backups/*
+!backups/.gitkeep
 
 # frontend (web/)
 node_modules/

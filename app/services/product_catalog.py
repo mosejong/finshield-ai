@@ -7,6 +7,10 @@ from app.clients.public_data_products import (
     ProductProviderConfigurationError,
     PublicDataProductClient,
 )
+from app.core.runtime_secrets import (
+    RuntimeSecretConfigurationError,
+    read_secret_setting,
+)
 from app.domain.finance.product_identity import SNAPSHOT_IDENTITY_POLICY
 from app.schemas.product import (
     FinancialProduct,
@@ -122,7 +126,12 @@ class ProductCatalogService:
 
 
 def build_product_catalog_service() -> ProductCatalogService:
-    service_key = os.getenv("PUBLIC_DATA_SERVICE_KEY", "")
+    try:
+        service_key = read_secret_setting(os.environ, "PUBLIC_DATA_SERVICE_KEY")
+    except RuntimeSecretConfigurationError as exc:
+        raise ProductProviderConfigurationError(
+            "official product provider secret configuration is invalid"
+        ) from exc
     ttl_seconds = _read_float_setting(
         "PRODUCT_CATALOG_CACHE_TTL_SECONDS",
         DEFAULT_CACHE_TTL_SECONDS,

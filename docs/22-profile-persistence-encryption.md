@@ -77,11 +77,18 @@ DELETE는 활성 table row를 제거하지만 PostgreSQL WAL, snapshot, backup�
 삭제를 보장하지 않는다. 공개 서비스 전에 보존기간, backup 만료, 사용자 삭제 요청,
 법적 보존 예외를 포함한 정책을 확정해야 한다.
 
+## Docker·PostgreSQL 검증 상태
+
+Compose runtime은 PostgreSQL 16, Alembic one-shot migration, FastAPI 2 workers와 Next standalone을 실제로
+구동한다. profile 생성 후 backend 재시작 조회, custom-format backup/임시 DB restore, 암호문 내 알려진
+금융값 평문 부재, 계정 삭제 후 3개 table 0건을 자동 검증한다. DB 비밀번호와 profile key는 file secret으로
+주입한다. 상세 실행법은 `docs/25-docker-postgres-runtime.md`를 따른다.
+
 ## 아직 남은 공개 배포 차단 조건
 
 - 익명 계정 전환·복구와 session/profile 보존기간·정리 정책
 - secret manager·KMS와 자동 키 순환 작업
-- PostgreSQL 기반 통합·복구·부하 테스트
+- PostgreSQL 부하·장애주입 테스트와 운영 backup 보존 자동화
 - 개인정보 처리방침, 동의, 보존·삭제 정책
 - 접근 감사로그와 이상 접근 탐지
 

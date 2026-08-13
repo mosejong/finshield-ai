@@ -136,6 +136,8 @@ web/                Next.js frontend MVP
 
 ## Run
 
+### 로컬 Python/Node 개발
+
 ```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate
@@ -167,6 +169,22 @@ npm run dev
 Then open `http://localhost:3000`. 기본 live 모드는 실행 중인 FastAPI를 Next
 서버사이드 프록시로 호출한다.
 
+### Docker·PostgreSQL 통합 실행
+
+Docker Desktop이 실행 중인 환경에서는 PostgreSQL, migration, FastAPI 2 workers와 Next standalone을
+한 스택으로 검증할 수 있다.
+
+```powershell
+Copy-Item .env.docker.example .env.docker
+.\.venv\Scripts\python.exe scripts\create_local_docker_secrets.py
+docker compose --env-file .env.docker up --detach --build
+.\.venv\Scripts\python.exe scripts\verify_compose_runtime.py
+```
+
+기본 주소는 backend `http://127.0.0.1:18000`, web `http://127.0.0.1:13000`이다. DB port와 secret은
+host에 공개하지 않는다. 로컬 HTTP와 공개 HTTPS 환경의 차이, backup/restore 검증과 안전한 종료 방법은
+`docs/25-docker-postgres-runtime.md`를 따른다.
+
 ## Test
 
 ```bash
@@ -178,7 +196,8 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **181 passed**, frontend **32 passed**, Next production build,
+현재 Docker 기능 브랜치 기준: Python **192 passed + POSIX 권한 테스트 1건 Windows skip**, frontend
+**32 passed**, Next production build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 

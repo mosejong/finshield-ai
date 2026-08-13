@@ -4,6 +4,10 @@ from datetime import timedelta
 
 from sqlalchemy.exc import ArgumentError
 
+from app.core.runtime_secrets import (
+    RuntimeSecretConfigurationError,
+    resolve_database_url,
+)
 from app.db.session import build_engine, build_session_factory
 from app.repositories.auth_sessions import (
     AuthSessionRepository,
@@ -22,7 +26,12 @@ def build_auth_session_service(
 ) -> AuthSessionService:
     values = environ if environ is not None else os.environ
     app_env = values.get("APP_ENV", "development").strip().lower()
-    database_url = values.get("DATABASE_URL", "").strip()
+    try:
+        database_url = resolve_database_url(values)
+    except RuntimeSecretConfigurationError as exc:
+        raise AuthSessionConfigurationError(
+            "authentication database configuration is invalid"
+        ) from exc
     local_environments = {"development", "test"}
 
     if not database_url:

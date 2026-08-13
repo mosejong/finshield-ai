@@ -1,4 +1,5 @@
 from datetime import timezone
+from pathlib import Path
 
 import httpx
 import pytest
@@ -12,7 +13,10 @@ from app.clients.public_data_products import (
     PublicDataProductClient,
 )
 from app.main import app
-from app.services.product_catalog import ProductCatalogService
+from app.services.product_catalog import (
+    ProductCatalogService,
+    build_product_catalog_service,
+)
 
 
 SAMPLE_ITEM = {
@@ -214,6 +218,41 @@ def test_products_endpoint_returns_503_when_service_key_is_missing(
 ) -> None:
     get_product_catalog_service.cache_clear()
     monkeypatch.delenv("PUBLIC_DATA_SERVICE_KEY", raising=False)
+    try:
+        response = TestClient(app).get("/api/v1/products")
+    finally:
+        get_product_catalog_service.cache_clear()
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "official product provider is not configured"
+    }
+
+
+def test_product_service_accepts_key_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    key_path = tmp_path / "public-data-key"
+    key_path.write_text("test-key\n", encoding="utf-8")
+    monkeypatch.delenv("PUBLIC_DATA_SERVICE_KEY", raising=False)
+    monkeypatch.setenv("PUBLIC_DATA_SERVICE_KEY_FILE", str(key_path))
+
+    service = build_product_catalog_service()
+
+    assert isinstance(service, ProductCatalogService)
+
+
+def test_products_endpoint_returns_503_for_unreadable_key_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    get_product_catalog_service.cache_clear()
+    monkeypatch.delenv("PUBLIC_DATA_SERVICE_KEY", raising=False)
+    monkeypatch.setenv(
+        "PUBLIC_DATA_SERVICE_KEY_FILE",
+        str(tmp_path / "missing-key"),
+    )
     try:
         response = TestClient(app).get("/api/v1/products")
     finally:

@@ -43,6 +43,7 @@
 - `session-profile-ownership-integration.md` — PR #43 병합·로컬 migration·browser E2E 통합 기록
 - `session-data-lifecycle.md` — 익명 계정 전체 삭제와 만료 세션/profile 정리 구현·검수
 - `session-data-lifecycle-integration.md` — PR #46 병합·데스크톱 최신화·live 삭제 E2E
+- `docker-postgres-runtime.md` — Compose, PostgreSQL, 다중 worker와 backup/restore 검증
 
 ## 작성 규칙
 
