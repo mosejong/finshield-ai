@@ -5,12 +5,15 @@ import {
 } from "@/lib/api/contracts";
 import { ApiError, requestJson } from "@/lib/api/client";
 import { toBackendProfile } from "@/lib/api/profiles";
-import { forwardedSessionCookie } from "@/lib/api/server-auth";
+import { forwardedSessionCookie, rejectCrossSiteRequest } from "@/lib/api/server-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const rejected = rejectCrossSiteRequest(request);
+  if (rejected) return rejected;
+
   let body: unknown;
   try {
     body = await request.json();

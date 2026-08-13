@@ -16,7 +16,8 @@
 - [x] pytest + CI
 - [x] 익명 계정 전체 삭제 + 만료 세션/profile dry-run 정리
 - [x] Docker·PostgreSQL runtime + migration + backup/restore CI
-- [ ] public MVP deployment
+- [x] HTTP security headers + same-origin state-change protection + HTTPS deployment config
+- [ ] public MVP deployment (real domain/DNS/certificate verification required)
 
 ## P1 — 경쟁력
 - [ ] Rule-only vs LLM-only vs Hybrid benchmark

@@ -3,6 +3,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.core.http_security import (
+    install_http_security,
+    verify_http_security_configuration,
+)
 from app.api.routes.account import router as account_router
 from app.api.routes.auth import (
     router as auth_router,
@@ -22,6 +26,7 @@ from app.api.routes.recommendations import router as recommendations_router
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    verify_http_security_configuration()
     verify_auth_session_storage()
     verify_financial_profile_storage()
     yield
@@ -33,6 +38,7 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+install_http_security(app)
 
 app.include_router(health_router)
 app.include_router(auth_router, prefix="/api/v1")

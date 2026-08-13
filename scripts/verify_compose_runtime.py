@@ -68,7 +68,10 @@ def request_json(
         f"{WEB_URL}{path}",
         data=payload,
         method=method,
-        headers={"Content-Type": "application/json"} if payload else {},
+        headers={
+            **({"Content-Type": "application/json"} if payload else {}),
+            **({"Origin": WEB_URL} if method not in {"GET", "HEAD"} else {}),
+        },
     )
     with opener.open(request, timeout=10) as response:
         content = response.read()

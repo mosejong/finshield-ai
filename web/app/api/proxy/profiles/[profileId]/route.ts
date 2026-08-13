@@ -6,7 +6,7 @@ import {
 } from "@/lib/api/contracts";
 import { ApiError, requestJson, requestNoContent } from "@/lib/api/client";
 import { toBackendProfile } from "@/lib/api/profiles";
-import { forwardedSessionCookie } from "@/lib/api/server-auth";
+import { forwardedSessionCookie, rejectCrossSiteRequest } from "@/lib/api/server-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +46,9 @@ export async function GET(request: Request, context: Context) {
 }
 
 export async function PUT(request: Request, context: Context) {
+  const rejected = rejectCrossSiteRequest(request);
+  if (rejected) return rejected;
+
   const profileId = await parseId(context);
   if (!profileId) return NextResponse.json({ message: "프로필 식별자가 올바르지 않습니다." }, { status: 400 });
 
@@ -74,6 +77,9 @@ export async function PUT(request: Request, context: Context) {
 }
 
 export async function DELETE(request: Request, context: Context) {
+  const rejected = rejectCrossSiteRequest(request);
+  if (rejected) return rejected;
+
   const profileId = await parseId(context);
   if (!profileId) return NextResponse.json({ message: "프로필 식별자가 올바르지 않습니다." }, { status: 400 });
 

@@ -9,6 +9,7 @@ x-backend-environment: &backend-environment
   DATABASE_USER: ${POSTGRES_USER:-finshield_app}
   DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
   PROFILE_ENCRYPTION_KEYS_FILE: /run/secrets/profile_encryption_keys
+  FINSHIELD_TRUSTED_HOSTS: ${FINSHIELD_TRUSTED_HOSTS:-backend,localhost,127.0.0.1}
 
 x-backend-secrets: &backend-secrets
   - postgres_password
@@ -71,7 +72,7 @@ services:
       migration:
         condition: service_completed_successfully
     ports:
-      - "${BACKEND_PORT:-18000}:8000"
+      - "127.0.0.1:${BACKEND_PORT:-18000}:8000"
     read_only: true
     tmpfs:
       - /tmp
@@ -94,12 +95,13 @@ services:
     restart: unless-stopped
     environment:
       FINSHIELD_API_URL: http://backend:8000
+      FINSHIELD_ALLOWED_ORIGINS: http://127.0.0.1:${WEB_PORT:-13000},http://localhost:${WEB_PORT:-13000}
       NODE_ENV: production
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "${WEB_PORT:-13000}:3000"
+      - "127.0.0.1:${WEB_PORT:-13000}:3000"
     read_only: true
     tmpfs:
       - /tmp
