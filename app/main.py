@@ -7,6 +7,7 @@ from app.core.http_security import (
     install_http_security,
     verify_http_security_configuration,
 )
+from app.core.observability import install_observability
 from app.api.routes.account import router as account_router
 from app.api.routes.auth import (
     router as auth_router,
@@ -16,6 +17,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.guidance import router as guidance_router
 from app.api.routes.analysis import router as analysis_router
 from app.api.routes.loans import router as loans_router
+from app.api.routes.observability import router as observability_router
 from app.api.routes.products import router as products_router
 from app.api.routes.profiles import (
     router as profiles_router,
@@ -39,8 +41,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 install_http_security(app)
+install_observability(app)
 
 app.include_router(health_router)
+app.include_router(observability_router)
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(account_router, prefix="/api/v1")
 app.include_router(guidance_router, prefix="/api/v1")

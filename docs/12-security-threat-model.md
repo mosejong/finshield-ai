@@ -13,5 +13,6 @@ Profile object access: guessed/shared UUID -> authenticated owner ID in every CR
 Next proxy: unrelated cookie leakage -> forward only `finshield_session`; never log raw Cookie or financial request bodies.
 State-changing proxy requests: CSRF/cross-site form submission -> require an allowed `Origin`; reject missing or `Sec-Fetch-Site: cross-site` requests.
 Public HTTP boundary: Host-header injection/TLS bypass/clickjacking -> explicit production trusted hosts, loopback-only internal ports, Caddy HTTPS-only public entry, CSP/frame denial/HSTS.
+Observability: financial text/profile/session leakage and unbounded labels -> allowlisted structured fields only, route templates, no body/query/header logging, runtime secret non-disclosure test.
 ## Security test backlog
 Prompt-injection golden set; PII logging regression; malicious URL; oversized payload; stale provider; schema drift; unsupported financial claim benchmark.

@@ -125,6 +125,9 @@ def main() -> int:
         if status != 201:
             raise RuntimeError("anonymous session was not created")
         session_created = True
+        session_tokens = [cookie.value for cookie in cookie_jar]
+        if len(session_tokens) != 1:
+            raise RuntimeError("runtime verification did not receive exactly one session cookie")
 
         status, resource = request_json(opener, "POST", "/api/proxy/profiles", PROFILE)
         if status != 201 or not resource:
@@ -167,6 +170,13 @@ def main() -> int:
         if plaintext_absent != "t":
             raise RuntimeError("backup unexpectedly exposed a known financial value")
 
+        backend_logs = compose("logs", "--no-color", "backend", capture=True)
+        for secret in ("2800000", profile_id, session_tokens[0]):
+            if secret in backend_logs:
+                raise RuntimeError("backend logs exposed runtime verification personal data")
+        if '"event":"http_request"' not in backend_logs:
+            raise RuntimeError("structured request observability log was not emitted")
+
         status, _ = request_json(opener, "DELETE", "/api/proxy/auth/account")
         if status != 204:
             raise RuntimeError("anonymous account was not deleted")
@@ -195,6 +205,8 @@ def main() -> int:
                     "backend_restart_persistence": True,
                     "backup_restore": True,
                     "encrypted_backup_plaintext_absent": True,
+                    "logs_exclude_profile_and_session_values": True,
+                    "structured_request_logs": True,
                     "account_delete_counts": counts,
                     "web_health": True,
                     "web_proxy_e2e": True,
