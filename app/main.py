@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from app.api.routes.health import router as health_router
@@ -5,13 +8,24 @@ from app.api.routes.guidance import router as guidance_router
 from app.api.routes.analysis import router as analysis_router
 from app.api.routes.loans import router as loans_router
 from app.api.routes.products import router as products_router
-from app.api.routes.profiles import router as profiles_router
+from app.api.routes.profiles import (
+    router as profiles_router,
+    verify_financial_profile_storage,
+)
 from app.api.routes.recommendations import router as recommendations_router
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    verify_financial_profile_storage()
+    yield
+
 
 app = FastAPI(
     title="FinShield AI",
     description="AI-powered financial social-engineering risk prevention MVP",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.include_router(health_router)
