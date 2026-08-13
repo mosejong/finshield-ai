@@ -21,6 +21,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-13/fraud-evaluation-integration.md` — PR #54 Linux CI·PM 승인·main 통합 기록
 - `devlog/2026-08-13/fraud-evaluation-benchmark-v0.1.md` — 합성 golden set·품질 gate·대회 증거 묶음
 - `devlog/2026-08-13/observability-pii-masking.md` — 요청 추적·latency·readiness·PII 비노출 구현
 - `devlog/2026-08-13/observability-integration.md` — PR #52 Linux CI·PII 비노출·main 통합 기록

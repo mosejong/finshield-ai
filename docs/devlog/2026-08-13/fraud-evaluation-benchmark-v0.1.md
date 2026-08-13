@@ -69,7 +69,8 @@ Scenario Engine → binary/type/signal/policy/action/evidence metrics → JSON r
 - PR: #54, https://github.com/mosejong/finshield-ai/pull/54
 - PR 생성: 2026-08-13 17:39:13 KST, draft
 - GitHub Actions Linux CI: test·web·container-runtime 모두 통과
-- 병합 시각·merge commit: PM 승인 후 기록
+- PM 승인·병합: 2026-08-13 17:44:31 KST
+- merge commit: `87e31770b383d64a4e56857d01cda386967b64c8`
 
 ## 알려진 위험과 다음 작업
 
