@@ -50,3 +50,4 @@ Date- and branch-based logs: `devlog/README.md`
 - `devlog/2026-08-13/profile-database-encryption.md` — SQLAlchemy·Alembic·profile 암호화 구현·검수·PR 병합
 - `devlog/2026-08-13/profile-persistence-integration.md` — 암호화 영속화 병합 후 README·색인·백로그 반영
 - `devlog/2026-08-13/session-profile-ownership.md` — 익명 세션 인증·profile 소유권 구현·검수·통합 기록
+- `devlog/2026-08-13/session-profile-ownership-integration.md` — PR #43 병합·로컬 migration·browser E2E 기록
