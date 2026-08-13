@@ -3,9 +3,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import secrets
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.repositories.auth_sessions import (
+    AuthCleanupSummary,
     AuthSessionNotFoundError,
     AuthSessionRepository,
 )
@@ -73,6 +74,20 @@ class AuthSessionService:
     def revoke(self, raw_token: str | None) -> None:
         if raw_token and 32 <= len(raw_token) <= 256:
             self._repository.delete(_token_hash(raw_token))
+
+    def delete_account(self, raw_token: str | None, user_id: UUID) -> None:
+        if not raw_token:
+            raise AuthSessionNotFoundError("missing session token")
+        principal = self.authenticate(raw_token)
+        if principal.user_id != user_id:
+            raise AuthSessionNotFoundError("session owner mismatch")
+        self._repository.delete_user(principal.user_id)
+
+    def cleanup_expired(self, *, execute: bool = False) -> AuthCleanupSummary:
+        return self._repository.cleanup_expired(
+            now=self._utc_now(),
+            execute=execute,
+        )
 
     def _utc_now(self) -> datetime:
         value = self._clock()

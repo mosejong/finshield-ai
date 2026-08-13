@@ -31,6 +31,9 @@ class FinancialProfileService:
     def delete(self, profile_id: UUID, owner_user_id: UUID) -> None:
         self._repository.delete(profile_id, owner_user_id)
 
+    def delete_all_for_owner(self, owner_user_id: UUID) -> int:
+        return self._repository.delete_all_for_owner(owner_user_id)
+
     def metrics(
         self, profile_id: UUID, owner_user_id: UUID
     ) -> ProfileMetricsResponse:

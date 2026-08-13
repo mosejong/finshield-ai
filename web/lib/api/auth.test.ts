@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  deleteAnonymousAccount,
   ensureAuthSession,
   resetAuthSessionCacheForTests,
 } from "@/lib/api/auth";
@@ -88,5 +89,29 @@ describe("server cookie forwarding", () => {
       headers: { cookie: "theme=dark" },
     });
     expect(forwardedSessionCookie(request)).toEqual({});
+  });
+});
+
+describe("anonymous account deletion", () => {
+  it("deletes the server account through the same-origin proxy", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(null, { status: 204 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(deleteAnonymousAccount()).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/proxy/auth/account",
+      expect.objectContaining({ method: "DELETE", cache: "no-store" }),
+    );
+  });
+
+  it("reports a server-side deletion failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 503 })),
+    );
+
+    await expect(deleteAnonymousAccount()).rejects.toThrow("503");
   });
 });

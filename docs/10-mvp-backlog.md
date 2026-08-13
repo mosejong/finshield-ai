@@ -14,6 +14,7 @@
 - [x] 공식 근거 기반 설명
 - [x] 분석 결과 provenance/source
 - [x] pytest + CI
+- [x] 익명 계정 전체 삭제 + 만료 세션/profile dry-run 정리
 - [ ] Docker
 - [ ] public MVP deployment
 

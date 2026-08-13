@@ -1,9 +1,11 @@
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import RLock
 from typing import Protocol
 from uuid import UUID
 
-from sqlalchemy import inspect, select
+from sqlalchemy import delete as sqlalchemy_delete
+from sqlalchemy import func, inspect, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -17,6 +19,14 @@ class AuthSessionNotFoundError(KeyError):
 
 class AuthSessionStorageError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class AuthCleanupSummary:
+    expired_sessions: int
+    anonymous_users: int
+    financial_profiles: int
+    executed: bool
 
 
 class AuthSessionRepository(Protocol):
@@ -35,10 +45,17 @@ class AuthSessionRepository(Protocol):
 
     def delete(self, token_hash: str) -> None: ...
 
+    def delete_user(self, user_id: UUID) -> None: ...
+
+    def cleanup_expired(
+        self, *, now: datetime, execute: bool
+    ) -> AuthCleanupSummary: ...
+
 
 class InMemoryAuthSessionRepository:
     def __init__(self) -> None:
         self._sessions: dict[str, SessionPrincipal] = {}
+        self._users: set[UUID] = set()
         self._lock = RLock()
 
     def verify(self) -> None:
@@ -60,6 +77,7 @@ class InMemoryAuthSessionRepository:
         with self._lock:
             if token_hash in self._sessions:
                 raise AuthSessionStorageError("session token collision")
+            self._users.add(user_id)
             self._sessions[token_hash] = principal
         return principal.model_copy(deep=True)
 
@@ -73,6 +91,44 @@ class InMemoryAuthSessionRepository:
     def delete(self, token_hash: str) -> None:
         with self._lock:
             self._sessions.pop(token_hash, None)
+
+    def delete_user(self, user_id: UUID) -> None:
+        with self._lock:
+            token_hashes = [
+                token_hash
+                for token_hash, principal in self._sessions.items()
+                if principal.user_id == user_id
+            ]
+            for token_hash in token_hashes:
+                del self._sessions[token_hash]
+            self._users.discard(user_id)
+
+    def cleanup_expired(
+        self, *, now: datetime, execute: bool
+    ) -> AuthCleanupSummary:
+        now = _as_utc(now)
+        with self._lock:
+            expired_tokens = {
+                token_hash
+                for token_hash, principal in self._sessions.items()
+                if principal.expires_at <= now
+            }
+            active_users = {
+                principal.user_id
+                for token_hash, principal in self._sessions.items()
+                if token_hash not in expired_tokens
+            }
+            stale_users = self._users - active_users
+            if execute:
+                for token_hash in expired_tokens:
+                    del self._sessions[token_hash]
+                self._users.difference_update(stale_users)
+            return AuthCleanupSummary(
+                expired_sessions=len(expired_tokens),
+                anonymous_users=len(stale_users),
+                financial_profiles=0,
+                executed=execute,
+            )
 
 
 class SqlAlchemyAuthSessionRepository:
@@ -188,6 +244,69 @@ class SqlAlchemyAuthSessionRepository:
                 session.rollback()
                 raise AuthSessionStorageError(
                     "authentication session delete failed"
+                ) from None
+
+    def delete_user(self, user_id: UUID) -> None:
+        with self._session_factory() as session:
+            try:
+                user = session.get(UserRecord, str(user_id))
+                if user is not None:
+                    session.delete(user)
+                    session.commit()
+            except SQLAlchemyError:
+                session.rollback()
+                raise AuthSessionStorageError(
+                    "anonymous account delete failed"
+                ) from None
+
+    def cleanup_expired(
+        self, *, now: datetime, execute: bool
+    ) -> AuthCleanupSummary:
+        now = _as_utc(now)
+        with self._session_factory() as session:
+            try:
+                active_session = select(AuthSessionRecord.token_hash).where(
+                    AuthSessionRecord.user_id == UserRecord.user_id,
+                    AuthSessionRecord.expires_at > now,
+                )
+                stale_user_ids = list(
+                    session.scalars(
+                        select(UserRecord.user_id).where(
+                            UserRecord.kind == "anonymous",
+                            ~active_session.exists(),
+                        )
+                    )
+                )
+                if not stale_user_ids:
+                    return AuthCleanupSummary(0, 0, 0, execute)
+
+                expired_sessions = session.scalar(
+                    select(func.count())
+                    .select_from(AuthSessionRecord)
+                    .where(AuthSessionRecord.user_id.in_(stale_user_ids))
+                ) or 0
+                financial_profiles = session.scalar(
+                    select(func.count())
+                    .select_from(FinancialProfileRecord)
+                    .where(FinancialProfileRecord.owner_user_id.in_(stale_user_ids))
+                ) or 0
+                if execute:
+                    session.execute(
+                        sqlalchemy_delete(UserRecord).where(
+                            UserRecord.user_id.in_(stale_user_ids)
+                        )
+                    )
+                    session.commit()
+                return AuthCleanupSummary(
+                    expired_sessions=expired_sessions,
+                    anonymous_users=len(stale_user_ids),
+                    financial_profiles=financial_profiles,
+                    executed=execute,
+                )
+            except SQLAlchemyError:
+                session.rollback()
+                raise AuthSessionStorageError(
+                    "expired anonymous data cleanup failed"
                 ) from None
 
 

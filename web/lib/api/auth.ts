@@ -42,3 +42,14 @@ export async function ensureAuthSession(): Promise<AuthSessionResponse> {
 export function resetAuthSessionCacheForTests(): void {
   bootstrapPromise = null;
 }
+
+export async function deleteAnonymousAccount(): Promise<void> {
+  const response = await fetch("/api/proxy/auth/account", {
+    method: "DELETE",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`개인정보를 삭제하지 못했습니다. (${response.status})`);
+  }
+  bootstrapPromise = null;
+}

@@ -3,8 +3,9 @@ from hashlib import sha256
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
+from cryptography.fernet import Fernet
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.routes.auth import get_auth_session_service
 from app.api.routes.profiles import get_financial_profile_service
@@ -13,7 +14,7 @@ from app.core.auth_sessions import (
     build_auth_session_service,
 )
 from app.db.base import Base
-from app.db.models import AuthSessionRecord, UserRecord
+from app.db.models import AuthSessionRecord, FinancialProfileRecord, UserRecord
 from app.db.session import build_engine, build_session_factory
 from app.main import app
 from app.repositories.auth_sessions import (
@@ -23,6 +24,8 @@ from app.repositories.auth_sessions import (
     SqlAlchemyAuthSessionRepository,
 )
 from app.repositories.financial_profiles import InMemoryFinancialProfileRepository
+from app.repositories.financial_profiles import SqlAlchemyFinancialProfileRepository
+from app.security.profile_encryption import ProfileEncryptionKeyring
 from app.services.auth_sessions import AuthSessionService
 from app.services.financial_profiles import FinancialProfileService
 
@@ -130,6 +133,63 @@ def test_sql_storage_verify_rejects_partial_migration() -> None:
         repository.verify()
 
 
+def test_expired_cleanup_preview_is_read_only_and_execute_cascades_profile() -> None:
+    engine = build_engine("sqlite+pysqlite://")
+    Base.metadata.create_all(engine)
+    session_factory = build_session_factory(engine)
+    repository = SqlAlchemyAuthSessionRepository(session_factory)
+    expired_user_id = uuid4()
+    active_user_id = uuid4()
+    repository.create(
+        token_hash="a" * 64,
+        user_id=expired_user_id,
+        created_at=NOW - timedelta(days=31),
+        expires_at=NOW,
+    )
+    repository.create(
+        token_hash="b" * 64,
+        user_id=active_user_id,
+        created_at=NOW,
+        expires_at=NOW + timedelta(days=30),
+    )
+    with session_factory() as session:
+        session.add_all(
+            [
+                FinancialProfileRecord(
+                    profile_id=str(uuid4()),
+                    owner_user_id=str(owner_id),
+                    encrypted_profile=b"test-ciphertext",
+                    encryption_key_id="c" * 32,
+                    created_at=NOW,
+                    updated_at=NOW,
+                )
+                for owner_id in (expired_user_id, active_user_id)
+            ]
+        )
+        session.commit()
+
+    preview = repository.cleanup_expired(now=NOW, execute=False)
+    assert preview.expired_sessions == 1
+    assert preview.anonymous_users == 1
+    assert preview.financial_profiles == 1
+    assert preview.executed is False
+    with session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(UserRecord)) == 2
+
+    executed = repository.cleanup_expired(now=NOW, execute=True)
+    assert executed == preview.__class__(1, 1, 1, True)
+    with session_factory() as session:
+        assert session.get(UserRecord, str(expired_user_id)) is None
+        assert session.get(AuthSessionRecord, "a" * 64) is None
+        assert session.scalar(
+            select(func.count())
+            .select_from(FinancialProfileRecord)
+            .where(FinancialProfileRecord.owner_user_id == str(expired_user_id))
+        ) == 0
+        assert session.get(UserRecord, str(active_user_id)) is not None
+        assert session.get(AuthSessionRecord, "b" * 64) is not None
+
+
 def test_deployed_auth_configuration_fails_closed() -> None:
     with pytest.raises(AuthSessionConfigurationError, match="DATABASE_URL"):
         build_auth_session_service({"APP_ENV": "production"})
@@ -223,3 +283,43 @@ def test_profile_routes_require_session_and_hide_other_owners_records() -> None:
     finally:
         app.dependency_overrides.pop(get_auth_session_service, None)
         app.dependency_overrides.pop(get_financial_profile_service, None)
+
+
+def test_account_delete_removes_user_sessions_and_owned_profiles() -> None:
+    engine = build_engine("sqlite+pysqlite://")
+    Base.metadata.create_all(engine)
+    session_factory = build_session_factory(engine)
+    auth_service = AuthSessionService(
+        SqlAlchemyAuthSessionRepository(session_factory),
+        clock=lambda: NOW,
+    )
+    profile_service = FinancialProfileService(
+        SqlAlchemyFinancialProfileRepository(
+            session_factory,
+            ProfileEncryptionKeyring([Fernet.generate_key().decode()]),
+            clock=lambda: NOW,
+        )
+    )
+    app.dependency_overrides[get_auth_session_service] = lambda: auth_service
+    app.dependency_overrides[get_financial_profile_service] = lambda: profile_service
+    try:
+        with TestClient(app) as client:
+            assert client.post("/api/v1/auth/session").status_code == 201
+            assert client.post(
+                "/api/v1/profiles", json=valid_profile_data()
+            ).status_code == 201
+
+            deleted = client.delete("/api/v1/auth/account")
+            assert deleted.status_code == 204
+            assert "finshield_session=" in deleted.headers["set-cookie"].lower()
+            assert client.get("/api/v1/auth/session").status_code == 401
+    finally:
+        app.dependency_overrides.pop(get_auth_session_service, None)
+        app.dependency_overrides.pop(get_financial_profile_service, None)
+
+    with session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(UserRecord)) == 0
+        assert session.scalar(select(func.count()).select_from(AuthSessionRecord)) == 0
+        assert session.scalar(
+            select(func.count()).select_from(FinancialProfileRecord)
+        ) == 0
