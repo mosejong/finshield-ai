@@ -4,7 +4,7 @@
 01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog
 
 ## Architecture / engineering
-04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · `adr/`
+04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · `adr/`
 
 ## Security
 08 AI security alignment · 12 security threat model
@@ -53,3 +53,4 @@ Date- and branch-based logs: `devlog/README.md`
 - `devlog/2026-08-13/session-profile-ownership-integration.md` — PR #43 병합·로컬 migration·browser E2E 기록
 - `devlog/2026-08-13/session-data-lifecycle.md` — 익명 계정 삭제·만료 데이터 정리 구현·검수 기록
 - `devlog/2026-08-13/session-data-lifecycle-integration.md` — PR #46 병합·로컬 DB·브라우저 E2E 기록
+- `devlog/2026-08-13/docker-postgres-runtime.md` — Docker·PostgreSQL·backup/restore 운영 스택 기록

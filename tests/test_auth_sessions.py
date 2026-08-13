@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
@@ -200,6 +201,25 @@ def test_deployed_auth_configuration_fails_closed() -> None:
                 "DATABASE_URL": "sqlite+pysqlite://",
             }
         )
+
+
+def test_auth_storage_accepts_database_components_with_password_file(
+    tmp_path: Path,
+) -> None:
+    password_path = tmp_path / "database-password"
+    password_path.write_text("local-secret", encoding="utf-8")
+
+    service = build_auth_session_service(
+        {
+            "APP_ENV": "development",
+            "DATABASE_HOST": "localhost",
+            "DATABASE_NAME": "finshield",
+            "DATABASE_USER": "finshield",
+            "DATABASE_PASSWORD_FILE": str(password_path),
+        }
+    )
+
+    assert isinstance(service, AuthSessionService)
     with pytest.raises(AuthSessionConfigurationError, match="integer"):
         build_auth_session_service(
             {

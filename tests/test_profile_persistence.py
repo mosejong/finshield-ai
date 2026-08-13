@@ -260,6 +260,22 @@ def test_profile_storage_configuration_is_fail_closed() -> None:
         build_financial_profile_repository(
             {"APP_ENV": "development", "DATABASE_URL": "sqlite+pysqlite://"}
         )
+
+
+def test_profile_storage_accepts_file_secrets(tmp_path: Path) -> None:
+    database_path = tmp_path / "profiles.sqlite3"
+    key_path = tmp_path / "profile-key"
+    key_path.write_text(Fernet.generate_key().decode(), encoding="utf-8")
+
+    repository = build_financial_profile_repository(
+        {
+            "APP_ENV": "development",
+            "DATABASE_URL": f"sqlite+pysqlite:///{database_path.as_posix()}",
+            "PROFILE_ENCRYPTION_KEYS_FILE": str(key_path),
+        }
+    )
+
+    assert isinstance(repository, SqlAlchemyFinancialProfileRepository)
     with pytest.raises(ProfileStorageConfigurationError, match="require PostgreSQL"):
         build_financial_profile_repository(
             {

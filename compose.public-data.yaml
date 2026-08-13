@@ -1,0 +1,10 @@
+services:
+  backend:
+    environment:
+      PUBLIC_DATA_SERVICE_KEY_FILE: /run/secrets/public_data_service_key
+    secrets:
+      - public_data_service_key
+
+secrets:
+  public_data_service_key:
+    file: ./secrets/public_data_service_key.txt
