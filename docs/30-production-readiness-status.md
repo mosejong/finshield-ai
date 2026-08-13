@@ -1,6 +1,6 @@
 # Production Readiness Status — Phases 1–3
 
-기준일: 2026-08-13  
+기준일: 2026-08-13
 기준 main: `b9906cd9d5990f50b73f571e49cc3d61ce83f6bf`
 
 ## 1차 — 데이터·운영·보안 경계
