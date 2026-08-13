@@ -3,6 +3,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.routes.auth import (
+    router as auth_router,
+    verify_auth_session_storage,
+)
 from app.api.routes.health import router as health_router
 from app.api.routes.guidance import router as guidance_router
 from app.api.routes.analysis import router as analysis_router
@@ -17,6 +21,7 @@ from app.api.routes.recommendations import router as recommendations_router
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    verify_auth_session_storage()
     verify_financial_profile_storage()
     yield
 
@@ -29,6 +34,7 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(guidance_router, prefix="/api/v1")
 app.include_router(analysis_router, prefix="/api/v1")
 app.include_router(loans_router, prefix="/api/v1")

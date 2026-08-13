@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/api/auth", () => ({
+  ensureAuthSession: vi.fn().mockResolvedValue({ authenticated: true }),
+}));
 import {
   BackendFinancialProfileResourceSchema,
   FinancialProfileSchema,

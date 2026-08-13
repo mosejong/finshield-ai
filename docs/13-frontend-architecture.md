@@ -214,9 +214,11 @@ FastAPI 에 `CORSMiddleware` 가 없어 브라우저가 `localhost:8000` 을 직
 - 사용자가 붙여넣은 원문과 분석 결과는 `sessionStorage` 에만 둔다. `localStorage` 가 아니다 — 탭을 닫으면 사라진다.
 - 프록시는 요청 본문을 로그로 남기지 않는다.
 - 프로필은 주민등록번호·계좌번호·실명을 받지 않고, 나이·신용점수는 band 로만 받는다.
-- 프로필 원문은 `sessionStorage`에 저장하지 않는다. process-local backend가 원본을
-  보관하고 브라우저에는 profile UUID와 persona만 둔다. 서버 재시작으로 404가 되면
-  재입력을 안내하며 빈 프로필이나 저장 성공으로 바꾸지 않는다.
+- 프로필 원문은 `sessionStorage`에 저장하지 않는다. 암호화 backend DB가 원본을
+  보관하고 브라우저에는 profile UUID와 persona만 둔다. profile 요청 전 same-origin
+  인증 프록시가 익명 세션을 확인·생성하며 원문 세션 토큰은 HttpOnly 쿠키에만 둔다.
+  현재 브라우저 세션의 소유 profile을 찾지 못하면 재입력을 안내하며 빈 프로필이나
+  저장 성공으로 바꾸지 않는다.
 - 상품 후보 요청에는 session profile 전체가 아니라 backend 규칙이 실제 사용하는
   `goal` 하나만 보낸다. 소득·부채·신용·연령은 전송하지 않는다.
 
@@ -241,7 +243,7 @@ uvicorn app.main:app --reload
 
 ## 8. 남은 작업
 
-- profile process-local 저장을 PostgreSQL·인증·소유권 검증으로 교체
+- 익명 계정 전환·복구와 세션/profile 보존기간·정리 정책
 - 경로 불일치: SKILL.md 는 `/api/v1/fraud/analyze`, 실제 구현은 `/api/v1/analyze`
 - 접근성 감사 (스크린리더, 명도대비 AA) — 자동 검사는 아직 돌리지 않았다
 - 실기기 확인 (지금까지는 헤드리스 Chrome 캡처만). iOS Safari 의 `env(safe-area-inset-bottom)` 과 `100dvh` 동작은 시뮬레이터로 재확인 필요

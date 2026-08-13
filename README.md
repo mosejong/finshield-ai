@@ -18,8 +18,11 @@ FinancialProfile CRUD v0.1도 백엔드에 추가되어 생성·단건 조회·�
 가능하다. SQLAlchemy 2.x·Alembic 저장 경계와 FinancialProfile 전체 인증 암호화를
 추가했다. 배포 환경은 PostgreSQL+psycopg와 암호화 키가 없거나 migration이 누락되면
 시작을 거부한다. development·test에서 설정이 없을 때만 process-local 저장으로
-동작하며 다음 공개 배포 차단 조건은 인증·소유권이다. 온보딩·프로필 화면은 API와 연결됐고 브라우저에는
-profile UUID와 fraud persona만 보관한다. 월 현금흐름·월소득 대비 상환액·비상자금
+동작한다. 개인정보를 추가 수집하지 않는 익명 세션 인증과 profile 소유권 검증도 적용했다. 세션 원문은
+HttpOnly·SameSite Strict 쿠키에만 두고 DB에는 SHA-256 해시만 저장한다. 모든 profile CRUD와 metrics는
+세션 사용자 ID가 owner와 일치해야 하며 다른 사용자의 UUID 접근은 404로 숨긴다. 온보딩·프로필 화면은
+Next same-origin 프록시로 세션을 자동 준비하며 브라우저에는 profile UUID와 fraud persona만 보관한다.
+월 현금흐름·월소득 대비 상환액·비상자금
 기간도 backend에서 결정론적으로 계산해 profile과 Home에 같은 값으로 표시한다.
 
 ## Problem
@@ -172,7 +175,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **170 passed**, frontend **24 passed**, Next build,
+현재 `main` 기준: Python **179 passed**, frontend **29 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -202,13 +205,16 @@ TODO: 현재 최대 600개월의 전체 schedule을 반환한다. 실제 사용�
 
 FinancialProfile의 최소 입력 스키마는 `app/schemas/financial_profile.py`에
 정의되어 있으며, 정의되지 않은 필드와 민감정보 입력을 허용하지 않는다.
+`POST/GET/DELETE /api/v1/auth/session`은 이름·이메일·전화번호 없이 익명 세션을
+생성·확인·폐기한다. 32-byte 불투명 토큰 원문은 HttpOnly 쿠키에만 두고 DB에는
+SHA-256 해시를 저장한다. 기본 만료는 30일이며 배포 환경에서는 Secure 쿠키를 강제한다.
 `POST /api/v1/profiles`, 단건 `GET`, 전체 교체 `PUT`, `DELETE`로 검증된 profile을
 재사용할 수 있다. 응답은 불투명 UUID와 UTC 생성·수정 시각을 포함하며 전체 목록
 endpoint는 제공하지 않는다. 현재 저장소는 기본 최대 1,000개의 process-local
 메모리 fallback 또는 설정된 SQLAlchemy DB를 사용한다. DB mode는 profile 전체를
 Fernet 인증 암호화하고 암호문을 profile UUID에 결합해 변조·row swap을 거부한다.
-배포 환경은 PostgreSQL과 Alembic migration을 강제한다. UUID는 인증이 아니며,
-인증·소유권 검증 전에는 공개 배포에 사용하면 안 된다.
+배포 환경은 PostgreSQL과 Alembic migration을 강제한다. UUID는 인증으로 사용하지
+않고 모든 query에서 현재 세션의 익명 사용자 ID와 `owner_user_id`를 함께 검증한다.
 프론트는 동일 오리진 Next proxy로 생성·조회·교체·삭제하고 profile 원문을
 `sessionStorage`에 저장하지 않는다. backend enum과 UI 계약은 일치시키며 UI 전용
 persona는 FinancialProfile 요청에서 제외한다.
@@ -275,7 +281,7 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
-- 사용자 인증·FinancialProfile 소유권 경계
+- 익명 계정 전환·복구, 세션/profile 보존기간과 정리 작업
 - PostgreSQL live·backup restore·다중 worker 검증
 - Starlette `TestClient` 사용 중단 예정 경고 대응
 

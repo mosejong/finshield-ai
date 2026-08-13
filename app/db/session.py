@@ -1,4 +1,4 @@
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -14,8 +14,19 @@ def build_engine(database_url: str) -> Engine:
         )
     elif database_url.startswith(("sqlite://", "sqlite+pysqlite://")):
         options["connect_args"] = {"check_same_thread": False}
-    return create_engine(database_url, **options)
+    engine = create_engine(database_url, **options)
+    if database_url.startswith(("sqlite://", "sqlite+pysqlite://")):
+        event.listen(engine, "connect", _enable_sqlite_foreign_keys)
+    return engine
 
 
 def build_session_factory(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, expire_on_commit=False, class_=Session)
+
+
+def _enable_sqlite_foreign_keys(dbapi_connection: object, _: object) -> None:
+    cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
+    try:
+        cursor.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cursor.close()

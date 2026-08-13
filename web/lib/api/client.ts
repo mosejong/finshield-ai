@@ -46,15 +46,18 @@ export async function requestJson<T>(
   body: unknown,
   schema: z.ZodType<T>,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  headers: HeadersInit = {},
 ): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let response: Response;
   try {
+    const requestHeaders = new Headers(headers);
+    requestHeaders.set("Content-Type", "application/json");
     response = await fetch(`${backendBaseUrl()}${path}`, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: requestHeaders,
       body: method === "GET" ? undefined : JSON.stringify(body),
       signal: controller.signal,
       cache: "no-store",
@@ -99,6 +102,7 @@ export async function requestNoContent(
   method: "DELETE",
   path: string,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  headers: HeadersInit = {},
 ): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -107,6 +111,7 @@ export async function requestNoContent(
   try {
     response = await fetch(`${backendBaseUrl()}${path}`, {
       method,
+      headers,
       signal: controller.signal,
       cache: "no-store",
     });

@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
+from app.api.routes.auth import CurrentSessionDependency
 from app.core.profile_storage import build_financial_profile_repository
 from app.repositories.financial_profiles import (
     FinancialProfileCapacityError,
@@ -41,9 +42,10 @@ ProfileServiceDependency = Annotated[
 def create_profile(
     profile: FinancialProfile,
     service: ProfileServiceDependency,
+    principal: CurrentSessionDependency,
 ) -> FinancialProfileResource:
     try:
-        return service.create(profile)
+        return service.create(profile, principal.user_id)
     except FinancialProfileCapacityError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -57,9 +59,10 @@ def create_profile(
 def get_profile(
     profile_id: UUID,
     service: ProfileServiceDependency,
+    principal: CurrentSessionDependency,
 ) -> FinancialProfileResource:
     try:
-        return service.get(profile_id)
+        return service.get(profile_id, principal.user_id)
     except FinancialProfileNotFoundError as exc:
         raise _not_found() from exc
     except FinancialProfileStorageError as exc:
@@ -70,9 +73,10 @@ def get_profile(
 def get_profile_metrics(
     profile_id: UUID,
     service: ProfileServiceDependency,
+    principal: CurrentSessionDependency,
 ) -> ProfileMetricsResponse:
     try:
-        return service.metrics(profile_id)
+        return service.metrics(profile_id, principal.user_id)
     except FinancialProfileNotFoundError as exc:
         raise _not_found() from exc
     except FinancialProfileStorageError as exc:
@@ -84,9 +88,10 @@ def replace_profile(
     profile_id: UUID,
     profile: FinancialProfile,
     service: ProfileServiceDependency,
+    principal: CurrentSessionDependency,
 ) -> FinancialProfileResource:
     try:
-        return service.replace(profile_id, profile)
+        return service.replace(profile_id, profile, principal.user_id)
     except FinancialProfileNotFoundError as exc:
         raise _not_found() from exc
     except FinancialProfileStorageError as exc:
@@ -97,9 +102,10 @@ def replace_profile(
 def delete_profile(
     profile_id: UUID,
     service: ProfileServiceDependency,
+    principal: CurrentSessionDependency,
 ) -> Response:
     try:
-        service.delete(profile_id)
+        service.delete(profile_id, principal.user_id)
     except FinancialProfileNotFoundError as exc:
         raise _not_found() from exc
     except FinancialProfileStorageError as exc:

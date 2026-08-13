@@ -5,6 +5,7 @@ import {
 } from "@/lib/api/contracts";
 import { ApiError, requestJson } from "@/lib/api/client";
 import { toBackendProfile } from "@/lib/api/profiles";
+import { forwardedSessionCookie } from "@/lib/api/server-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,10 +29,14 @@ export async function POST(request: Request) {
       "/api/v1/profiles",
       toBackendProfile(parsed.data),
       BackendFinancialProfileResourceSchema,
+      8000,
+      forwardedSessionCookie(request),
     );
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    const status = error instanceof ApiError && error.status === 503 ? 503 : 502;
+    const status = error instanceof ApiError && [401, 503].includes(error.status)
+      ? error.status
+      : 502;
     return NextResponse.json({ message: "금융상태를 저장하지 못했습니다." }, { status });
   }
 }

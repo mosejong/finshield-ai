@@ -11,6 +11,7 @@ FinancialProfile의 재시작·다중 worker 영속성을 확보하고 DB dump�
 `financial_profiles` table은 다음 값만 저장한다.
 
 - `profile_id`: 불투명 UUID
+- `owner_user_id`: 인증 사용자 UUID FK. 신규 row는 필수이며 기존 owner 미확정 row는 `NULL`
 - `encrypted_profile`: version, profile UUID, 검증된 profile JSON을 포함한 Fernet 암호문
 - `encryption_key_id`: 비밀이 아닌 키 식별자
 - `created_at`, `updated_at`: UTC 시각
@@ -78,7 +79,7 @@ DELETE는 활성 table row를 제거하지만 PostgreSQL WAL, snapshot, backup�
 
 ## 아직 남은 공개 배포 차단 조건
 
-- 사용자 인증과 profile 소유권 검증
+- 익명 계정 전환·복구와 session/profile 보존기간·정리 정책
 - secret manager·KMS와 자동 키 순환 작업
 - PostgreSQL 기반 통합·복구·부하 테스트
 - 개인정보 처리방침, 동의, 보존·삭제 정책

@@ -13,19 +13,25 @@ class FinancialProfileService:
     def verify_storage(self) -> None:
         self._repository.verify()
 
-    def create(self, profile: FinancialProfile) -> FinancialProfileResource:
-        return self._repository.create(profile)
+    def create(
+        self, profile: FinancialProfile, owner_user_id: UUID
+    ) -> FinancialProfileResource:
+        return self._repository.create(profile, owner_user_id)
 
-    def get(self, profile_id: UUID) -> FinancialProfileResource:
-        return self._repository.get(profile_id)
+    def get(
+        self, profile_id: UUID, owner_user_id: UUID
+    ) -> FinancialProfileResource:
+        return self._repository.get(profile_id, owner_user_id)
 
     def replace(
-        self, profile_id: UUID, profile: FinancialProfile
+        self, profile_id: UUID, profile: FinancialProfile, owner_user_id: UUID
     ) -> FinancialProfileResource:
-        return self._repository.replace(profile_id, profile)
+        return self._repository.replace(profile_id, profile, owner_user_id)
 
-    def delete(self, profile_id: UUID) -> None:
-        self._repository.delete(profile_id)
+    def delete(self, profile_id: UUID, owner_user_id: UUID) -> None:
+        self._repository.delete(profile_id, owner_user_id)
 
-    def metrics(self, profile_id: UUID) -> ProfileMetricsResponse:
-        return build_profile_metrics(self._repository.get(profile_id))
+    def metrics(
+        self, profile_id: UUID, owner_user_id: UUID
+    ) -> ProfileMetricsResponse:
+        return build_profile_metrics(self._repository.get(profile_id, owner_user_id))
