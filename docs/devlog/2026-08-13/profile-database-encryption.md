@@ -108,4 +108,6 @@
 ## Git
 
 - 기능 커밋: `62b16c79918cec950935f19904c6353eeeef5e37`
-- PR: 생성 후 기록
+- 검증 문서 커밋: `39a0b9352617b919cd2da92a93c5a2526436b6b0`
+- PR: #40, https://github.com/mosejong/finshield-ai/pull/40
+- PR 생성: 14:09 KST, draft
