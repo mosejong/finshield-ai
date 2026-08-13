@@ -6,7 +6,7 @@
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-main`
 - 기준 main: `02f2de4f34a6b0a11d688f7b805783de97e06eb7`
 - 시작: 14:27
-- 종료: 진행 중
+- 종료: 15:03
 
 ## 목표와 범위
 
@@ -31,6 +31,14 @@ Fraud Scenario Engine 계산과 계약은 변경하지 않는다.
   배포 환경 fail-closed 설정 테스트를 추가. backend 179 passed 재확인.
 - 14:50: Next production build, Python compile, 전체 테스트와 비밀값·diff 검사를 완료.
 - 14:53: 기능 commit을 push하고 Draft PR #43 생성. PM 최종 검수 시작.
+- 14:55: GitHub backend·web CI 4개 통과, PR 파일 범위와 전체 diff 재검수 완료.
+- 14:56: PR #43을 ready로 전환하고 squash merge. main SHA `bce70703f9152efbe402670b411f00934913f1a5`.
+- 14:57: 데스크톱 저장소 역할 브랜치를 최신 main으로 fast-forward. `.env`, `AGENTS.md`, `.agents/` 보존.
+- 14:58: 로컬 암호화 SQLite를 `20260813_01`에서 `20260813_02` head로 migration.
+- 14:59: 처음 live 저장이 실패해 확인한 결과, 실행 중인 FastAPI·Next가 새 route 파일을 반영하지 않아
+  양쪽 인증 경로가 404였음. 오래된 두 개발 서버만 종료하고 동일 포트 8000·3001로 재시작.
+- 15:01: 실제 브라우저에서 가짜 profile 생성 → 암호화 DB 저장 → 파생지표 조회 → 삭제 E2E 통과.
+  브라우저 콘솔 오류 없음. curl 검증용 세션도 정확한 사용자 ID로 정리해 profile 테스트 row 0건 확인.
 
 ## 구현 흐름
 
@@ -51,7 +59,9 @@ Fraud Scenario Engine 계산과 계약은 변경하지 않는다.
 - 보안 회귀: 원문 토큰 DB 비저장, Strict/HttpOnly/Secure 쿠키, 만료·폐기, 무인증 401, 교차 사용자
   GET/PUT/DELETE/metrics 404, 다른 브라우저 쿠키 비전달
 - Next production build: 통과, 인증 프록시를 포함한 21개 route 생성
-- 실제 SQLite migration과 live browser E2E: 진행 중
+- 실제 SQLite migration: 데스크톱 `finshield.sqlite3` revision `20260813_02 (head)` 통과
+- live browser E2E: localhost:3001에서 profile 생성·조회·metrics·삭제 통과, 콘솔 오류 0건
+- E2E 정리 후 로컬 DB: users 1, sessions 1, profiles 0 (현재 브라우저 익명 세션만 유지)
 
 ## 개인정보·보안 영향
 
@@ -77,10 +87,10 @@ Fraud Scenario Engine 계산과 계약은 변경하지 않는다.
 - session/profile 보존기간과 정리 job
 - 실제 PostgreSQL 동시성·백업 복구 테스트
 - CSP/HSTS/TLS/secret manager/감사 로그
-- PR 생성·PM 최종 검수·main 병합·데스크톱 저장소 migration
 
 ## Git/PR
 
 - 기능 commit SHA: `ec28b3d6c768aae8ed03b64d56904a931e188294`
-- PR: #43 `https://github.com/mosejong/finshield-ai/pull/43` (14:53 Draft 생성)
-- 병합 시각: 대기
+- PR: #43 `https://github.com/mosejong/finshield-ai/pull/43` (14:53 Draft 생성, 14:56 ready 전환)
+- 병합 시각: 2026-08-13 14:56:30 KST
+- main merge SHA: `bce70703f9152efbe402670b411f00934913f1a5`
