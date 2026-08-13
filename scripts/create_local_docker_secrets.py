@@ -26,7 +26,10 @@ def main() -> int:
     try:
         for name, factory in SECRET_FILES.items():
             path = secret_dir / name
-            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            # Compose file secrets are bind-mounted with their host mode. The
+            # directory stays owner-only while 0644 lets the non-root container
+            # UID read the mounted file on Linux runners.
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
             with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
                 stream.write(factory())
                 stream.write("\n")

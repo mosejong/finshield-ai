@@ -196,7 +196,8 @@ npm run lint
 npm test
 ```
 
-현재 Docker 기능 브랜치 기준: Python **192 passed**, frontend **32 passed**, Next production build,
+현재 Docker 기능 브랜치 기준: Python **192 passed + POSIX 권한 테스트 1건 Windows skip**, frontend
+**32 passed**, Next production build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 

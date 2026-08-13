@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 import pytest
 
@@ -87,3 +88,23 @@ def test_database_components_build_encoded_postgres_url(tmp_path: Path) -> None:
 def test_incomplete_or_ambiguous_database_components_fail(values: dict[str, str]) -> None:
     with pytest.raises(RuntimeSecretConfigurationError):
         resolve_database_url(values)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits are not authoritative on Windows")
+def test_generated_compose_secrets_use_private_directory_readable_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts import create_local_docker_secrets
+
+    secret_dir = tmp_path / "secrets"
+    monkeypatch.setattr(
+        create_local_docker_secrets,
+        "__file__",
+        str(tmp_path / "scripts" / "create_local_docker_secrets.py"),
+    )
+
+    assert create_local_docker_secrets.main() == 0
+    assert secret_dir.stat().st_mode & 0o777 == 0o700
+    for name in create_local_docker_secrets.SECRET_FILES:
+        assert (secret_dir / name).stat().st_mode & 0o777 == 0o644

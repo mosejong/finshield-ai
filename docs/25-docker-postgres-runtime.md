@@ -47,6 +47,8 @@ docker compose --env-file .env.docker up --detach --build
 - 컨테이너끼리는 host port가 아니라 `http://backend:8000`, `db:5432`로 통신한다.
 - `.env.docker`와 `secrets/*.txt`는 Git에서 제외된다.
 - secret 생성기는 기존 파일이 하나라도 있으면 덮어쓰지 않고 중단한다.
+- Linux에서는 secret 디렉터리를 owner-only `0700`, 내부 파일을 container non-root UID가 읽을 수 있는
+  `0644`로 만든다. 다른 host 사용자는 상위 디렉터리를 통과할 수 없다.
 
 공식 금융상품 live 조회까지 컨테이너에서 확인하려면 포털의 일반 인증키만 담은
 `secrets/public_data_service_key.txt`를 직접 만들고 선택 override를 함께 사용한다. 이 파일도 Git에서

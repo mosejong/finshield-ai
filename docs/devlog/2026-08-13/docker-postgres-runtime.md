@@ -58,10 +58,15 @@ PostgreSQL, Alembic migration, FastAPI 다중 worker, Next standalone server를 
   400 발견. browser 계약으로 수정하고 중간 실패 계정 best-effort 정리 추가.
 - 16:13: Next proxy → FastAPI 2 workers → PostgreSQL → backup/restore → 계정 삭제 최종 E2E 통과.
   종료 후 원본 3개 table `0|0|0`, 복원 DB 0, backup artifact는 `.gitkeep`만 존재.
+- 16:16: Draft PR #48 생성. 기존 Python·web CI는 통과했지만 Linux container-runtime이 migration secret
+  `PermissionError`로 실패. Windows bind mount와 달리 Linux가 host `0600` mode를 보존한 것이 원인.
+- 16:18: host secret 디렉터리는 `0700`으로 유지하고 파일은 non-root container가 읽을 수 있는 `0644`로
+  생성하도록 교정. POSIX mode 회귀 테스트 추가.
 
 ## 검증 결과
 
-- Python 192 passed, frontend 32 passed, Next build·TypeScript·lint·Python compile 통과
+- Python 192 passed + POSIX mode test 1건 Windows skip, frontend 32 passed, Next
+  build·TypeScript·lint·Python compile 통과
 - Compose config·backend/web image build 통과
 - PostgreSQL health → migration exit 0 → backend health → web health 순서 통과
 - FastAPI Python 3.12.10, worker 2개, backend/web UID 10001 확인
