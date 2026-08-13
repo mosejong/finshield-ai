@@ -122,7 +122,7 @@
 - 구현·PM 교정 commit: `7b8135e`
 - PR: #56, https://github.com/mosejong/finshield-ai/pull/56
 - 생성: 2026-08-13 18:05:43 KST, draft
-- GitHub Actions Linux CI: 진행 중
+- GitHub Actions Linux CI: test·web·container-runtime 모두 통과
 - 병합 시각·merge commit: PM 승인 후 기록
 
 ## 변경 파일
