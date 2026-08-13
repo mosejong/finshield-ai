@@ -5,11 +5,13 @@
 
 ## Architecture / engineering
 
+27 observability/PII masking · `adr/0006-privacy-safe-observability.md`
 26 HTTP security/HTTPS boundary · `adr/0005-http-security-and-https-boundary.md`
 04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · `adr/`
 
 ## Security
 
+Privacy-safe logs and runtime PII regression: `27-observability-pii-masking.md`
 HTTP response headers, same-origin state changes, trusted hosts and public TLS: `26-http-security-https.md`
 08 AI security alignment · 12 security threat model
 
@@ -18,6 +20,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-13/observability-pii-masking.md` — 요청 추적·latency·readiness·PII 비노출 구현
 - `devlog/2026-08-13/security-https-boundary.md` — 보안 헤더·CSRF·Host·HTTPS 경계 구현 및 검증
 - `devlog/2026-08-13/security-https-integration.md` — PR #50 Linux CI·PM 검수·main 통합 기록
 

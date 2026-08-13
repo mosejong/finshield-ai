@@ -31,8 +31,9 @@
 - [x] official product candidate UI (goal-only minimum input)
 - [x] What-if loan simulation (backend-only calculation, current vs alternative UI)
 - [x] 재테크 기초 가이드 v0.1 (공식 금융교육 근거, 입력·종목·매매 추천 없음)
-- [ ] API p50/p95 instrumentation
-- [ ] audit log / PII masking
+- [x] API latency instrumentation (exact JSON duration + process histogram; dashboard pending)
+- [x] privacy-safe request logging / PII non-disclosure regression
+- [ ] account-level audit log (requires identity and retention policy)
 
 ## P2 — 본선/Stretch
 - [ ] STT
