@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionHeading } from "@/components/common/SectionHeading";
@@ -10,6 +10,8 @@ import { DisclaimerNote } from "@/components/common/DisclaimerNote";
 import { MetricList } from "@/components/finance/MetricList";
 import { ProfileFacts } from "@/components/finance/ProfileFacts";
 import { getSnapshot } from "@/lib/api/home";
+import { fetchProfileMetrics } from "@/lib/api/profiles";
+import type { ProfileMetricsResponse } from "@/lib/api/contracts";
 import { clearProfile, useProfileStore } from "@/lib/store/profile-store";
 
 /**
@@ -25,9 +27,39 @@ export default function ProfilePage() {
   const loading = profileState.status === "idle" || profileState.status === "loading";
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [metricsState, setMetricsState] = useState<{
+    profileId: string;
+    data?: ProfileMetricsResponse;
+    error?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (profileState.status !== "ready" || !profileState.profileId) return;
+    const profileId = profileState.profileId;
+    let active = true;
+    fetchProfileMetrics(profileId)
+      .then((data) => {
+        if (active) setMetricsState({ profileId, data });
+      })
+      .catch(() => {
+        if (active) {
+          setMetricsState({
+            profileId,
+            error: "입력값은 저장됐지만 계산 지표를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.",
+          });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [profileState.profileId, profileState.status]);
 
   const demoSnapshot = getSnapshot();
   const hasOwnProfile = profile !== null;
+  const currentMetrics =
+    profileState.profileId && metricsState?.profileId === profileState.profileId
+      ? metricsState
+      : null;
 
   return (
     <AppShell>
@@ -55,7 +87,7 @@ export default function ProfilePage() {
 
             <p className="rounded-lg border border-border bg-card p-4 text-body text-foreground">
               {hasOwnProfile
-                ? "입력하신 내용을 서버에 저장했습니다. 아래에서 확인하세요."
+                ? currentMetrics?.data?.summary ?? "입력값으로 금융지표를 계산하고 있습니다…"
                 : demoSnapshot.summary}
             </p>
           </section>
@@ -68,10 +100,29 @@ export default function ProfilePage() {
             </SectionHeading>
 
             {hasOwnProfile ? (
-              <p className="rounded-lg border border-dashed border-border bg-secondary/60 p-4 text-body text-muted-foreground">
-                입력하신 값으로 계산한 지표는 아직 준비 중입니다. 금융 계산은
-                서버에서 수행하도록 설계되어 있어, 파생지표 API 구현 후에 표시됩니다.
-              </p>
+              currentMetrics?.error ? (
+                <p role="alert" className="rounded-lg border border-risk-medium-border bg-risk-medium-bg p-4 text-body text-risk-medium">
+                  {currentMetrics.error}
+                </p>
+              ) : currentMetrics?.data ? (
+                <>
+                  <MetricList metrics={currentMetrics.data.metrics} />
+                  <details className="mt-3 rounded-lg border border-border bg-card p-4">
+                    <summary className="cursor-pointer text-body font-medium text-foreground">
+                      계산 기준 보기
+                    </summary>
+                    <ul className="mt-3 list-disc space-y-2 pl-5 text-caption text-muted-foreground">
+                      {currentMetrics.data.assumptions.map((assumption) => (
+                        <li key={assumption}>{assumption}</li>
+                      ))}
+                    </ul>
+                  </details>
+                </>
+              ) : (
+                <p className="rounded-lg border border-dashed border-border bg-secondary/60 p-4 text-body text-muted-foreground">
+                  입력값으로 금융지표를 계산하고 있습니다…
+                </p>
+              )
             ) : (
               <MetricList metrics={demoSnapshot.metrics} />
             )}
@@ -125,8 +176,9 @@ export default function ProfilePage() {
       )}
 
       <DisclaimerNote>
-        여기 표시되는 지표는 상황을 이해하기 위한 참고값이며, 은행이 대출 심사에
-        사용하는 공식 기준과 다릅니다.
+        {hasOwnProfile && currentMetrics?.data
+          ? currentMetrics.data.disclaimer
+          : "여기 표시되는 지표는 상황을 이해하기 위한 참고값이며, 은행이 대출 심사에 사용하는 공식 기준과 다릅니다."}
       </DisclaimerNote>
     </AppShell>
   );

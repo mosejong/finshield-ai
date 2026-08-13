@@ -548,6 +548,27 @@ export const DerivedMetricSchema = z.object({
 });
 export type DerivedMetric = z.infer<typeof DerivedMetricSchema>;
 
+const SignedDecimalStringSchema = z.string().regex(/^-?\d+(?:\.\d+)?$/);
+
+export const ProfileMetricsResponseSchema = z.object({
+  version: z.literal("0.1"),
+  profile_id: z.string().uuid(),
+  profile_updated_at: z.string().datetime({ offset: true }),
+  summary: z.string().min(1),
+  metrics: z.array(DerivedMetricSchema).length(3),
+  calculation: z.object({
+    monthly_disposable_cashflow: SignedDecimalStringSchema,
+    monthly_debt_payment_ratio_percent: DecimalStringSchema.nullable(),
+    emergency_fund_coverage_months: DecimalStringSchema.nullable(),
+    essential_monthly_expenses: DecimalStringSchema,
+    emergency_fund_target_amount: DecimalStringSchema,
+    emergency_fund_gap: DecimalStringSchema,
+  }).strict(),
+  assumptions: z.array(z.string().min(1)).min(3),
+  disclaimer: z.string().min(1),
+}).strict();
+export type ProfileMetricsResponse = z.infer<typeof ProfileMetricsResponseSchema>;
+
 export const FinancialSnapshotSchema = z.object({
   hasProfile: z.boolean(),
   profile: FinancialProfileSchema.nullable(),

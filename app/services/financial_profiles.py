@@ -2,6 +2,8 @@ from uuid import UUID
 
 from app.repositories.financial_profiles import InMemoryFinancialProfileRepository
 from app.schemas.financial_profile import FinancialProfile, FinancialProfileResource
+from app.schemas.profile_metrics import ProfileMetricsResponse
+from app.services.profile_metrics import build_profile_metrics
 
 
 class FinancialProfileService:
@@ -21,3 +23,6 @@ class FinancialProfileService:
 
     def delete(self, profile_id: UUID) -> None:
         self._repository.delete(profile_id)
+
+    def metrics(self, profile_id: UUID) -> ProfileMetricsResponse:
+        return build_profile_metrics(self._repository.get(profile_id))
