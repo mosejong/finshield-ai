@@ -31,6 +31,7 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "수사관",
             "정부기관",
             "공공기관",
+            "수사기관",
         ),
         25,
         "공식 기관 사칭 가능성",
@@ -50,13 +51,14 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "대환대출",
             "특례 대출",
             "보증료 입금",
+            "정부 융자",
         ),
         30,
         "대출·정책금융 제안",
     ),
     SignalRule(
         "credential_request",
-        ("인증번호", "비밀번호", "otp", "보안카드 번호"),
+        ("인증번호", "비밀번호", "otp", "보안카드 번호", "일회용 승인코드"),
         40,
         "인증정보 요구",
     ),
@@ -75,7 +77,7 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
     ),
     SignalRule(
         "app_install_request",
-        ("앱 설치", "어플 설치", "apk", "프로그램 설치"),
+        ("앱 설치", "어플 설치", "apk", "프로그램 설치", "실행파일"),
         35,
         "앱 설치 요구",
     ),
@@ -93,13 +95,28 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
     ),
     SignalRule(
         "receive_and_forward_money",
-        ("입금받고", "재송금", "다시 보내", "전달해", "돈을 받아서 보내"),
+        (
+            "입금받고",
+            "재송금",
+            "다시 보내",
+            "전달해",
+            "돈을 받아서 보내",
+            "수령한 금액",
+            "제3자 계좌로 옮기",
+        ),
         70,
         "자금 수취·재전달 요구",
     ),
     SignalRule(
         "card_delivery_claim",
-        ("카드 배송", "카드가 발급", "신청한 카드", "카드 배달", "배송 기사"),
+        (
+            "카드 배송",
+            "카드가 발급",
+            "신청한 카드",
+            "카드 배달",
+            "배송 기사",
+            "신용카드 수령",
+        ),
         35,
         "신청하지 않은 카드 배송·발급 주장",
     ),
@@ -160,11 +177,71 @@ def _detect_by_rules(text: str, rules: tuple[SignalRule, ...]) -> list[RiskSigna
     normalized = text.casefold()
     detected = []
     for rule in rules:
-        if any(keyword.casefold() in normalized for keyword in rule.keywords):
+        if (
+            any(keyword.casefold() in normalized for keyword in rule.keywords)
+            and not _safe_context_suppresses(rule.code, normalized)
+        ):
             detected.append(
                 RiskSignal(code=rule.code, label=rule.label, weight=rule.weight)
             )
     return detected
+
+
+def _safe_context_suppresses(code: str, normalized: str) -> bool:
+    """명시적인 예방·정상 이용 문맥만 억제한다.
+
+    일반 negation 해석기가 아니다. 공격 지시가 함께 있는 혼합 문장은 억제하지
+    않도록 좁은 문구 조합만 사용한다.
+    """
+    if code in {"credential_request", "account_access_request"}:
+        return any(
+            phrase in normalized
+            for phrase in ("알려주지 마세요", "공유하지 마세요", "전달하지 마세요")
+        ) and not any(
+            phrase in normalized
+            for phrase in (
+                "답장해",
+                "보내 주세요",
+                "불러 주세요",
+                "입력해 주세요",
+                "입력하세요",
+                "전송해 주세요",
+                "말해 주세요",
+                "제출해 주세요",
+            )
+        )
+    if code in {"authority_impersonation", "money_transfer_request"}:
+        return "요구하지 않습니다" in normalized and not any(
+            phrase in normalized
+            for phrase in (
+                "송금해",
+                "입금해",
+                "돈을 보내",
+                "보호계좌로 보내",
+                "안전계좌로 보내",
+            )
+        )
+    if code == "loan_policy_offer":
+        return (
+            "상품을 비교" in normalized
+            and "공식 금리" in normalized
+            and "보증료 입금" not in normalized
+        )
+    if code in {"app_install_request", "remote_control_request"}:
+        return any(
+            phrase in normalized for phrase in ("설치하지 마세요", "허용하지 마세요")
+        ) and not any(
+            phrase in normalized
+            for phrase in (
+                "설치해 주세요",
+                "설치하세요",
+                "원격 접속을 허용하세요",
+                "화면 공유를 켜 주세요",
+            )
+        )
+    if code == "card_delivery_claim":
+        return "제가 신청한" in normalized and "공식 앱" in normalized
+    return False
 
 
 def _is_lexically_suspicious_url(raw_url: str) -> bool:

@@ -36,6 +36,7 @@
 
 ## 2026-08-13
 
+- `fraud-evaluation-benchmark-v0.1.md` — 합성 61건 benchmark, 실패·교정·재검수와 대회 증거 경계
 - `profile-metrics-integration.md` — profile metrics PR #38 병합 후 README·백로그·색인 반영
 - `profile-database-encryption.md` — encrypted SQLAlchemy profile persistence 구현·검수·PR #40 병합
 - `profile-persistence-integration.md` — PR #40 병합 후 README·백로그·색인 반영
