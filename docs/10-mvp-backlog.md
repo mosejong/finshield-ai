@@ -20,8 +20,9 @@
 - [ ] public MVP deployment (real domain/DNS/certificate verification required)
 
 ## P1 — 경쟁력
-- [ ] Rule-only vs LLM-only vs Hybrid benchmark
-- [ ] persona별 scenario golden set
+- [x] Legacy rule vs Scenario Engine bootstrap benchmark (합성 61건, non-held-out)
+- [x] persona·전체 UserState scenario golden set v0.1 (합성 bootstrap)
+- [ ] 고정 LLM-only vs proposed Hybrid held-out benchmark
 - [x] URL lexical feature analysis (offline safe implementation)
 - [ ] URL domain/reputation feature analysis (outbound-fetch policy required)
 - [x] financial profile dashboard shell

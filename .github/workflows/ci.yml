@@ -15,6 +15,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: pytest -q
+      - run: python -m scripts.evaluate_fraud_engine --check
 
   web:
     runs-on: ubuntu-latest

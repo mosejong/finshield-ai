@@ -4,7 +4,7 @@
 
 ## Status
 
-**MVP implementation — 2026-08-12**
+**MVP implementation — 2026-08-13**
 
 목표 대회: **2026 금융 AI Challenge**  
 Fraud Scenario Engine v0.1 백엔드가 `main`에 병합됐다. 현재 분석은 LLM이나
@@ -27,6 +27,13 @@ Next same-origin 프록시로 세션을 자동 준비하며 브라우저에는 p
 남기지 않는다.
 월 현금흐름·월소득 대비 상환액·비상자금
 기간도 backend에서 결정론적으로 계산해 profile과 Home에 같은 값으로 표시한다.
+Fraud evaluation v0.1은 팀이 직접 작성한 합성 61건으로 legacy 5-keyword baseline과
+Scenario Engine을 재현 가능하게 비교한다. bootstrap 개발셋 기준 Scenario Engine은
+precision 0.973684, recall 0.948718, F1 0.961039, FPR 0.045455이며 action-source
+근거 연결 coverage는 1.0이다. 같은 데이터로 규칙을 교정했으므로 독립 held-out
+성능이나 실서비스 정확도로 주장하지 않는다. LLM-only와 Hybrid 비교도 아직
+수행하지 않았다. 상세 결과와 주장 한계는 `docs/28-fraud-evaluation-benchmark.md`와
+`docs/29-competition-evidence-pack.md`를 따른다.
 
 ## Problem
 
@@ -189,6 +196,7 @@ host에 공개하지 않는다. 로컬 HTTP와 공개 HTTPS 환경의 차이, ba
 
 ```bash
 pytest -q
+python -m scripts.evaluate_fraud_engine --check
 cd web
 npm run build
 npx tsc --noEmit
@@ -196,10 +204,9 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **192 passed + POSIX 권한 테스트 1건 Windows skip**, frontend
-**32 passed**, Next production build,
-TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
-유지보수 항목으로 관리한다.
+현재 검증 수치는 각 PR의 개발일지와 CI를 기준으로 갱신한다. Python 전체 테스트,
+fraud quality gate, frontend test·production build·typecheck·lint를 각각 실행한다.
+Starlette `TestClient` 사용 중단 예정 경고 1건은 별도 유지보수 항목으로 관리한다.
 
 ## Backend v0.1 API
 
@@ -307,7 +314,8 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 
 보안 경계 v0.1이 적용되었다. 브라우저·API 보안 헤더, 쿠키 기반 상태 변경 요청의 same-origin 검사, production trusted host fail-closed, loopback 내부 포트, Caddy HTTPS 공개 구성을 포함한다. 실제 공개 완료에는 도메인·DNS·인증서 외부 검증이 남아 있다. 운영법과 제한은 `docs/26-http-security-https.md`를 따른다.
 
-- 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
+- 독립 작성·동결한 held-out fraud golden v0.2 평가
+- 고정 model·prompt·provider 계약 후 LLM-only와 Hybrid 비교
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
