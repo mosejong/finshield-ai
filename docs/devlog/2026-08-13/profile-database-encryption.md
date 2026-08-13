@@ -6,7 +6,7 @@
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-main`
 - 시작: 13:45 KST
 - 종료: 14:07 KST
-- 상태: 구현·로컬 검증 완료, PR 준비
+- 상태: PM 검수·GitHub Actions 통과, 병합 준비
 
 ## 목표
 
@@ -94,6 +94,9 @@
   development·test allowlist 외 모든 환경을 배포 환경으로 간주.
 - PM 리뷰 3: 설정만 맞고 migration이 없으면 첫 요청까지 실패가 늦어짐 → 앱 시작 시
   연결·table 검증 추가.
+- 14:11: PR #40 최종 head 기준 GitHub Actions `test` 2회와 `web` 2회 모두 통과.
+  PM diff 재검수에서 API 호환성, 프론트 비변경, 비밀키 미포함, migration downgrade,
+  일반화된 503 경계를 확인했고 추가 차단 이슈 없음.
 - 첫 통합 스모크의 합성 비교가 PowerShell Decimal 형변환 때문에 false로 기록됨 →
   ID·목표·소득 조건을 분리하고 Decimal 명시 변환 후 모두 true 확인. 최초 결과를
   통과로 기록하지 않음.
