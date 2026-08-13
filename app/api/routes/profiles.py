@@ -9,6 +9,7 @@ from app.repositories.financial_profiles import (
     InMemoryFinancialProfileRepository,
 )
 from app.schemas.financial_profile import FinancialProfile, FinancialProfileResource
+from app.schemas.profile_metrics import ProfileMetricsResponse
 from app.services.financial_profiles import FinancialProfileService
 
 
@@ -52,6 +53,17 @@ def get_profile(
 ) -> FinancialProfileResource:
     try:
         return service.get(profile_id)
+    except FinancialProfileNotFoundError as exc:
+        raise _not_found() from exc
+
+
+@router.get("/{profile_id}/metrics", response_model=ProfileMetricsResponse)
+def get_profile_metrics(
+    profile_id: UUID,
+    service: ProfileServiceDependency,
+) -> ProfileMetricsResponse:
+    try:
+        return service.metrics(profile_id)
     except FinancialProfileNotFoundError as exc:
         raise _not_found() from exc
 

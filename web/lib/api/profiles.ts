@@ -1,10 +1,12 @@
 import {
   BackendFinancialProfileResourceSchema,
+  ProfileMetricsResponseSchema,
   type BackendFinancialProfile,
   type BackendFinancialProfileResource,
   type FinancialProfile,
   type FinancialProfileResource,
   type Persona,
+  type ProfileMetricsResponse,
 } from "@/lib/api/contracts";
 
 export type ProfileRequestError = Error & { status?: number };
@@ -118,4 +120,18 @@ export async function deleteProfile(profileId: string): Promise<void> {
     error.status = response.status;
     throw error;
   }
+}
+
+export async function fetchProfileMetrics(
+  profileId: string,
+): Promise<ProfileMetricsResponse> {
+  const response = await fetch(`/api/proxy/profiles/${profileId}/metrics`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const error = new Error("금융지표를 불러오지 못했습니다.") as ProfileRequestError;
+    error.status = response.status;
+    throw error;
+  }
+  return ProfileMetricsResponseSchema.parse(await response.json());
 }

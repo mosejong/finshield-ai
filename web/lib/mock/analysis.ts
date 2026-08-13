@@ -1,7 +1,6 @@
 import type {
   Action,
   AnalysisResult,
-  AnalysisSummary,
   RiskLevel,
   UserState,
 } from "@/lib/api/contracts";
@@ -419,8 +418,7 @@ function demoLowAnalysis(id: string, createdAt: string): AnalysisResult {
  * 그래서 예시 id 일 때만 예시를 돌려주고, 나머지는 null 로 "찾을 수 없음"을 알린다.
  */
 export function demoAnalysisFor(id: string): AnalysisResult | null {
-  const summary = MOCK_RECENT_ANALYSES.find((item) => item.id === id);
-  const createdAt = summary?.createdAt ?? new Date().toISOString();
+  const createdAt = new Date().toISOString();
 
   if (id === "demo-2") return demoLowAnalysis(id, createdAt);
   if (id === "demo" || id === "demo-1") {
@@ -428,22 +426,3 @@ export function demoAnalysisFor(id: string): AnalysisResult | null {
   }
   return null;
 }
-
-export const MOCK_RECENT_ANALYSES: AnalysisSummary[] = [
-  {
-    id: "demo-1",
-    createdAt: "2026-08-11T09:20:00.000Z",
-    level: "high",
-    headline: "지금 중단해야 하는 요청입니다",
-    excerpt: "급여 계좌 등록 위해 체크카드를 퀵으로 보내달라는 문자",
-    openActionCount: 2,
-  },
-  {
-    id: "demo-2",
-    createdAt: "2026-08-08T14:05:00.000Z",
-    level: "low",
-    headline: "지금 단계에서 뚜렷한 위험 신호는 보이지 않습니다",
-    excerpt: "카드사 명의 결제 안내 문자",
-    openActionCount: 0,
-  },
-];

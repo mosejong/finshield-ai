@@ -1,9 +1,7 @@
 import { AppShell } from "@/components/layout/AppShell";
-import { FinancialStatusBlock } from "@/components/home/FinancialStatusBlock";
-import { CheckTodayBlock } from "@/components/home/CheckTodayBlock";
+import { HomeFinancialStatus } from "@/components/home/HomeFinancialStatus";
+import { HomeCheckToday, HomeNextAction } from "@/components/home/HomeProfileActions";
 import { SuspiciousContactBlock } from "@/components/home/SuspiciousContactBlock";
-import { NextActionBlock } from "@/components/home/NextActionBlock";
-import { getHomeView } from "@/lib/api/home";
 
 /**
  * Home — 금융 안전 대시보드.
@@ -14,8 +12,6 @@ import { getHomeView } from "@/lib/api/home";
  * 블록당 카드 1개를 넘기지 않는다.
  */
 export default function HomePage() {
-  const view = getHomeView();
-
   return (
     <AppShell>
       <div className="mb-6">
@@ -26,19 +22,10 @@ export default function HomePage() {
       </div>
 
       <div className="flex flex-col gap-7">
-        <FinancialStatusBlock snapshot={view.snapshot} />
-        <CheckTodayBlock
-          items={view.checkItems}
-          source={view.checkItemsSource}
-        />
-        <SuspiciousContactBlock
-          recent={view.recentAnalyses}
-          source={view.recentAnalysesSource}
-        />
-        <NextActionBlock
-          action={view.nextAction}
-          source={view.nextActionSource}
-        />
+        <HomeFinancialStatus />
+        <HomeCheckToday />
+        <SuspiciousContactBlock recent={[]} source="live" />
+        <HomeNextAction />
       </div>
     </AppShell>
   );

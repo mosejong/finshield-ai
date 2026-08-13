@@ -33,6 +33,8 @@ finshield-ai/
 | `/products/simulate` | 현재 금리와 변경 금리의 대출 What-if 비교 | 구현 |
 | `/learn/wealth` | 공식 근거 기반 재테크 기초 교육 | 구현 |
 | `/products/[id]`, `/products/compare` | 공식 상품 상세·2개 원문 비교 | 구현 |
+| `/profile` 파생지표 | backend 월 현금흐름·상환비율·비상자금 기간 | 구현 |
+| `/` 현재 금융상태 | 저장 profile + backend 파생지표 live 요약 | 구현 |
 | `/evidence/[id]` | 근거 상세 | 미구현 (목록 컴포넌트만 존재) |
 
 **`/check` 는 프로필 없이 동작한다.** 의심 문자를 방금 받은 사람에게 온보딩을 먼저 요구하면 이탈한다. 프로필은 개인화 품질만 올리는 선택 요소이며, 있으면 `persona` 만 요청에 실린다.
