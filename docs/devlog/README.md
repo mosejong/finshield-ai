@@ -37,6 +37,8 @@
 ## 2026-08-13
 
 - `profile-metrics-integration.md` — profile metrics PR #38 병합 후 README·백로그·색인 반영
+- `profile-database-encryption.md` — encrypted SQLAlchemy profile persistence 구현·검수·PR #40 병합
+- `profile-persistence-integration.md` — PR #40 병합 후 README·백로그·색인 반영
 
 ## 작성 규칙
 

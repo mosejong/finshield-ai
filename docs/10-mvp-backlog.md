@@ -2,6 +2,7 @@
 
 ## P0 — 반드시 구현
 - [x] FinancialProfile CRUD v0.1 (process-local prototype)
+- [x] FinancialProfile SQLAlchemy·Alembic 영속화 + application-level 인증 암호화
 - [x] 공식 금융상품 API adapter (live 검증 2026-08-12)
 - [x] 최신월 공식 상품 live data profile (325건, 2026-08-12)
 - [x] Product normalization + latest-month in-memory cache
@@ -22,7 +23,7 @@
 - [x] URL lexical feature analysis (offline safe implementation)
 - [ ] URL domain/reputation feature analysis (outbound-fetch policy required)
 - [x] financial profile dashboard shell
-- [x] financial profile frontend integration (process-local backend CRUD v0.1)
+- [x] financial profile frontend integration (backend CRUD v0.1)
 - [x] deterministic profile metrics + live profile/Home status v0.1
 - [x] official product detail / 2-product comparison UI
 - [x] official product candidate UI (goal-only minimum input)
