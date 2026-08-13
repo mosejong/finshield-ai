@@ -6,7 +6,8 @@
 - 기준 main: `bce70703f9152efbe402670b411f00934913f1a5`
 - 관련 기능 PR: #43
 - 시작: 14:56
-- 종료: 진행 중
+- 종료: 15:08
+- 상태: 통합·로컬 적용 완료
 
 ## 통합 결과
 
@@ -67,6 +68,8 @@ Next same-origin 프록시는 `finshield_session` 하나만 FastAPI로 전달한
 
 ## Git/PR
 
-- 문서 commit SHA: 대기
-- 문서 PR: 대기
-- 문서 병합 시각: 대기
+- 통합 문서 commit SHA: `762e8435b05619fe763d2e56f36ea3780981dc60`
+- 통합 문서 PR: #44 `https://github.com/mosejong/finshield-ai/pull/44`
+- 통합 문서 병합 시각: 2026-08-13 15:07:29 KST
+- 통합 문서 merge SHA: `3b0e675cb54c7324d3f8c5a8a73258eb2eb1cc62`
+- PR #44 GitHub Actions: backend test 2개, web 2개 모두 통과
