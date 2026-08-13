@@ -34,6 +34,10 @@
 - `product-detail-compare-v0.1.md` — 공식 상품 상세·2개 비교 구현·실데이터 검수·PR #36 병합
 - `product-detail-compare-integration.md` — 상품 상세·비교 병합 후 PM 관리 문서 반영
 
+## 2026-08-13
+
+- `profile-metrics-integration.md` — profile metrics PR #38 병합 후 README·백로그·색인 반영
+
 ## 작성 규칙
 
 상세한 필수 항목과 PR 흐름은 `docs/14-development-workflow.md`를 따른다.

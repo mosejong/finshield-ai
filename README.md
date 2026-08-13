@@ -17,7 +17,8 @@ Next.js 프론트엔드 MVP도 `main`에 병합되어 실제 분석 API의 위�
 FinancialProfile CRUD v0.1도 백엔드에 추가되어 생성·단건 조회·전체 교체·삭제가
 가능하다. 현재 profile 저장은 로컬 프로토타입용 process-local 방식이며 다음 단계는
 PostgreSQL·인증 경계다. 온보딩·프로필 화면은 이 API와 연결됐고 브라우저에는
-profile UUID와 fraud persona만 보관한다.
+profile UUID와 fraud persona만 보관한다. 월 현금흐름·월소득 대비 상환액·비상자금
+기간도 backend에서 결정론적으로 계산해 profile과 Home에 같은 값으로 표시한다.
 
 ## Problem
 
@@ -162,7 +163,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **150 passed**, frontend **21 passed**, Next build,
+현재 `main` 기준: Python **158 passed**, frontend **24 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -200,6 +201,14 @@ endpoint는 제공하지 않는다. 현재 저장소는 기본 최대 1,000개�
 프론트는 동일 오리진 Next proxy로 생성·조회·교체·삭제하고 profile 원문을
 `sessionStorage`에 저장하지 않는다. backend enum과 UI 계약은 일치시키며 UI 전용
 persona는 FinancialProfile 요청에서 제외한다.
+
+`GET /api/v1/profiles/{profile_id}/metrics`는 저장된 profile을 다시 읽어 월 현금흐름,
+월소득 대비 부채상환액, 비상자금 기간과 목표 부족액을 Decimal로 계산한다. 비율과
+기간은 소수 첫째 자리 `ROUND_HALF_UP`을 사용하고, 월소득이나 생활비 분모가 0원이면
+0%·무한대로 추정하지 않고 `null`과 `계산 불가`를 반환한다. 상환 비율은 공식 DSR이
+아니며 임의의 좋음·나쁨 임계값을 적용하지 않는다. `/profile`과 Home은 계산식 없이
+backend 표시값·가정·주의문을 사용한다. 계산 결과는 별도 저장하지 않고 추가 개인정보도
+수집하지 않는다. 상세 계약은 `docs/21-profile-derived-metrics.md`에 기록했다.
 
 `GET /api/v1/products`는 금융위원회 `서민금융상품기본정보`의 고정 HTTPS
 endpoint를 호출하고 공식 응답을 내부 상품 계약으로 정규화한다. 금리·한도·기간과
