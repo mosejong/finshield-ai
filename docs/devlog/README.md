@@ -44,6 +44,7 @@
 - `session-data-lifecycle.md` — 익명 계정 전체 삭제와 만료 세션/profile 정리 구현·검수
 - `session-data-lifecycle-integration.md` — PR #46 병합·데스크톱 최신화·live 삭제 E2E
 - `docker-postgres-runtime.md` — Compose, PostgreSQL, 다중 worker와 backup/restore 검증
+- `docker-postgres-integration.md` — PR #48 Linux CI 수정·병합·데스크톱 최신화
 
 ## 작성 규칙
 
