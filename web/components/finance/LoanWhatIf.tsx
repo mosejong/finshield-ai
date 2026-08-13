@@ -252,6 +252,7 @@ export function LoanWhatIf() {
         <button
           type="submit"
           disabled={pending}
+          aria-busy={pending}
           className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-body font-semibold text-primary-foreground disabled:opacity-60"
         >
           {pending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
@@ -261,6 +262,10 @@ export function LoanWhatIf() {
 
       {comparison ? (
         <section className="mt-6" aria-labelledby="loan-comparison-title">
+          {/* 결과가 화면 아래에 새로 나타나므로 스크린리더에 한 번 알린다 */}
+          <p role="status" className="sr-only">
+            두 조건의 계산 결과가 준비되었습니다.
+          </p>
           <h2 id="loan-comparison-title" className="text-title text-foreground">계산 결과</h2>
           <p className="mt-1 text-caption text-muted-foreground">
             두 조건을 같은 계산 기준으로 각각 계산해 나란히 보여줍니다.

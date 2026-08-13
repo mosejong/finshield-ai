@@ -36,7 +36,7 @@ export function ProductDetail({ productId }: { productId: string }) {
     );
   }
   if (!product) {
-    return <p className="text-body text-muted-foreground">최신 공식 상품을 확인하고 있습니다…</p>;
+    return <p role="status" className="text-body text-muted-foreground">최신 공식 상품을 확인하고 있습니다…</p>;
   }
 
   return (

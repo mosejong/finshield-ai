@@ -18,7 +18,7 @@ export default function OnboardingPage() {
       />
 
       {loading ? (
-        <p className="text-body text-muted-foreground">불러오는 중…</p>
+        <p role="status" className="text-body text-muted-foreground">불러오는 중…</p>
       ) : (
         <>
           {profileState.error ? (

@@ -535,8 +535,8 @@ export type WealthGuidanceResponse = z.infer<
 /**
  * 파생지표.
  *
- * 계산은 프론트에서 하지 않는다. 서비스 레이어가 계산 완료값을 내려주고
- * 화면은 표시만 한다. 백엔드 `/profiles/{id}/metrics` 가 생기면 그대로 교체된다.
+ * 계산은 프론트에서 하지 않는다. 백엔드 `/profiles/{id}/metrics`가 계산 완료값을
+ * 내려주고 화면은 표시만 한다.
  */
 export const DerivedMetricSchema = z.object({
   key: z.enum([

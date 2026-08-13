@@ -9,10 +9,10 @@ import type { Evidence } from "@/lib/api/contracts";
  *
  * 아래 항목은 모두 실재하는 기관/창구를 가리키지만, 이번 작업에서 공식 출처를
  * 직접 조회해 확인한 것은 아니다. 따라서 전부 `verified: false` 로 두고
- * 화면에 "공식 확인 전"으로 표시한다. 백엔드 `/api/v1/evidence` 가 생기면
- * fetchedAt 과 함께 검증된 항목으로 대체된다.
+ * 화면에 "공식 확인 전"으로 표시한다. live 분석은 이미
+ * `/api/v1/analyze`의 `official_sources`를 사용하며 이 목록은 mock 전용이다.
  */
-const UNVERIFIED_NOTE = "백엔드 근거 연동 전이라 공식 확인 절차를 거치지 않았습니다.";
+const UNVERIFIED_NOTE = "고정 예시라 이 화면에서 공식 확인 절차를 거치지 않았습니다.";
 
 export const MOCK_EVIDENCE: Record<string, Evidence> = {
   fss_1332: {
