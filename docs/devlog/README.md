@@ -36,6 +36,7 @@
 
 ## 2026-08-13
 
+- `frontend-accessibility-integration.md` — PR #56 CI·PM 교정·main 통합 기록
 - `frontend-accessibility-e2e.md` — 프론트 접근성 v0.1, PM 교정과 3개 viewport 검수
 - `fraud-evaluation-integration.md` — PR #54 Linux CI·PM 승인·main 통합 기록
 - `fraud-evaluation-benchmark-v0.1.md` — 합성 61건 benchmark, 실패·교정·재검수와 대회 증거 경계

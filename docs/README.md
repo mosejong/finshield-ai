@@ -1,7 +1,7 @@
 # FinShield Documentation Index
 
 ## Product / research
-01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog · 28 fraud evaluation benchmark · 29 competition evidence pack
+01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog · 28 fraud evaluation benchmark · 29 competition evidence pack · 30 production readiness status
 
 ## Architecture / engineering
 
@@ -21,6 +21,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-13/frontend-accessibility-integration.md` — PR #56 CI·PM 교정·main 통합 기록
 - `devlog/2026-08-13/frontend-accessibility-e2e.md` — Claude 구현·PM 교정·실브라우저 반응형 검수
 - `devlog/2026-08-13/fraud-evaluation-integration.md` — PR #54 Linux CI·PM 승인·main 통합 기록
 - `devlog/2026-08-13/fraud-evaluation-benchmark-v0.1.md` — 합성 golden set·품질 gate·대회 증거 묶음
