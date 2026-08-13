@@ -15,8 +15,10 @@ Next.js 프론트엔드 MVP도 `main`에 병합되어 실제 분석 API의 위�
 요청 pagination은 같은 snapshot에서 처리한다. source identity 무결성, 보수적 중복
 정책, goal 기반 filtering, 공식 상품 후보·상세·2개 비교 UI까지 완료했다.
 FinancialProfile CRUD v0.1도 백엔드에 추가되어 생성·단건 조회·전체 교체·삭제가
-가능하다. 현재 profile 저장은 로컬 프로토타입용 process-local 방식이며 다음 단계는
-PostgreSQL·인증 경계다. 온보딩·프로필 화면은 이 API와 연결됐고 브라우저에는
+가능하다. SQLAlchemy 2.x·Alembic 저장 경계와 FinancialProfile 전체 인증 암호화를
+추가했다. 배포 환경은 PostgreSQL+psycopg와 암호화 키가 없거나 migration이 누락되면
+시작을 거부한다. development·test에서 설정이 없을 때만 process-local 저장으로
+동작하며 다음 공개 배포 차단 조건은 인증·소유권이다. 온보딩·프로필 화면은 API와 연결됐고 브라우저에는
 profile UUID와 fraud persona만 보관한다. 월 현금흐름·월소득 대비 상환액·비상자금
 기간도 backend에서 결정론적으로 계산해 profile과 Home에 같은 값으로 표시한다.
 
@@ -108,7 +110,8 @@ app/
   core/             legacy-compatible risk interface
   data/fraud/       reviewed static official sources
   domain/fraud/     detection, classification, policy, provenance
-  repositories/     process-local prototype persistence boundaries
+  db/               SQLAlchemy models and session configuration
+  repositories/     encrypted/profile persistence boundaries
   schemas/          request/response schemas
   services/         application orchestration
 docs/
@@ -120,6 +123,7 @@ docs/
   06-roadmap.md
   devlog/           date- and branch-based development history
 tests/
+migrations/         Alembic database migrations
 web/                Next.js frontend MVP
 .github/workflows/
 ```
@@ -135,6 +139,11 @@ uvicorn app.main:app --reload
 ```
 
 Then open `/docs`.
+
+암호화 DB 저장을 사용하려면 `DATABASE_URL`과 `PROFILE_ENCRYPTION_KEYS`를 함께 설정하고
+서버 시작 전에 `alembic upgrade head`를 실행한다. development·test는 SQLite 검증이
+가능하지만 staging·production은 `postgresql+psycopg://`만 허용한다. 키 생성·순환,
+migration, 삭제·backup 경계는 `docs/22-profile-persistence-encryption.md`를 따른다.
 
 공식 금융상품 live 조회를 사용하려면 공공데이터포털 활용신청 후 발급된
 `일반 인증키`를 환경변수 `PUBLIC_DATA_SERVICE_KEY`에 그대로 설정한다. backend는
@@ -163,7 +172,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **158 passed**, frontend **24 passed**, Next build,
+현재 `main` 기준: Python **170 passed**, frontend **24 passed**, Next build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -196,8 +205,10 @@ FinancialProfile의 최소 입력 스키마는 `app/schemas/financial_profile.py
 `POST /api/v1/profiles`, 단건 `GET`, 전체 교체 `PUT`, `DELETE`로 검증된 profile을
 재사용할 수 있다. 응답은 불투명 UUID와 UTC 생성·수정 시각을 포함하며 전체 목록
 endpoint는 제공하지 않는다. 현재 저장소는 기본 최대 1,000개의 process-local
-메모리 저장이므로 재시작·다중 worker에서 유지되지 않는다. UUID는 인증이 아니며,
-인증·소유권 검증과 PostgreSQL 전환 전에는 공개 배포에 사용하면 안 된다.
+메모리 fallback 또는 설정된 SQLAlchemy DB를 사용한다. DB mode는 profile 전체를
+Fernet 인증 암호화하고 암호문을 profile UUID에 결합해 변조·row swap을 거부한다.
+배포 환경은 PostgreSQL과 Alembic migration을 강제한다. UUID는 인증이 아니며,
+인증·소유권 검증 전에는 공개 배포에 사용하면 안 된다.
 프론트는 동일 오리진 Next proxy로 생성·조회·교체·삭제하고 profile 원문을
 `sessionStorage`에 저장하지 않는다. backend enum과 UI 계약은 일치시키며 UI 전용
 persona는 FinancialProfile 요청에서 제외한다.
@@ -264,7 +275,8 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
-- PostgreSQL·SQLAlchemy·Alembic 영구 저장과 인증·소유권 경계
+- 사용자 인증·FinancialProfile 소유권 경계
+- PostgreSQL live·backup restore·다중 worker 검증
 - Starlette `TestClient` 사용 중단 예정 경고 대응
 
 ## Verified official-data direction (2026-08-11)

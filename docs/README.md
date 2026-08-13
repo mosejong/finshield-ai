@@ -4,7 +4,7 @@
 01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog
 
 ## Architecture / engineering
-04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · `adr/`
+04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · `adr/`
 
 ## Security
 08 AI security alignment · 12 security threat model
@@ -47,3 +47,5 @@ Date- and branch-based logs: `devlog/README.md`
 - `devlog/2026-08-12/product-detail-compare-integration.md` — 상품 상세·비교 병합 후 README·백로그 반영
 - `devlog/2026-08-12/profile-metrics-v0.1.md` — backend 파생지표·profile/Home live 연결 구현·검수·병합
 - `devlog/2026-08-13/profile-metrics-integration.md` — profile metrics 병합 후 README·색인·백로그 반영
+- `devlog/2026-08-13/profile-database-encryption.md` — SQLAlchemy·Alembic·profile 암호화 구현·검수·PR 병합
+- `devlog/2026-08-13/profile-persistence-integration.md` — 암호화 영속화 병합 후 README·색인·백로그 반영
