@@ -31,15 +31,19 @@ class FinancialProfileStorageError(RuntimeError):
 class FinancialProfileRepository(Protocol):
     def verify(self) -> None: ...
 
-    def create(self, profile: FinancialProfile) -> FinancialProfileResource: ...
-
-    def get(self, profile_id: UUID) -> FinancialProfileResource: ...
-
-    def replace(
-        self, profile_id: UUID, profile: FinancialProfile
+    def create(
+        self, profile: FinancialProfile, owner_user_id: UUID
     ) -> FinancialProfileResource: ...
 
-    def delete(self, profile_id: UUID) -> None: ...
+    def get(
+        self, profile_id: UUID, owner_user_id: UUID
+    ) -> FinancialProfileResource: ...
+
+    def replace(
+        self, profile_id: UUID, profile: FinancialProfile, owner_user_id: UUID
+    ) -> FinancialProfileResource: ...
+
+    def delete(self, profile_id: UUID, owner_user_id: UUID) -> None: ...
 
 
 class InMemoryFinancialProfileRepository:
@@ -61,12 +65,15 @@ class InMemoryFinancialProfileRepository:
         self._max_profiles = max_profiles
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._profiles: dict[UUID, FinancialProfileResource] = {}
+        self._owners: dict[UUID, UUID] = {}
         self._lock = RLock()
 
     def verify(self) -> None:
         return None
 
-    def create(self, profile: FinancialProfile) -> FinancialProfileResource:
+    def create(
+        self, profile: FinancialProfile, owner_user_id: UUID
+    ) -> FinancialProfileResource:
         with self._lock:
             if len(self._profiles) >= self._max_profiles:
                 raise FinancialProfileCapacityError("profile capacity reached")
@@ -79,24 +86,31 @@ class InMemoryFinancialProfileRepository:
                 updated_at=now,
             )
             self._profiles[record.profile_id] = record.model_copy(deep=True)
+            self._owners[record.profile_id] = owner_user_id
             return record.model_copy(deep=True)
 
-    def get(self, profile_id: UUID) -> FinancialProfileResource:
+    def get(
+        self, profile_id: UUID, owner_user_id: UUID
+    ) -> FinancialProfileResource:
         with self._lock:
             try:
                 record = self._profiles[profile_id]
             except KeyError as exc:
                 raise FinancialProfileNotFoundError(profile_id) from exc
+            if self._owners[profile_id] != owner_user_id:
+                raise FinancialProfileNotFoundError(profile_id)
             return record.model_copy(deep=True)
 
     def replace(
-        self, profile_id: UUID, profile: FinancialProfile
+        self, profile_id: UUID, profile: FinancialProfile, owner_user_id: UUID
     ) -> FinancialProfileResource:
         with self._lock:
             try:
                 current = self._profiles[profile_id]
             except KeyError as exc:
                 raise FinancialProfileNotFoundError(profile_id) from exc
+            if self._owners[profile_id] != owner_user_id:
+                raise FinancialProfileNotFoundError(profile_id)
 
             now = self._utc_now()
             if now <= current.updated_at:
@@ -111,10 +125,13 @@ class InMemoryFinancialProfileRepository:
             self._profiles[profile_id] = replacement.model_copy(deep=True)
             return replacement.model_copy(deep=True)
 
-    def delete(self, profile_id: UUID) -> None:
+    def delete(self, profile_id: UUID, owner_user_id: UUID) -> None:
         with self._lock:
             try:
+                if self._owners[profile_id] != owner_user_id:
+                    raise KeyError(profile_id)
                 del self._profiles[profile_id]
+                del self._owners[profile_id]
             except KeyError as exc:
                 raise FinancialProfileNotFoundError(profile_id) from exc
 
@@ -156,12 +173,15 @@ class SqlAlchemyFinancialProfileRepository:
                     "financial profile storage is unavailable"
                 ) from None
 
-    def create(self, profile: FinancialProfile) -> FinancialProfileResource:
+    def create(
+        self, profile: FinancialProfile, owner_user_id: UUID
+    ) -> FinancialProfileResource:
         profile_id = uuid4()
         now = self._utc_now()
         encrypted = self._keyring.encrypt(profile, profile_id)
         record = FinancialProfileRecord(
             profile_id=str(profile_id),
+            owner_user_id=str(owner_user_id),
             encrypted_profile=encrypted.ciphertext,
             encryption_key_id=encrypted.key_id,
             created_at=now,
@@ -178,10 +198,17 @@ class SqlAlchemyFinancialProfileRepository:
                 ) from exc
         return self._resource_from_record(record)
 
-    def get(self, profile_id: UUID) -> FinancialProfileResource:
+    def get(
+        self, profile_id: UUID, owner_user_id: UUID
+    ) -> FinancialProfileResource:
         with self._session_factory() as session:
             try:
-                record = session.get(FinancialProfileRecord, str(profile_id))
+                record = session.scalar(
+                    select(FinancialProfileRecord).where(
+                        FinancialProfileRecord.profile_id == str(profile_id),
+                        FinancialProfileRecord.owner_user_id == str(owner_user_id),
+                    )
+                )
             except SQLAlchemyError as exc:
                 raise FinancialProfileStorageError(
                     "financial profile read failed"
@@ -191,14 +218,17 @@ class SqlAlchemyFinancialProfileRepository:
             return self._resource_from_record(record)
 
     def replace(
-        self, profile_id: UUID, profile: FinancialProfile
+        self, profile_id: UUID, profile: FinancialProfile, owner_user_id: UUID
     ) -> FinancialProfileResource:
         with self._session_factory() as session:
             try:
-                record = session.get(
-                    FinancialProfileRecord,
-                    str(profile_id),
-                    with_for_update=True,
+                record = session.scalar(
+                    select(FinancialProfileRecord)
+                    .where(
+                        FinancialProfileRecord.profile_id == str(profile_id),
+                        FinancialProfileRecord.owner_user_id == str(owner_user_id),
+                    )
+                    .with_for_update()
                 )
                 if record is None:
                     raise FinancialProfileNotFoundError(profile_id)
@@ -223,13 +253,16 @@ class SqlAlchemyFinancialProfileRepository:
                 ) from exc
             return self._resource_from_record(record)
 
-    def delete(self, profile_id: UUID) -> None:
+    def delete(self, profile_id: UUID, owner_user_id: UUID) -> None:
         with self._session_factory() as session:
             try:
-                record = session.get(
-                    FinancialProfileRecord,
-                    str(profile_id),
-                    with_for_update=True,
+                record = session.scalar(
+                    select(FinancialProfileRecord)
+                    .where(
+                        FinancialProfileRecord.profile_id == str(profile_id),
+                        FinancialProfileRecord.owner_user_id == str(owner_user_id),
+                    )
+                    .with_for_update()
                 )
                 if record is None:
                     raise FinancialProfileNotFoundError(profile_id)

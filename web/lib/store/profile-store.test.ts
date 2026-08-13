@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FinancialProfile } from "@/lib/api/contracts";
 
+vi.mock("@/lib/api/auth", () => ({
+  ensureAuthSession: vi.fn().mockResolvedValue({ authenticated: true }),
+}));
+
 const PROFILE: FinancialProfile = {
   ageBand: "20_29",
   employmentStatus: "employed",

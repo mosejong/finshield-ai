@@ -1,15 +1,30 @@
 from decimal import Decimal
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.routes.auth import get_current_session
 from app.api.routes.profiles import get_financial_profile_service
 from app.domain.finance.profile_metrics import calculate_profile_metrics
 from app.main import app
 from app.repositories.financial_profiles import InMemoryFinancialProfileRepository
 from app.schemas.financial_profile import FinancialProfile
+from app.schemas.auth import SessionPrincipal
 from app.services.financial_profiles import FinancialProfileService
+
+
+TEST_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+
+
+def principal_override() -> SessionPrincipal:
+    now = datetime(2026, 8, 13, tzinfo=timezone.utc)
+    return SessionPrincipal(
+        user_id=TEST_USER_ID,
+        created_at=now,
+        expires_at=now + timedelta(days=30),
+    )
 
 
 def profile_data(**overrides: object) -> dict[str, object]:
@@ -86,9 +101,11 @@ def test_profile_metrics_do_not_invent_values_for_zero_denominators() -> None:
 def metrics_client() -> TestClient:
     service = FinancialProfileService(InMemoryFinancialProfileRepository())
     app.dependency_overrides[get_financial_profile_service] = lambda: service
+    app.dependency_overrides[get_current_session] = principal_override
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.pop(get_financial_profile_service, None)
+    app.dependency_overrides.pop(get_current_session, None)
 
 
 def test_profile_metrics_endpoint_returns_display_and_audit_values(

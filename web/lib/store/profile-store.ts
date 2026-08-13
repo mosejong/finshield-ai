@@ -135,7 +135,7 @@ async function loadStoredProfile(): Promise<void> {
         profileId: null,
         profile: null,
         status: "error",
-        error: "서버가 다시 시작되어 저장한 금융상태를 찾지 못했습니다. 다시 입력해 주세요.",
+        error: "현재 브라우저 세션에서 저장한 금융상태를 찾지 못했습니다. 다시 입력해 주세요.",
       });
       return;
     }

@@ -14,6 +14,14 @@ import { z } from "zod";
 export const SourceKindSchema = z.enum(["live", "mock"]);
 export type SourceKind = z.infer<typeof SourceKindSchema>;
 
+export const AuthSessionResponseSchema = z.object({
+  authenticated: z.literal(true),
+  user_id: z.string().uuid(),
+  kind: z.literal("anonymous"),
+  expires_at: z.string().datetime({ offset: true }),
+}).strict();
+export type AuthSessionResponse = z.infer<typeof AuthSessionResponseSchema>;
+
 /* ------------------------------------------------------------------ */
 /* 공통                                                                */
 /* ------------------------------------------------------------------ */

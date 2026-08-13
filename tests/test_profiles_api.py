@@ -1,10 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.routes.auth import get_current_session
 from app.api.routes.profiles import get_financial_profile_service
 from app.main import app
 from app.repositories.financial_profiles import (
@@ -12,7 +13,21 @@ from app.repositories.financial_profiles import (
     InMemoryFinancialProfileRepository,
 )
 from app.schemas.financial_profile import FinancialGoal, FinancialProfile
+from app.schemas.auth import SessionPrincipal
 from app.services.financial_profiles import FinancialProfileService
+
+
+TEST_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+OTHER_USER_ID = UUID("00000000-0000-0000-0000-000000000002")
+
+
+def principal_override(user_id: UUID = TEST_USER_ID) -> SessionPrincipal:
+    now = datetime(2026, 8, 13, tzinfo=timezone.utc)
+    return SessionPrincipal(
+        user_id=user_id,
+        created_at=now,
+        expires_at=now + timedelta(days=30),
+    )
 
 
 def valid_profile_data() -> dict[str, object]:
@@ -47,9 +62,11 @@ def valid_profile_data() -> dict[str, object]:
 def profile_client() -> TestClient:
     service = FinancialProfileService(InMemoryFinancialProfileRepository())
     app.dependency_overrides[get_financial_profile_service] = lambda: service
+    app.dependency_overrides[get_current_session] = principal_override
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.pop(get_financial_profile_service, None)
+    app.dependency_overrides.pop(get_current_session, None)
 
 
 def test_profile_crud_flow(profile_client: TestClient) -> None:
@@ -138,6 +155,7 @@ def test_profile_capacity_is_explicit_service_failure() -> None:
         InMemoryFinancialProfileRepository(max_profiles=1)
     )
     app.dependency_overrides[get_financial_profile_service] = lambda: service
+    app.dependency_overrides[get_current_session] = principal_override
     try:
         with TestClient(app) as client:
             assert client.post(
@@ -146,6 +164,7 @@ def test_profile_capacity_is_explicit_service_failure() -> None:
             response = client.post("/api/v1/profiles", json=valid_profile_data())
     finally:
         app.dependency_overrides.pop(get_financial_profile_service, None)
+        app.dependency_overrides.pop(get_current_session, None)
 
     assert response.status_code == 503
     assert response.json() == {"detail": "profile storage capacity reached"}
@@ -154,10 +173,10 @@ def test_profile_capacity_is_explicit_service_failure() -> None:
 def test_repository_returns_defensive_copies() -> None:
     repository = InMemoryFinancialProfileRepository()
     profile = FinancialProfile.model_validate(valid_profile_data())
-    created = repository.create(profile)
+    created = repository.create(profile, TEST_USER_ID)
 
     created.profile.goal = FinancialGoal.ASSET_BUILDING
-    fetched = repository.get(created.profile_id)
+    fetched = repository.get(created.profile_id, TEST_USER_ID)
 
     assert fetched.profile.goal is FinancialGoal.DEBT_REFINANCE
 
@@ -169,14 +188,17 @@ def test_repository_rejects_naive_clock() -> None:
     profile = FinancialProfile.model_validate(valid_profile_data())
 
     with pytest.raises(ValueError, match="timezone-aware"):
-        repository.create(profile)
+        repository.create(profile, TEST_USER_ID)
 
 
 def test_repository_normalizes_timestamp_to_utc() -> None:
     repository = InMemoryFinancialProfileRepository(
         clock=lambda: datetime(2026, 8, 12, tzinfo=timezone.utc)
     )
-    record = repository.create(FinancialProfile.model_validate(valid_profile_data()))
+    record = repository.create(
+        FinancialProfile.model_validate(valid_profile_data()),
+        TEST_USER_ID,
+    )
 
     assert record.created_at.tzinfo is timezone.utc
 
@@ -187,7 +209,7 @@ def test_repository_capacity_remains_bounded_under_concurrent_writes() -> None:
 
     def create_once() -> bool:
         try:
-            repository.create(profile)
+            repository.create(profile, TEST_USER_ID)
         except FinancialProfileCapacityError:
             return False
         return True

@@ -8,6 +8,7 @@ import {
   type Persona,
   type ProfileMetricsResponse,
 } from "@/lib/api/contracts";
+import { ensureAuthSession } from "@/lib/api/auth";
 
 export type ProfileRequestError = Error & { status?: number };
 
@@ -78,6 +79,7 @@ async function parseResponse(response: Response): Promise<BackendFinancialProfil
 export async function createProfile(
   profile: FinancialProfile,
 ): Promise<FinancialProfileResource> {
+  await ensureAuthSession();
   const response = await fetch("/api/proxy/profiles", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -91,6 +93,7 @@ export async function fetchProfile(
   profileId: string,
   persona: Persona,
 ): Promise<FinancialProfileResource> {
+  await ensureAuthSession();
   const response = await fetch(`/api/proxy/profiles/${profileId}`, {
     cache: "no-store",
   });
@@ -101,6 +104,7 @@ export async function replaceProfile(
   profileId: string,
   profile: FinancialProfile,
 ): Promise<FinancialProfileResource> {
+  await ensureAuthSession();
   const response = await fetch(`/api/proxy/profiles/${profileId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -111,6 +115,7 @@ export async function replaceProfile(
 }
 
 export async function deleteProfile(profileId: string): Promise<void> {
+  await ensureAuthSession();
   const response = await fetch(`/api/proxy/profiles/${profileId}`, {
     method: "DELETE",
     cache: "no-store",
@@ -125,6 +130,7 @@ export async function deleteProfile(profileId: string): Promise<void> {
 export async function fetchProfileMetrics(
   profileId: string,
 ): Promise<ProfileMetricsResponse> {
+  await ensureAuthSession();
   const response = await fetch(`/api/proxy/profiles/${profileId}/metrics`, {
     cache: "no-store",
   });
