@@ -6,7 +6,7 @@
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-main`
 - 기준 main: `da4877b8b4ff3b617e5786edaea6ef332b118b5d`
 - 시작: 15:41
-- 상태: 구현·로컬 live 검증 완료, PR 준비
+- 상태: PR #48 병합 완료
 
 ## 목표
 
@@ -87,4 +87,8 @@ PostgreSQL, Alembic migration, FastAPI 다중 worker, Next standalone server를 
 
 ## Git/PR
 
-- commit/PR/병합: 검증 후 기록
+- 기능 commits: `9e61dd2`, `0915124`
+- PR: #48 `https://github.com/mosejong/finshield-ai/pull/48`
+- 병합 시각: 2026-08-13 16:22:29 KST
+- main SHA: `7bb05c21193ae0dab8ba00854d35c4edda196afc`
+- 통합 기록: `docker-postgres-integration.md`

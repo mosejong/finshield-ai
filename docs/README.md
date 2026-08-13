@@ -54,3 +54,4 @@ Date- and branch-based logs: `devlog/README.md`
 - `devlog/2026-08-13/session-data-lifecycle.md` — 익명 계정 삭제·만료 데이터 정리 구현·검수 기록
 - `devlog/2026-08-13/session-data-lifecycle-integration.md` — PR #46 병합·로컬 DB·브라우저 E2E 기록
 - `devlog/2026-08-13/docker-postgres-runtime.md` — Docker·PostgreSQL·backup/restore 운영 스택 기록
+- `devlog/2026-08-13/docker-postgres-integration.md` — PR #48 Linux CI·병합·로컬 종료 기록
