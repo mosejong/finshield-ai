@@ -19,6 +19,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 ## Development history
 
 - `devlog/2026-08-13/security-https-boundary.md` — 보안 헤더·CSRF·Host·HTTPS 경계 구현 및 검증
+- `devlog/2026-08-13/security-https-integration.md` — PR #50 Linux CI·PM 검수·main 통합 기록
 
 Date- and branch-based logs: `devlog/README.md`
 
