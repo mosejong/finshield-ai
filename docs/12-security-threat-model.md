@@ -11,5 +11,7 @@ LLM: hallucination/override/leakage -> grounding, narrow role, structured output
 Browser session: token theft/fixation/CSRF -> 32-byte CSPRNG token, DB hash only, expiry, HttpOnly·SameSite Strict cookie, Secure in deployed environments.
 Profile object access: guessed/shared UUID -> authenticated owner ID in every CRUD/metrics query, uniform 404 for missing and foreign-owned records.
 Next proxy: unrelated cookie leakage -> forward only `finshield_session`; never log raw Cookie or financial request bodies.
+State-changing proxy requests: CSRF/cross-site form submission -> require an allowed `Origin`; reject missing or `Sec-Fetch-Site: cross-site` requests.
+Public HTTP boundary: Host-header injection/TLS bypass/clickjacking -> explicit production trusted hosts, loopback-only internal ports, Caddy HTTPS-only public entry, CSP/frame denial/HSTS.
 ## Security test backlog
 Prompt-injection golden set; PII logging regression; malicious URL; oversized payload; stale provider; schema drift; unsupported financial claim benchmark.

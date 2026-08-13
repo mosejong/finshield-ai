@@ -303,6 +303,8 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 
 ## Next priorities
 
+보안 경계 v0.1이 적용되었다. 브라우저·API 보안 헤더, 쿠키 기반 상태 변경 요청의 same-origin 검사, production trusted host fail-closed, loopback 내부 포트, Caddy HTTPS 공개 구성을 포함한다. 실제 공개 완료에는 도메인·DNS·인증서 외부 검증이 남아 있다. 운영법과 제한은 `docs/26-http-security-https.md`를 따른다.
+
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측

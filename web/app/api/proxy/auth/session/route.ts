@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { backendBaseUrl } from "@/lib/api/client";
-import { forwardedSessionCookie } from "@/lib/api/server-auth";
+import { forwardedSessionCookie, rejectCrossSiteRequest } from "@/lib/api/server-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,9 +38,13 @@ export function GET(request: Request) {
 }
 
 export function POST(request: Request) {
+  const rejected = rejectCrossSiteRequest(request);
+  if (rejected) return rejected;
   return proxySession(request, "POST");
 }
 
 export function DELETE(request: Request) {
+  const rejected = rejectCrossSiteRequest(request);
+  if (rejected) return rejected;
   return proxySession(request, "DELETE");
 }

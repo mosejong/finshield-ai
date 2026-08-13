@@ -47,6 +47,13 @@ jobs:
       - run: python -m pip install "cryptography>=45.0,<47.0"
       - run: python scripts/create_local_docker_secrets.py
       - run: docker compose config --quiet
+      - run: FINSHIELD_DOMAIN=finshield.example.com docker compose -f compose.yaml -f compose.https.yaml config --quiet
+      - run: >-
+          docker run --rm
+          -e FINSHIELD_DOMAIN=finshield.example.com
+          -v "${{ github.workspace }}/deploy/Caddyfile:/etc/caddy/Caddyfile:ro"
+          caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+          caddy validate --config /etc/caddy/Caddyfile
       - run: docker compose build
       - run: docker compose up --detach
       - run: python scripts/verify_compose_runtime.py

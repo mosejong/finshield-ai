@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { backendBaseUrl } from "@/lib/api/client";
-import { forwardedSessionCookie } from "@/lib/api/server-auth";
+import { forwardedSessionCookie, rejectCrossSiteRequest } from "@/lib/api/server-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function DELETE(request: Request) {
+  const rejected = rejectCrossSiteRequest(request);
+  if (rejected) return rejected;
+
   let upstream: Response;
   try {
     upstream = await fetch(`${backendBaseUrl()}/api/v1/auth/account`, {

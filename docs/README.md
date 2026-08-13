@@ -4,15 +4,21 @@
 01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog
 
 ## Architecture / engineering
+
+26 HTTP security/HTTPS boundary · `adr/0005-http-security-and-https-boundary.md`
 04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · `adr/`
 
 ## Security
+
+HTTP response headers, same-origin state changes, trusted hosts and public TLS: `26-http-security-https.md`
 08 AI security alignment · 12 security threat model
 
 ## Agent instructions
 Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
+
+- `devlog/2026-08-13/security-https-boundary.md` — 보안 헤더·CSRF·Host·HTTPS 경계 구현 및 검증
 
 Date- and branch-based logs: `devlog/README.md`
 
