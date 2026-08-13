@@ -26,4 +26,9 @@
 - LLM-only와 Hybrid 비교는 미실행·미구현 상태다.
 - 공개 환경 latency와 독립 held-out v0.2가 후속 과제다.
 
-이 문서 PR의 번호·생성·병합 시각은 PR 생성 후 이 파일에 추가한다.
+## 문서 PR
+
+- PR: #55, https://github.com/mosejong/finshield-ai/pull/55
+- 생성: 2026-08-13 17:46:02 KST, draft
+- commit: `3a60bba`
+- 병합 결과는 다음 PM 통합 기록에서 확정한다.
