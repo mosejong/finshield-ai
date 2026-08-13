@@ -52,3 +52,4 @@ Date- and branch-based logs: `devlog/README.md`
 - `devlog/2026-08-13/session-profile-ownership.md` — 익명 세션 인증·profile 소유권 구현·검수·통합 기록
 - `devlog/2026-08-13/session-profile-ownership-integration.md` — PR #43 병합·로컬 migration·browser E2E 기록
 - `devlog/2026-08-13/session-data-lifecycle.md` — 익명 계정 삭제·만료 데이터 정리 구현·검수 기록
+- `devlog/2026-08-13/session-data-lifecycle-integration.md` — PR #46 병합·로컬 DB·브라우저 E2E 기록

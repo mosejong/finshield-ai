@@ -6,7 +6,7 @@
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-main`
 - 기준 main: `8a27208a1d19f5ad817e6b56a716f0bb2b9bce67`
 - 시작: 15:17
-- 상태: 구현·로컬 검증 완료, PR 준비
+- 상태: PR #46 병합 완료
 
 ## 목표와 범위
 
@@ -73,6 +73,8 @@
 
 ## Git/PR
 
-- 기능 commit SHA: PR 생성 후 기록
-- PR: 생성 후 기록
-- 병합 시각·main SHA: 병합 후 통합 개발일지에 기록
+- 기능 commit SHA: `ca70e4d0f334e144e2091c6caec4f7596c4aa402`
+- PR: #46 `https://github.com/mosejong/finshield-ai/pull/46`
+- 병합 시각: 2026-08-13 15:34:18 KST
+- main SHA: `d80af256e66fa84f8c2528d168e160ff40231c73`
+- 실제 로컬 통합 결과: `session-data-lifecycle-integration.md`
