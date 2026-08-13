@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { z } from "zod";
 import { PersonaSchema, type FinancialProfile, type Persona } from "@/lib/api/contracts";
+import { deleteAnonymousAccount } from "@/lib/api/auth";
 import {
   createProfile,
   deleteProfile,
@@ -171,6 +172,19 @@ export async function saveProfile(profile: FinancialProfile): Promise<void> {
 export async function clearProfile(): Promise<void> {
   const identity = reconcileIdentity();
   if (identity) await deleteProfile(identity.profileId);
+  identityRaw = null;
+  removeSession(IDENTITY_KEY);
+  removeSession(LEGACY_PROFILE_KEY);
+  emit({
+    profileId: null,
+    profile: null,
+    status: "empty",
+    error: null,
+  });
+}
+
+export async function clearAnonymousAccount(): Promise<void> {
+  await deleteAnonymousAccount();
   identityRaw = null;
   removeSession(IDENTITY_KEY);
   removeSession(LEGACY_PROFILE_KEY);

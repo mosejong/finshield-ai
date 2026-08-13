@@ -35,6 +35,8 @@ FinancialProfile을 생성한 브라우저 세션의 사용자에게만 공개�
   사용자와 세션을 생성한다.
 - `GET /api/v1/auth/session`: 현재 세션의 공개 메타데이터를 반환한다.
 - `DELETE /api/v1/auth/session`: 세션을 폐기하고 쿠키를 만료시킨다.
+- `DELETE /api/v1/auth/account`: 현재 익명 사용자, 모든 세션과 소유 FinancialProfile을 삭제하고 쿠키를
+  만료시킨다. 세션 폐기와 개인정보 삭제는 서로 다른 계약이다.
 - `POST/GET/PUT/DELETE /api/v1/profiles`, `GET /api/v1/profiles/{id}/metrics`: 유효한 세션 필수.
 - 인증 실패는 `401`, 저장소 장애는 내부 정보를 숨긴 `503`을 반환한다.
 - 존재하지 않는 프로필과 다른 사용자의 프로필은 모두 같은 `404`를 반환한다. 소유 여부를 추측할 수
@@ -91,11 +93,16 @@ HttpOnly는 XSS가 사용자의 브라우저에서 같은 출처 요청을 실�
 프론트는 별도 설정 없이 `/api/proxy/auth/session`으로 세션을 준비한다. 브라우저 개발자 도구에서 쿠키가
 HttpOnly·SameSite Strict인지 확인할 수 있지만 원문 토큰을 로그나 문서에 복사하지 않는다.
 
+## 데이터 생명주기
+
+profile 화면은 단일 profile 삭제와 익명 계정 전체 삭제를 분리한다. 활성 세션이 하나도 없는 익명 사용자와
+소유 profile은 dry-run 기본 운영 명령으로 집계한 뒤 명시적으로 정리한다. 상세 보존·삭제·백업 경계는
+`docs/24-anonymous-data-lifecycle.md`를 따른다.
+
 ## 남은 운영 과제
 
 - 익명 사용자의 계정 전환·복구 정책
-- 만료 session과 접근 불가능한 익명 profile의 보존기간·정리 작업
-- 로그아웃과 개인정보 삭제를 구분한 제품 흐름
+- 운영 스케줄러와 정리 실패 알림
 - PostgreSQL 동시성·복구·부하 통합 테스트
 - CSP, HSTS, reverse proxy TLS, secret manager, 접근 감사 로그
 - 세션 교체·다중 기기·강제 폐기 운영 도구

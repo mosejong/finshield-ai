@@ -4,6 +4,7 @@ from threading import RLock
 from typing import Protocol
 from uuid import UUID, uuid4
 
+from sqlalchemy import delete as sqlalchemy_delete
 from sqlalchemy import inspect, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
@@ -44,6 +45,8 @@ class FinancialProfileRepository(Protocol):
     ) -> FinancialProfileResource: ...
 
     def delete(self, profile_id: UUID, owner_user_id: UUID) -> None: ...
+
+    def delete_all_for_owner(self, owner_user_id: UUID) -> int: ...
 
 
 class InMemoryFinancialProfileRepository:
@@ -134,6 +137,18 @@ class InMemoryFinancialProfileRepository:
                 del self._owners[profile_id]
             except KeyError as exc:
                 raise FinancialProfileNotFoundError(profile_id) from exc
+
+    def delete_all_for_owner(self, owner_user_id: UUID) -> int:
+        with self._lock:
+            profile_ids = [
+                profile_id
+                for profile_id, current_owner_id in self._owners.items()
+                if current_owner_id == owner_user_id
+            ]
+            for profile_id in profile_ids:
+                del self._profiles[profile_id]
+                del self._owners[profile_id]
+            return len(profile_ids)
 
     def _utc_now(self) -> datetime:
         value = self._clock()
@@ -275,6 +290,22 @@ class SqlAlchemyFinancialProfileRepository:
                 session.rollback()
                 raise FinancialProfileStorageError(
                     "financial profile delete failed"
+                ) from exc
+
+    def delete_all_for_owner(self, owner_user_id: UUID) -> int:
+        with self._session_factory() as session:
+            try:
+                result = session.execute(
+                    sqlalchemy_delete(FinancialProfileRecord).where(
+                        FinancialProfileRecord.owner_user_id == str(owner_user_id)
+                    )
+                )
+                session.commit()
+                return result.rowcount or 0
+            except SQLAlchemyError as exc:
+                session.rollback()
+                raise FinancialProfileStorageError(
+                    "financial profile owner delete failed"
                 ) from exc
 
     def _resource_from_record(

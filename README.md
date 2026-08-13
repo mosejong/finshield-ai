@@ -22,6 +22,9 @@ FinancialProfile CRUD v0.1도 백엔드에 추가되어 생성·단건 조회·�
 HttpOnly·SameSite Strict 쿠키에만 두고 DB에는 SHA-256 해시만 저장한다. 모든 profile CRUD와 metrics는
 세션 사용자 ID가 owner와 일치해야 하며 다른 사용자의 UUID 접근은 404로 숨긴다. 온보딩·프로필 화면은
 Next same-origin 프록시로 세션을 자동 준비하며 브라우저에는 profile UUID와 fraud persona만 보관한다.
+사용자는 profile 1건 삭제와 익명 계정·모든 금융정보 삭제를 구분해 실행할 수 있다. 활성 세션이 없는
+익명 사용자와 소유 profile은 dry-run 기본 운영 명령으로 집계·정리하며 식별자나 금융 원문을 로그에
+남기지 않는다.
 월 현금흐름·월소득 대비 상환액·비상자금
 기간도 backend에서 결정론적으로 계산해 profile과 Home에 같은 값으로 표시한다.
 
@@ -175,7 +178,7 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **179 passed**, frontend **29 passed**, Next build,
+현재 기능 브랜치 기준: Python **181 passed**, frontend **32 passed**, Next production build,
 TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
 유지보수 항목으로 관리한다.
 
@@ -208,6 +211,10 @@ FinancialProfile의 최소 입력 스키마는 `app/schemas/financial_profile.py
 `POST/GET/DELETE /api/v1/auth/session`은 이름·이메일·전화번호 없이 익명 세션을
 생성·확인·폐기한다. 32-byte 불투명 토큰 원문은 HttpOnly 쿠키에만 두고 DB에는
 SHA-256 해시를 저장한다. 기본 만료는 30일이며 배포 환경에서는 Secure 쿠키를 강제한다.
+`DELETE /api/v1/auth/account`는 현재 익명 사용자, 모든 세션과 소유 FinancialProfile을
+삭제한다. 만료 데이터 정리 명령은 기본 dry-run이며 명시적 `--execute`에서만 활성 세션이
+없는 익명 사용자와 profile을 cascade 삭제한다. 상세 경계는
+`docs/24-anonymous-data-lifecycle.md`에 기록했다.
 `POST /api/v1/profiles`, 단건 `GET`, 전체 교체 `PUT`, `DELETE`로 검증된 profile을
 재사용할 수 있다. 응답은 불투명 UUID와 UTC 생성·수정 시각을 포함하며 전체 목록
 endpoint는 제공하지 않는다. 현재 저장소는 기본 최대 1,000개의 process-local
@@ -281,7 +288,7 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
-- 익명 계정 전환·복구, 세션/profile 보존기간과 정리 작업
+- 익명 계정 전환·복구와 다중 기기 정책
 - PostgreSQL live·backup restore·다중 worker 검증
 - Starlette `TestClient` 사용 중단 예정 경고 대응
 

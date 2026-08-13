@@ -12,7 +12,11 @@ import { ProfileFacts } from "@/components/finance/ProfileFacts";
 import { getSnapshot } from "@/lib/api/home";
 import { fetchProfileMetrics } from "@/lib/api/profiles";
 import type { ProfileMetricsResponse } from "@/lib/api/contracts";
-import { clearProfile, useProfileStore } from "@/lib/store/profile-store";
+import {
+  clearAnonymousAccount,
+  clearProfile,
+  useProfileStore,
+} from "@/lib/store/profile-store";
 
 /**
  * 내 금융상태.
@@ -27,6 +31,8 @@ export default function ProfilePage() {
   const loading = profileState.status === "idle" || profileState.status === "loading";
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [accountDeletePending, setAccountDeletePending] = useState(false);
+  const [accountDeleteError, setAccountDeleteError] = useState<string | null>(null);
   const [metricsState, setMetricsState] = useState<{
     profileId: string;
     data?: ProfileMetricsResponse;
@@ -171,6 +177,43 @@ export default function ProfilePage() {
               </button>
             ) : null}
             {deleteError ? <p role="alert" className="mt-2 text-caption text-risk-medium">{deleteError}</p> : null}
+
+            {hasOwnProfile ? (
+              <div className="mt-5 rounded-lg border border-risk-medium-border bg-risk-medium-bg p-4">
+                <p className="text-caption text-risk-medium">
+                  이 브라우저의 익명 사용자, 금융상태와 모든 세션을 함께 삭제합니다.
+                  삭제한 데이터는 복구할 수 없습니다.
+                </p>
+                <button
+                  type="button"
+                  disabled={accountDeletePending}
+                  onClick={async () => {
+                    const confirmed = window.confirm(
+                      "이 브라우저에 연결된 익명 사용자와 모든 금융정보를 삭제할까요? 삭제 후 복구할 수 없습니다.",
+                    );
+                    if (!confirmed) return;
+                    setAccountDeletePending(true);
+                    setAccountDeleteError(null);
+                    try {
+                      await clearAnonymousAccount();
+                    } catch {
+                      setAccountDeleteError(
+                        "모든 데이터를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+                      );
+                      setAccountDeletePending(false);
+                    }
+                  }}
+                  className="mt-3 min-h-11 rounded-md border border-risk-medium-border px-4 text-caption font-semibold text-risk-medium hover:bg-background disabled:opacity-60"
+                >
+                  {accountDeletePending ? "모든 데이터 삭제 중…" : "익명 사용자와 모든 데이터 삭제"}
+                </button>
+                {accountDeleteError ? (
+                  <p role="alert" className="mt-2 text-caption text-risk-medium">
+                    {accountDeleteError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </section>
         </div>
       )}

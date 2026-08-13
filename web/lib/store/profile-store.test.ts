@@ -3,6 +3,7 @@ import type { FinancialProfile } from "@/lib/api/contracts";
 
 vi.mock("@/lib/api/auth", () => ({
   ensureAuthSession: vi.fn().mockResolvedValue({ authenticated: true }),
+  deleteAnonymousAccount: vi.fn().mockResolvedValue(undefined),
 }));
 
 const PROFILE: FinancialProfile = {
@@ -102,5 +103,21 @@ describe("profile session identity", () => {
     await clearProfile();
 
     expect(storage.getItem("finshield:profile-identity:v1")).toBeNull();
+  });
+
+  it("removes local identity after anonymous account deletion succeeds", async () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "finshield:profile-identity:v1",
+      JSON.stringify({ profileId: RESOURCE.profile_id, persona: "early_career" }),
+    );
+    storage.setItem("finshield:profile", JSON.stringify(PROFILE));
+    vi.stubGlobal("sessionStorage", storage);
+    const { clearAnonymousAccount } = await import("@/lib/store/profile-store");
+
+    await clearAnonymousAccount();
+
+    expect(storage.getItem("finshield:profile-identity:v1")).toBeNull();
+    expect(storage.getItem("finshield:profile")).toBeNull();
   });
 });
