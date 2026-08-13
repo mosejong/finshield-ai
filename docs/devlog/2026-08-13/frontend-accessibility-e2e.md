@@ -1,7 +1,9 @@
 # 프론트엔드 접근성 패스 · 구조적 a11y 회귀 테스트
 
 - 날짜: 2026-08-13
-- 브랜치: `feature/frontend-accessibility-e2e`
+- Claude 원본 브랜치: `feature/frontend-accessibility-e2e`
+- PM 검수 브랜치: `feature/frontend-accessibility-e2e-final`
+- PM worktree: `finshield-ai-frontend`
 - 범위: `web/` 전용 (문서는 `docs/13-frontend-architecture.md`, 본 devlog만 수정)
 
 ## 배경
@@ -114,6 +116,14 @@
 - frontend: 11 files, 47 tests passed; production build·TypeScript·lint 통과.
 - 최신 main Python: 209 passed, 1 skipped, 기존 TestClient 경고 1건.
 - `git diff --check`: 통과.
+
+## 커밋·PR
+
+- 구현·PM 교정 commit: `7b8135e`
+- PR: #56, https://github.com/mosejong/finshield-ai/pull/56
+- 생성: 2026-08-13 18:05:43 KST, draft
+- GitHub Actions Linux CI: 진행 중
+- 병합 시각·merge commit: PM 승인 후 기록
 
 ## 변경 파일
 
