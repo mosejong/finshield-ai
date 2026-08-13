@@ -6,7 +6,7 @@
 - worktree: `C:\Users\user\Documents\Codex\finshield-ai-main`
 - 시작: 14:13 KST
 - 종료: 14:14 KST
-- 상태: 문서 통합 완료, PR 준비
+- 상태: 통합·로컬 적용 완료
 
 ## 목적
 
@@ -41,4 +41,20 @@ profile 저장·암호화 경계, 실행 방법, 검증 수치와 남은 공개 
 
 - `git diff --check`: 통과
 - 오래된 158 passed·process-local 전용·PostgreSQL 미구현 문구 검색: 0건
-- 커밋·PR: 생성 후 기록
+- 통합 커밋: `1befba66ee402b53c93a31d47c78ec4d345480ad`
+- 통합 PR: #41, https://github.com/mosejong/finshield-ai/pull/41
+- 통합 merge: `b849944e3d62c758ab57ad7faeea37ee2607f9a1`
+- PR #41 GitHub Actions: `test` 2회, `web` 2회 통과
+
+## 데스크톱 로컬 적용
+
+- 14:17: 역할 브랜치를 최종 main `b849944`로 fast-forward. 기존 `.agents/`,
+  `AGENTS.md`는 수정·스테이징하지 않음.
+- 기존 `.env`의 `PUBLIC_DATA_SERVICE_KEY`를 보존하고 값 출력 없이 로컬 SQLite URL과
+  신규 Fernet 키를 추가. `.env`와 DB는 Git ignore 상태를 유지.
+- Alembic `20260813_01 (head)` 적용 후 암호화 DB 설정으로 backend 8000 재시작.
+- backend 8000과 frontend 3001 HTTP 200 확인.
+- 실제 profile API 생성·조회 일치, SQLite binary에서 테스트 금액·목표 평문 미검출,
+  임시 profile API 삭제 204와 최종 row 0건 확인.
+- Docker가 설치되어 있지 않아 PostgreSQL live 검증은 수행하지 않았으며 공개 배포
+  차단 조건으로 유지한다.
