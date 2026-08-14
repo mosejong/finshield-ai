@@ -243,6 +243,37 @@ export const CreditScoreBandSchema = z.enum([
   "poor",
   "unknown",
 ]);
+export const MaritalStatusSchema = z.enum([
+  "single",
+  "married",
+  "other",
+  "prefer_not_to_say",
+]);
+export const BusinessRevenueBandSchema = z.enum([
+  "under_30m",
+  "30m_100m",
+  "100m_500m",
+  "over_500m",
+  "unknown",
+]);
+export const DebtCategorySchema = z.enum([
+  "mortgage",
+  "rent_deposit",
+  "credit_loan",
+  "secured_loan",
+  "student_loan",
+  "auto_loan",
+  "business_loan",
+  "card_loan",
+  "other",
+]);
+export const ProfileRepaymentTypeSchema = z.enum([
+  "equal_principal_and_interest",
+  "equal_principal",
+  "interest_only",
+  "bullet",
+  "other",
+]);
 export const FinancialGoalSchema = z.enum([
   "housing",
   "emergency_cash",
@@ -263,6 +294,13 @@ export const FinancialProfileSchema = z.object({
   employmentStatus: EmploymentStatusSchema,
   householdSize: z.number().int().min(1).max(10),
   dependentsCount: z.number().int().min(0).max(10),
+
+  /**
+   * 화면은 아직 입력받지 않지만 서버가 보관하는 값이다.
+   * 왕복에서 빠뜨리면 프로필 수정 시 서버 값이 null 로 덮여 사라진다.
+   */
+  maritalStatus: MaritalStatusSchema.nullable().default(null),
+  region: z.string().min(1).max(50).nullable().default(null),
 
   monthlyNetIncome: z.number().int().min(0),
   monthlyFixedExpenses: z.number().int().min(0),
@@ -299,13 +337,23 @@ const BackendMoneySchema = z
   .union([z.number().nonnegative(), z.string().regex(/^\d+(?:\.\d+)?$/)])
   .transform(Number);
 
+/** app/schemas/financial_profile.py 의 LoanItem 과 1:1. */
+export const BackendLoanItemSchema = z.object({
+  category: DebtCategorySchema,
+  balance: BackendMoneySchema,
+  annual_rate: BackendMoneySchema,
+  remaining_months: z.number().int().min(1).max(600),
+  repayment_type: ProfileRepaymentTypeSchema,
+}).strict();
+export type BackendLoanItem = z.infer<typeof BackendLoanItemSchema>;
+
 /** app/schemas/financial_profile.py 와 1:1로 검증하는 서버 계약. */
 export const BackendFinancialProfileSchema = z.object({
   age_band: AgeBandSchema,
   employment_status: EmploymentStatusSchema,
   household_size: z.number().int().min(1).max(20),
   dependents_count: z.number().int().min(0).max(19),
-  marital_status: z.string().nullable(),
+  marital_status: MaritalStatusSchema.nullable(),
   region: z.string().nullable(),
   monthly_net_income: BackendMoneySchema,
   monthly_fixed_expenses: BackendMoneySchema,
@@ -314,11 +362,11 @@ export const BackendFinancialProfileSchema = z.object({
   emergency_fund_target_months: z.number().int().min(0).max(60),
   total_debt: BackendMoneySchema,
   monthly_debt_payment: BackendMoneySchema,
-  loan_items: z.array(z.unknown()),
+  loan_items: z.array(BackendLoanItemSchema),
   credit_score_band: CreditScoreBandSchema,
   business_owner: z.boolean(),
   business_age_months: z.number().int().nullable(),
-  annual_business_revenue_band: z.string().nullable(),
+  annual_business_revenue_band: BusinessRevenueBandSchema.nullable(),
   goal: FinancialGoalSchema,
 }).strict();
 export type BackendFinancialProfile = z.infer<
@@ -451,9 +499,22 @@ export const RepaymentTypeSchema = z.enum([
 ]);
 export type RepaymentType = z.infer<typeof RepaymentTypeSchema>;
 
+/** 백엔드 LoanSimulationRequest 는 annual_interest_rate 를 소수점 4자리까지만 받는다. */
+export const MAX_INTEREST_RATE_DECIMALS = 4;
+
 export const LoanScenarioInputSchema = z.object({
   principal: z.number().positive().max(999_999_999_999_999.99),
-  annualInterestRate: z.number().min(0).max(100),
+  annualInterestRate: z
+    .number()
+    .min(0)
+    .max(100)
+    // 자릿수를 세면 0.1+0.2 같은 부동소수점 잡음까지 거부한다.
+    // 4자리로 반올림해도 값이 같은지만 본다.
+    .refine(
+      (rate) =>
+        Math.abs(rate - Number(rate.toFixed(MAX_INTEREST_RATE_DECIMALS))) < 1e-9,
+      { message: "금리는 소수점 넷째 자리까지만 입력할 수 있습니다." },
+    ),
   months: z.number().int().min(1).max(600),
   repaymentType: RepaymentTypeSchema,
 }).strict();
