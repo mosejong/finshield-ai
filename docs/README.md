@@ -7,7 +7,7 @@
 
 27 observability/PII masking · `adr/0006-privacy-safe-observability.md`
 26 HTTP security/HTTPS boundary · `adr/0005-http-security-and-https-boundary.md`
-04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · `adr/`
+04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · 28 production readiness · ADR 색인 `adr/README.md`
 
 ## Security
 
@@ -17,6 +17,8 @@ HTTP response headers, same-origin state changes, trusted hosts and public TLS: 
 
 ## Agent instructions
 Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
+
+동일한 규칙을 Claude 외 agent 도구에도 적용하려고 `AGENTS.md` 와 `.agents/skills/finshield/SKILL.md` 를 미러로 둔다. 넷 다 같은 Language rule·non-negotiables 를 담아야 하며, 한쪽만 고치면 도구별로 규칙이 갈라진다. `web/AGENTS.md` 는 `next dev` 가 자동 생성하는 별개 파일이니 손대지 않는다.
 
 ## Development history
 

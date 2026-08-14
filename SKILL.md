@@ -29,7 +29,7 @@ Forbidden: invented eligibility, repayment calculation, overriding safety blocks
 /api/v1/profiles
 /api/v1/products
 /api/v1/loans/simulate
-/api/v1/fraud/analyze
+/api/v1/analyze
 /api/v1/recommendations
 /api/v1/evidence
 

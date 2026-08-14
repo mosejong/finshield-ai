@@ -1,5 +1,7 @@
 # 10. MVP Backlog
 
+공개 배포까지 남은 항목의 순서·완료 기준은 `28-production-readiness.md`에 있다. 이 문서는 기능 범위, 28은 운영 준비 상태를 다룬다.
+
 ## P0 — 반드시 구현
 - [x] FinancialProfile CRUD v0.1 (process-local prototype)
 - [x] FinancialProfile SQLAlchemy·Alembic 영속화 + application-level 인증 암호화
@@ -17,7 +19,11 @@
 - [x] 익명 계정 전체 삭제 + 만료 세션/profile dry-run 정리
 - [x] Docker·PostgreSQL runtime + migration + backup/restore CI
 - [x] HTTP security headers + same-origin state-change protection + HTTPS deployment config
-- [ ] public MVP deployment (real domain/DNS/certificate verification required)
+- [ ] public MVP deployment (real domain/DNS/certificate verification required) — 선행 조건은 `28-production-readiness.md` 2절 P0-1~P0-5
+- [ ] rate limiting + 요청 본문 크기 제한 (인증 없는 `/api/v1/analyze`·세션 발급 보호)
+- [ ] 만료 데이터 정리 자동 스케줄 (`adr/0004` 이행)
+- [ ] 운영 backup 스케줄 + 복원 리허설 (현재 pg_dump는 CI 검증 경로에만 존재)
+- [ ] 파이썬 의존성 해시 잠금 (이미지는 digest 고정, 패키지는 범위 지정)
 
 ## P1 — 경쟁력
 - [ ] Rule-only vs LLM-only vs Hybrid benchmark
