@@ -180,11 +180,25 @@ HIGH_RISK_SIGNAL_COMBINATIONS: tuple[frozenset[str], ...] = (
     frozenset({"app_install_request", "remote_control_request"}),
 )
 
+# 사용자에게 보이는 등급을 직접 결정하는 임계값이다.
+# tests/test_fraud_risk_level.py 가 경계값(34/35/69/70)을 고정한다.
+HIGH_RISK_SCORE_THRESHOLD = 70
+MEDIUM_RISK_SCORE_THRESHOLD = 35
+
 
 def determine_risk_level(
     score: int, signals: list[RiskSignal], state: UserState
 ) -> str:
-    signal_level = "high" if score >= 70 else "medium" if score >= 35 else "low"
+    """점수·신호·사용자 상태 중 가장 높은 위험 수준을 채택한다.
+
+    세 근거는 서로 독립적이며 어느 하나도 다른 하나를 낮추지 못한다.
+    """
+    if score >= HIGH_RISK_SCORE_THRESHOLD:
+        signal_level = "high"
+    elif score >= MEDIUM_RISK_SCORE_THRESHOLD:
+        signal_level = "medium"
+    else:
+        signal_level = "low"
     signal_codes = {signal.code for signal in signals}
     for code in signal_codes:
         minimum = SIGNAL_MINIMUM_RISK.get(code, "low")

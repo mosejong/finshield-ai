@@ -8,6 +8,7 @@ from app.core.http_security import (
     verify_http_security_configuration,
 )
 from app.core.observability import install_observability
+from app.domain.fraud.sources import verify_official_sources
 from app.api.routes.account import router as account_router
 from app.api.routes.auth import (
     router as auth_router,
@@ -31,6 +32,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     verify_http_security_configuration()
     verify_auth_session_storage()
     verify_financial_profile_storage()
+    verify_official_sources()
     yield
 
 

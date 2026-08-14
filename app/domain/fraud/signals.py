@@ -143,6 +143,29 @@ URL_CANDIDATE_PATTERN = re.compile(
     r"t\.co|tinyurl\.com|url\.kr)/)[^\s<>\"']+",
     re.IGNORECASE,
 )
+
+# 실제 스미싱 문자는 스킴 없이 `1.2.3.4/login` 형태로 온다.
+# 경로가 붙은 것만 링크 후보로 본다. 그래야 "report.pdf" 같은 문자열을 링크로 오인하지 않는다.
+BARE_URL_CANDIDATE_PATTERN = re.compile(
+    r"(?<![\w@.\-/])"
+    r"(?:"
+    r"\d{1,3}(?:\.\d{1,3}){3}"
+    r"|[a-z0-9](?:[a-z0-9\-]*[a-z0-9])?"
+    r"(?:\.[a-z0-9](?:[a-z0-9\-]*[a-z0-9])?)*"
+    r"\.[a-z]{2,24}"
+    r")"
+    r"(?::\d{2,5})?"
+    r"/[^\s<>\"']*",
+    re.IGNORECASE,
+)
+
+# `scheme://host` 형태
+SCHEME_SEPARATED_PATTERN = re.compile(r"^[a-z][a-z0-9+.\-]*://", re.IGNORECASE)
+# `javascript:`, `data:`, `mailto:` 처럼 호스트가 없는 스킴.
+# 콜론 뒤가 숫자면 `example.com:8080` 같은 포트 표기이므로 스킴으로 보지 않는다.
+OPAQUE_SCHEME_PATTERN = re.compile(r"^[a-z][a-z0-9+.\-]*:(?![0-9])", re.IGNORECASE)
+SAFE_URL_SCHEMES = {"http", "https"}
+
 KNOWN_SHORTENERS = {
     "bit.ly",
     "cutt.ly",
@@ -168,25 +191,38 @@ def _detect_by_rules(text: str, rules: tuple[SignalRule, ...]) -> list[RiskSigna
 
 
 def _is_lexically_suspicious_url(raw_url: str) -> bool:
+    """링크를 열지 않고 문자열 형태만으로 위험 여부를 판단한다.
+
+    서버는 이 URL 을 요청하지 않는다. 순수 문자열 검사다.
+
+    스킴 유무로 검사 범위가 갈리면 `http://1.2.3.4/login` 은 잡히고
+    `1.2.3.4/login` 은 통과하는 구멍이 생긴다. 스킴이 없으면 https 를 가정해
+    호스트를 뽑고, 스킴이 있든 없든 같은 검사를 적용한다.
+    """
     candidate = raw_url.strip().rstrip(".,;:!?)]}")
-    normalized_candidate = candidate.casefold()
-    lacks_scheme = not normalized_candidate.startswith(("http://", "https://"))
-    known_host_prefix = normalized_candidate.startswith("www.") or any(
-        normalized_candidate == shortener
-        or normalized_candidate.startswith(f"{shortener}/")
-        for shortener in KNOWN_SHORTENERS
-    )
-    parse_target = (
-        f"https://{candidate}" if lacks_scheme and known_host_prefix else candidate
-    )
+    if not candidate:
+        return False
+
+    has_scheme = SCHEME_SEPARATED_PATTERN.match(candidate) is not None
+    if not has_scheme and OPAQUE_SCHEME_PATTERN.match(candidate):
+        # javascript:, data:, mailto: 는 링크로 위장한 실행·수집 지시일 수 있다.
+        return True
+
+    parse_target = candidate if has_scheme else f"https://{candidate}"
     try:
         parsed = urlsplit(parse_target)
         hostname = (parsed.hostname or "").casefold().rstrip(".")
     except ValueError:
+        # 대괄호 불일치 등 파싱되지 않는 문자열은 정상 링크로 취급하지 않는다.
         return True
 
-    if parsed.scheme.casefold() == "http":
+    scheme = parsed.scheme.casefold()
+    if has_scheme and scheme not in SAFE_URL_SCHEMES:
         return True
+    if scheme == "http":
+        return True
+    if not hostname:
+        return False
     if parsed.username is not None or parsed.password is not None:
         return True
     if hostname == "localhost" or hostname.endswith(".localhost"):
@@ -206,8 +242,18 @@ def _is_lexically_suspicious_url(raw_url: str) -> bool:
     return True
 
 
+def _url_candidates(text: str, supplied_url: str | None = None) -> list[str]:
+    candidates = [match.group(0) for match in URL_CANDIDATE_PATTERN.finditer(text)]
+    candidates.extend(
+        match.group(0) for match in BARE_URL_CANDIDATE_PATTERN.finditer(text)
+    )
+    if supplied_url and supplied_url.strip():
+        candidates.append(supplied_url)
+    return candidates
+
+
 def contains_url(text: str, supplied_url: str | None = None) -> bool:
-    return bool(supplied_url or URL_CANDIDATE_PATTERN.search(text))
+    return bool(_url_candidates(text, supplied_url))
 
 
 def detect_legacy_signals(text: str) -> list[RiskSignal]:
@@ -218,9 +264,7 @@ def detect_canonical_signals(
     text: str, supplied_url: str | None = None
 ) -> list[RiskSignal]:
     detected = _detect_by_rules(text, SIGNAL_RULES)
-    url_candidates = [match.group(0) for match in URL_CANDIDATE_PATTERN.finditer(text)]
-    if supplied_url:
-        url_candidates.append(supplied_url)
+    url_candidates = _url_candidates(text, supplied_url)
 
     if any(_is_lexically_suspicious_url(url) for url in url_candidates):
         detected.append(
