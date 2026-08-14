@@ -76,7 +76,7 @@ export default function ProfilePage() {
       />
 
       {loading ? (
-        <p className="text-body text-muted-foreground">불러오는 중…</p>
+        <p role="status" className="text-body text-muted-foreground">불러오는 중…</p>
       ) : (
         <div className="flex flex-col gap-7">
           {profileState.error ? (
@@ -125,7 +125,7 @@ export default function ProfilePage() {
                   </details>
                 </>
               ) : (
-                <p className="rounded-lg border border-dashed border-border bg-secondary/60 p-4 text-body text-muted-foreground">
+                <p role="status" className="rounded-lg border border-dashed border-border bg-secondary/60 p-4 text-body text-muted-foreground">
                   입력값으로 금융지표를 계산하고 있습니다…
                 </p>
               )
@@ -154,6 +154,11 @@ export default function ProfilePage() {
             <p className="mt-3 text-caption text-muted-foreground">
               주민등록번호, 계좌번호, 실명은 받지 않습니다. 브라우저에는 프로필
               식별자만 남고, 입력값은 로컬 프로토타입 서버에서 관리합니다.
+            </p>
+            <p className="mt-2 text-caption text-muted-foreground">
+              이 금융상태는 지금 브라우저의 익명 세션에만 연결됩니다. 로그인·이메일이
+              없어 쿠키를 지우거나 다른 브라우저·기기로 열면 다시 불러올 수 없고, 복구
+              수단도 없습니다.
             </p>
 
             {/* 탭을 닫을 때까지 기다리지 않고 지울 수 있어야 한다 */}

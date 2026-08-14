@@ -49,7 +49,7 @@ export function ProductComparison({ productIds }: { productIds: string[] }) {
     );
   }
   if (!data) {
-    return <p className="text-body text-muted-foreground">같은 기준월의 공식 상품을 확인하고 있습니다…</p>;
+    return <p role="status" className="text-body text-muted-foreground">같은 기준월의 공식 상품을 확인하고 있습니다…</p>;
   }
 
   const [first, second] = data.items;

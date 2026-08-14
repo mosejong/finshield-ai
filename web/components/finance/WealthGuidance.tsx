@@ -41,7 +41,7 @@ export function WealthGuidance() {
   }
 
   if (!data) {
-    return <p className="text-body text-muted-foreground">공식 금융교육을 확인하고 있습니다…</p>;
+    return <p role="status" className="text-body text-muted-foreground">공식 금융교육을 확인하고 있습니다…</p>;
   }
 
   const sourcesById = new Map(

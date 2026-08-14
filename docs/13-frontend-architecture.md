@@ -241,9 +241,23 @@ uvicorn app.main:app --reload
 
 ---
 
-## 8. 남은 작업
+## 8. 접근성 계약
+
+프로덕션 지향 접근성 패스로 다음을 보강했다 (`docs/devlog/2026-08-13/frontend-accessibility-e2e.md`).
+
+- **본문 건너뛰기 링크**: `app/layout.tsx`의 첫 포커스 요소가 `#main-content`로 이동한다. 대상은 `AppShell`의 `main#main-content`(`tabIndex=-1`)다.
+- **공통 포커스 표시**: `globals.css`가 `:focus-visible`에 `--ring` 아웃라인을 한 곳에서 보장한다. 개별 컴포넌트는 추가 링을 붙여도 되지만 없어도 항상 보인다.
+- **움직임 최소화**: `@media (prefers-reduced-motion: reduce)`로 스피너·전환을 즉시 종료한다.
+- **라이브 영역**: 로딩은 `role="status"`(polite), 오류는 `role="alert"`(assertive). 비동기 결과(대출 계산 등)는 별도 `role="status"`로 한 번 알린다.
+- **폼 라벨**: 의심 메시지 textarea는 `aria-describedby`로 설명·글자수·개인정보 주의를 연결하고, 제출 버튼은 `aria-busy`로 진행 상태를 노출한다.
+
+### 자동 검사
+
+`web/components/a11y.test.tsx`가 `react-dom/server` 정적 렌더링으로 랜드마크·폼 라벨·라이브 영역·장식 아이콘 숨김·근거 표시 계약을 CI에서 검증한다. 브라우저 DOM은 필요 없다. 검증 순서는 기존과 같다: `npm test` → `npm run build` → `npx tsc --noEmit` → `npm run lint`.
+
+## 9. 남은 작업
 
 - 익명 계정 전환·복구와 세션/profile 보존기간·정리 정책
-- 경로 불일치: SKILL.md 는 `/api/v1/fraud/analyze`, 실제 구현은 `/api/v1/analyze`
-- 접근성 감사 (스크린리더, 명도대비 AA) — 자동 검사는 아직 돌리지 않았다
-- 실기기 확인 (지금까지는 헤드리스 Chrome 캡처만). iOS Safari 의 `env(safe-area-inset-bottom)` 과 `100dvh` 동작은 시뮬레이터로 재확인 필요
+- 접근성 육안·상호작용 검수 (스크린리더 낭독, 명도대비 AA 측정, 키보드 탭 순서 실동작, 다크모드·375/768/1280 뷰포트) — 4절의 헤드리스 Chrome iframe 하네스로 후속 확인. 구조적 자동 회귀만 상시 실행 중이다.
+- 실기기 확인 (지금까지는 헤드리스 Chrome 캡처와 실서버 SSR HTML 확인만). iOS Safari 의 `env(safe-area-inset-bottom)` 과 `100dvh` 동작은 시뮬레이터로 재확인 필요
+- 폼 필드별 `aria-invalid`/오류 개별 연결 (현재는 폼 단위 `role="alert"` 요약)

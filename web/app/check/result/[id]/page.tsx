@@ -50,7 +50,7 @@ export default function CheckResultPage({
   if (!loaded) {
     return (
       <AppShell>
-        <p className="py-8 text-body text-muted-foreground">불러오는 중…</p>
+        <p role="status" className="py-8 text-body text-muted-foreground">불러오는 중…</p>
       </AppShell>
     );
   }

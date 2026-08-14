@@ -19,7 +19,19 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ko" className="h-full antialiased">
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {/*
+          키보드 사용자가 매 화면마다 좌측 네비를 모두 통과하지 않고 본문으로
+          바로 이동할 수 있게 한다. 평소에는 sr-only 로 숨고 포커스될 때만 보인다.
+        */}
+        <a
+          href="#main-content"
+          className="sr-only rounded-md bg-primary px-4 py-2 text-body font-semibold text-primary-foreground focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50"
+        >
+          본문으로 건너뛰기
+        </a>
+        {children}
+      </body>
     </html>
   );
 }

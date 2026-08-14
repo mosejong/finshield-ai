@@ -203,6 +203,41 @@
     @apply font-sans;
     -webkit-text-size-adjust: 100%;
   }
+
+  /*
+   * 공통 포커스 표시.
+   *
+   * 링·아웃라인을 개별 컴포넌트에서 챙기지 않아도 키보드 사용자가 링크·버튼·카드
+   * 어디에 있는지 항상 보이도록 한 곳에서 보장한다. 마우스 클릭(:focus)에는 뜨지
+   * 않고 키보드 이동(:focus-visible)에서만 뜬다. 색은 시맨틱 --ring 토큰이라
+   * 다크모드에서도 대비가 유지된다.
+   */
+  :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* 본문 건너뛰기 대상이 프로그램적으로 포커스될 때 큰 아웃라인을 만들지 않는다 */
+  main:focus {
+    outline: none;
+  }
+}
+
+/*
+ * 움직임 최소화 선호 존중.
+ *
+ * 스피너·펼침 회전·색 전환 등은 정보 전달이 아니라 장식이므로, 전정 장애·멀미
+ * 민감 사용자를 위해 시스템 설정에서 움직임을 줄였을 때 거의 즉시 끝나게 한다.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @utility text-display {
