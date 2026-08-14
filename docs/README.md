@@ -22,6 +22,9 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-14/dependency-hash-locking.md` — 해시 고정 universal lock·런타임/개발 분리·CI drift 차단
+- `devlog/2026-08-14/code-verification-and-fixes.md` — mutation·독립 재계산 검증과 위험 판정·링크·출처 수정
+- `devlog/2026-08-13/frontend-accessibility-e2e.md` — 접근성 패스와 구조적 a11y 회귀 검사
 - `devlog/2026-08-13/observability-pii-masking.md` — 요청 추적·latency·readiness·PII 비노출 구현
 - `devlog/2026-08-13/observability-integration.md` — PR #52 Linux CI·PII 비노출·main 통합 기록
 - `devlog/2026-08-13/security-https-boundary.md` — 보안 헤더·CSRF·Host·HTTPS 경계 구현 및 검증

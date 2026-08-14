@@ -11,6 +11,7 @@
 | 영역 | 상태 | 근거 |
 |---|---|---|
 | 컨테이너 이미지 | base 이미지 digest 고정, non-root uid 10001, `read_only`, `cap_drop: ALL`, `no-new-privileges` | `Dockerfile`, `web/Dockerfile`, `compose.yaml` |
+| 파이썬 의존성 | 해시 고정 universal lock, 런타임·개발 분리, CI가 lock 드리프트 차단 | `requirements.in`, `requirements.txt`, `.github/workflows/ci.yml` (2절 P0-5) |
 | 프로세스 경계 | db / migration / backend / web 분리, 내부 포트 loopback 전용, healthcheck 기반 기동 순서 | `compose.yaml` |
 | HTTPS 진입점 | Caddy 자동 인증서, HTTP→HTTPS, HSTS, `FINSHIELD_DOMAIN` 필수 | `compose.https.yaml`, `deploy/Caddyfile`, `docs/26` |
 | 비밀값 관리 | `*_FILE` 우선 조회 + Docker file secrets. 이미지·환경변수·저장소에 값이 남지 않음 | `app/core/runtime_secrets.py` |
@@ -89,13 +90,37 @@ Mutation 감사에서 **위험 등급 임계값만 통과했다.** `score >= 70`
 - 인증서 갱신 실패 시 알림 경로 (갱신은 60일 뒤에 조용히 실패한다)
 - 완료 기준: 외부 네트워크에서 실제 도메인으로 전 주요 화면 동작
 
-### P0-5. 파이썬 의존성 잠금
+### P0-5. 파이썬 의존성 잠금 — 완료 (2026-08-14)
 
-컨테이너 base 이미지는 digest로 고정했는데 `requirements.txt`는 `fastapi>=0.116,<1.0` 같은 범위 지정이다. 같은 커밋을 다시 빌드해도 다른 버전이 설치된다. 이미지 재현성을 절반만 확보한 상태이고, 장애 시 "어제와 무엇이 달라졌는가"에 답할 수 없다.
+문제였던 것: base 이미지는 digest로 고정했는데 `requirements.txt`는 `fastapi>=0.116,<1.0` 같은 범위 지정이었다. 같은 커밋을 다시 빌드해도 다른 버전이 설치돼, 장애 시 "어제와 무엇이 달라졌는가"에 답할 수 없었다. 부수적으로 `pytest`가 런타임 목록에 있어 프로덕션 이미지에 테스트 프레임워크가 실려 나갔다.
 
-- 해시 고정 lock 파일 도입 (`requirements.lock` 등), 런타임 의존성과 개발 의존성 분리
-- CI와 Dockerfile 모두 lock 기준으로 설치
-- 완료 기준: 서로 다른 시점의 빌드가 동일한 패키지 버전 집합을 설치
+구조:
+
+| 파일 | 성격 | 쓰는 곳 |
+|---|---|---|
+| `requirements.in` | 사람이 고침 (런타임) | lock 원본 |
+| `requirements-dev.in` | 사람이 고침 (`-r requirements.in` + pytest, uv) | lock 원본 |
+| `requirements.txt` | 생성물, 해시 고정 | 컨테이너 이미지, `container-runtime` job |
+| `requirements-dev.txt` | 생성물, 해시 고정 | 로컬 개발, `test`·`deps-lock` job |
+
+`uv pip compile --universal --generate-hashes`로 만든다. `--universal`을 쓰는 이유는 개발이 Windows, 배포가 Linux이기 때문이다. 플랫폼별로 해석하면 lock이 두 벌로 갈라지는데, universal은 marker로 한 파일에 담는다 (`uvloop`은 non-win32, `colorama`는 win32). 설치는 양쪽 모두 `pip install --require-hashes`다. `--no-deps`를 쓰지 않으므로 lock에 전이 의존성이 빠져 있으면 조용히 넘어가지 않고 설치가 실패한다.
+
+CI `deps-lock` job이 `.in`과 lock의 어긋남을 막는다. `--upgrade` 없이 재컴파일하면 기존 pin이 유지되므로, 상류에 새 버전이 나왔다는 이유로는 실패하지 않고 `.in`을 고치고 lock을 갱신하지 않은 경우에만 diff가 생긴다.
+
+검증 결과:
+
+| 확인 | 방법 | 결과 |
+|---|---|---|
+| lock이 Windows에서 설치되는가 | 새 venv에 `pip install --require-hashes -r requirements-dev.txt` | 성공 |
+| 잠긴 버전에서 회귀가 없는가 | 그 venv로 `pytest -q` | 277 passed, 1 skipped |
+| lock이 Linux에서 설치되는가 | `docker build` (linux/amd64) | 성공 |
+| 재컴파일이 멱등한가 | `--upgrade` 없이 재생성 후 byte diff | 동일 |
+| 이미지가 lock과 정확히 일치하는가 | 이미지 `pip freeze` vs lock pin 대조 | 32개 전부 일치, lock 밖 패키지 0개 |
+| 개발 의존성이 이미지에서 빠졌는가 | 이미지 안에서 import 확인 | `pytest`·`uv` 없음, `uvloop` 있음, `colorama` 없음 |
+
+완료 기준("서로 다른 시점의 빌드가 동일한 패키지 버전 집합을 설치")은 마지막 두 줄로 충족된다. 이미지에 설치된 집합이 lock pin 집합과 완전히 일치하고, lock은 `--upgrade` 없이는 변하지 않는다.
+
+남는 것: **버전 상승을 관측할 경로가 없다.** lock은 사람이 `--upgrade`를 붙일 때만 움직이므로, 보안 패치가 나와도 아무도 알려주지 않는다. Dependabot 또는 주기적 `--upgrade` PR을 P1-5로 둔다.
 
 ## 3. P1 — 공개 직후 필요한 운영 역량
 
@@ -116,6 +141,10 @@ Mutation 감사에서 **위험 등급 임계값만 통과했다.** `score >= 70`
 ### P1-4. nonce 기반 strict CSP
 
 `docs/26`의 남은 항목. Next.js standalone과 함께 쓸 때 nonce 전달 경로를 확인해야 한다.
+
+### P1-5. 의존성 버전 상승 관측
+
+P0-5로 버전은 고정했지만, 고정은 그 자체로 위험을 만든다. lock은 사람이 `--upgrade`를 붙일 때만 움직이므로 취약점 패치가 나와도 저장소는 조용하다. Dependabot(`pip` + `npm` + `docker`) 또는 주기적 `--upgrade` PR로 **상승 사실을 알리는 경로**를 만든다. 자동 병합은 하지 않는다. `deps-lock` job이 이미 lock 무결성을 검증하므로, 필요한 것은 알림뿐이다.
 
 ## 4. P2 — 제품·대회 완성도
 
@@ -166,16 +195,16 @@ Capacitor로 감싸는 선택지는 스토어 등록이 실제로 필요해질 �
 
 ```
 0. 접근성 브랜치 병합 (작업 중 브랜치 정리)
-1. P0-5 의존성 잠금        ← 이후 모든 검증의 기준을 고정
-2. P0-1 rate limit + 본문 크기 제한
+1. P0-5 의존성 잠금        ← 완료 (2026-08-14)
+2. P0-1 rate limit + 본문 크기 제한   ← 다음
 3. P0-2 만료 데이터 정리 자동화
 4. P0-3 백업 자동화 + 복원 리허설
 5. PWA (manifest + share_target)  ← 실도메인 직전
 6. P0-4 실도메인·DNS·TLS   ← 공개 배포
-7. P1-1 알림 → P1-3 배포·롤백 → P1-2 audit log → P1-4 CSP
+7. P1-1 알림 → P1-5 의존성 상승 관측 → P1-3 배포·롤백 → P1-2 audit log → P1-4 CSP
 8. P2-1 평가 하네스 → P2-2 LLM 계층
 ```
 
-P0-5를 맨 앞에 두는 이유는 의존성이 고정돼야 이후 rate limit·백업 검증 결과가 재현되기 때문이다. P0-4를 마지막에 두는 이유는 공개 노출이 되돌리기 가장 어려운 단계라서다.
+P0-5를 맨 앞에 둔 이유는 의존성이 고정돼야 이후 rate limit·백업 검증 결과가 재현되기 때문이다. P0-4를 마지막에 두는 이유는 공개 노출이 되돌리기 가장 어려운 단계라서다.
 
 대회 일정이 공개 URL보다 우선한다면 P2-1(평가 하네스)을 P0-1 다음으로 올린다. Rule-only 베이스라인 측정은 배포 상태와 무관하게 지금 바로 가능하다.

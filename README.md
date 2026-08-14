@@ -142,11 +142,35 @@ web/                Next.js frontend MVP
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
+pip install --require-hashes -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
 Then open `/docs`.
+
+### 의존성
+
+원본은 `requirements.in`(런타임)과 `requirements-dev.in`(개발·CI)이고,
+`requirements*.txt`는 해시가 박힌 생성물이다. `.txt`를 직접 고치지 않는다.
+
+| 파일 | 쓰는 곳 |
+|---|---|
+| `requirements.txt` | 컨테이너 이미지, `container-runtime` CI job |
+| `requirements-dev.txt` | 로컬 개발, `test`·`deps-lock` CI job |
+
+lock은 `--universal`로 만들어 Windows·Linux·macOS가 한 파일을 공유한다.
+플랫폼별 패키지는 marker로 갈린다 (`uvloop`은 non-win32, `colorama`는 win32).
+
+의존성을 바꾸려면 `.in`을 고친 뒤 재생성한다.
+
+```bash
+uv pip compile requirements.in     --universal --generate-hashes --python-version 3.12 -o requirements.txt
+uv pip compile requirements-dev.in --universal --generate-hashes --python-version 3.12 -o requirements-dev.txt
+```
+
+`--upgrade` 없이는 기존 pin을 유지하므로 재생성해도 무관한 패키지가 따라
+올라가지 않는다. 버전을 올릴 때만 `--upgrade` 또는 `--upgrade-package <이름>`을
+붙인다. `.in`만 고치고 lock을 갱신하지 않으면 `deps-lock` CI job이 막는다.
 
 암호화 DB 저장을 사용하려면 `DATABASE_URL`과 `PROFILE_ENCRYPTION_KEYS`를 함께 설정하고
 서버 시작 전에 `alembic upgrade head`를 실행한다. development·test는 SQLite 검증이

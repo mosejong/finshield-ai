@@ -23,7 +23,7 @@
 - [ ] rate limiting + 요청 본문 크기 제한 (인증 없는 `/api/v1/analyze`·세션 발급 보호)
 - [ ] 만료 데이터 정리 자동 스케줄 (`adr/0004` 이행)
 - [ ] 운영 backup 스케줄 + 복원 리허설 (현재 pg_dump는 CI 검증 경로에만 존재)
-- [ ] 파이썬 의존성 해시 잠금 (이미지는 digest 고정, 패키지는 범위 지정)
+- [x] 파이썬 의존성 해시 잠금 + 런타임·개발 의존성 분리
 
 ## P1 — 경쟁력
 - [ ] Rule-only vs LLM-only vs Hybrid benchmark
