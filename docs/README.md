@@ -22,6 +22,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-15/expired-data-retention-schedule.md` — 만료 데이터 정리 주기 실행·heartbeat healthcheck·거짓 성공 차단
 - `devlog/2026-08-15/rate-limiting-request-limits.md` — IP 기준 요청 한도·본문 크기 상한·홉 신뢰 경계·429 문구
 - `devlog/2026-08-14/dependency-hash-locking.md` — 해시 고정 universal lock·런타임/개발 분리·CI drift 차단
 - `devlog/2026-08-14/code-verification-and-fixes.md` — mutation·독립 재계산 검증과 위험 판정·링크·출처 수정

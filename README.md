@@ -333,6 +333,8 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 
 요청 한도와 본문 크기 제한이 적용되었다. 식별자는 client IP 단독이며(세션은 공격자가 스스로 발급할 수 있어 한도를 무력화한다), 카운터는 IP를 그대로 담지 않도록 HMAC 버킷 키로 PostgreSQL에 저장한다. 초과 시 `429` + `Retry-After`를 돌려주고, 프론트는 그것을 "안전하다"가 아니라 "아직 확인되지 않았다"로 표현한다. 본문 상한은 스키마 검증 이전에 backend와 web 양쪽에서 적용된다. 신뢰 proxy 홉 수는 기본 0(헤더 불신)이며 배포에서 명시해야 한다. 설계 판단과 검증 결과는 `docs/28-production-readiness.md` 2절 P0-1을 따른다.
 
+만료 데이터 정리가 자동 실행된다. compose의 `retention` 서비스가 만료 세션·소유 프로필·닫힌 rate limit window를 주기적으로 지운다(기본 1시간). 성공한 실행만 heartbeat를 갱신하고 healthcheck가 그 나이를 보므로, 계속 실패하는 상태가 정상으로 보이지 않는다. 로그에는 건수와 성공 여부만 남기고 예외 메시지조차 남기지 않는다 — SQLAlchemy가 바인딩 값을 메시지에 붙이기 때문이다. 운영법은 `docs/24-anonymous-data-lifecycle.md`, 설계 판단은 `docs/28-production-readiness.md` 2절 P0-2를 따른다.
+
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측

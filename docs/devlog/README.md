@@ -59,6 +59,7 @@
 ## 2026-08-15
 
 - `rate-limiting-request-limits.md` — IP 기준 요청 한도·본문 크기 상한·홉 신뢰 경계·429 문구
+- `expired-data-retention-schedule.md` — 만료 데이터 정리 주기 실행·heartbeat healthcheck·거짓 성공 차단
 
 ## 작성 규칙
 

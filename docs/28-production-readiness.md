@@ -19,7 +19,8 @@
 | 로그 개인정보 | 로그 필드 allowlist 고정. 쿼리·본문·경로 파라미터가 구조적으로 로그에 없음 | `app/core/observability.py`, `tests/test_observability.py` |
 | HTTP 보안 경계 | 보안 헤더, same-origin 상태 변경 보호, trusted host | `app/core/http_security.py`, `docs/26` |
 | 요청 한도·본문 크기 | IP 기준 rate limit(429 + `Retry-After`), 파싱 이전 본문 상한, 카운터는 HMAC 버킷으로 PostgreSQL 저장 | `app/core/rate_limit.py`, `app/core/request_limits.py`, `web/lib/api/request-body.ts` (2절 P0-1) |
-| CI | pytest / 프론트 build·tsc·lint·test / compose 실기동 + backup·restore + rate limit·본문 상한 검증 | `.github/workflows/ci.yml`, `scripts/verify_compose_runtime.py` |
+| 만료 데이터 정리 | 전용 컨테이너가 주기 실행. 성공 시각 heartbeat 기반 healthcheck, 로그는 건수·성공 여부만 | `app/services/data_retention.py`, `scripts/run_retention_scheduler.py`, `compose.yaml` (2절 P0-2) |
+| CI | pytest / 프론트 build·tsc·lint·test / compose 실기동 + backup·restore + rate limit·본문 상한 + 정리 스케줄 검증 | `.github/workflows/ci.yml`, `scripts/verify_compose_runtime.py` |
 
 정리하면 **배포 스택 자체는 이미 프로덕션 형태다.** 남은 것은 스택이 아니라 운영이다.
 
@@ -104,18 +105,46 @@ web이 체인을 다듬을 때 **오른쪽 기준 인덱스가 절대 밀리지 
 
 컨테이너에서의 확인은 CI에 넣었다. `container-runtime` job이 `FINSHIELD_RATE_LIMIT_ENABLED=1`로 스택을 띄우고, `scripts/verify_compose_runtime.py`가 (1) 200KB 본문이 400이 아니라 **413**으로 잘리는지 — 400이면 스키마가 거부했다는 뜻이고 그건 이 방어가 동작하지 않았다는 뜻이다 — (2) 31번째 요청에서 429 + 유효한 `Retry-After`가 나오는지, (3) 카운터가 PostgreSQL 행으로 남는지 — 프로세스 메모리에 있으면 재시작 한 번으로 초기화되고 워커가 여러 개면 워커 수만큼 헐거워진다 — (4) 그 행의 `bucket_key`가 64자 hex인지, 즉 **IP가 그대로 저장되지 않는지**를 검사한다.
 
-남은 것: 실제 다중 워커 구성에서의 카운터 공유는 현재 backend가 단일 워커라 아직 측정 대상이 아니다. 워커를 늘릴 때 다시 확인해야 한다.
+남은 것: backend는 이미 `uvicorn --workers 2`로 뜨지만(`Dockerfile`), 위 검증은 **한도 초과가 실제로 429가 되는지**만 확인한다. 두 워커가 같은 카운터 행을 동시에 갱신할 때 경합으로 카운트가 새는지는 측정하지 않았다. 저장소가 PostgreSQL이라 원자적 UPSERT로 처리되지만, 확인된 사실이 아니라 설계상의 기대다. 워커를 더 늘리기 전에 동시 부하로 재확인해야 한다.
 
-### P0-2. 만료 데이터 정리 자동 실행
+### P0-2. 만료 데이터 정리 자동 실행 — 완료 (2026-08-15)
 
-`scripts/cleanup_expired_anonymous_data.py`는 있지만 아무도 부르지 않는다. `docs/24`가 스케줄을 "권장"으로만 적어둔 상태다. 보존기간 정책이 문서에만 있고 실행되지 않으면 두 가지가 발생한다. 개인정보 보존 약속 위반, 그리고 DB 무한 증가.
+문제였던 것: `scripts/cleanup_expired_anonymous_data.py`는 있었지만 아무도 부르지 않았다. `adr/0004`의 보존기간은 문서상의 약속일 뿐 이행되지 않았고, 그 상태로 공개하면 개인정보 보존 약속 위반과 DB 무한 증가가 동시에 발생한다.
 
-- compose에 스케줄 실행 경로를 넣는다 (전용 서비스 또는 호스트 스케줄러)
-- 실행 결과를 관측 가능하게 남긴다 — 삭제 건수, 실패 여부. 개인 식별 값은 남기지 않는다
-- 실패가 조용히 넘어가지 않도록 한다
-- 완료 기준: 만료 데이터를 넣고 스케줄 주기를 지난 뒤 자동으로 사라지는 것을 실환경에서 확인
+구조:
 
-`adr/0004-anonymous-data-lifecycle.md`의 이행 부분이다.
+| 부분 | 파일 | 판단 |
+|---|---|---|
+| 삭제 로직 | `app/services/data_retention.py` | `RetentionRunner`가 만료 세션 → 소유 프로필 → 닫힌 rate limit window 순으로 지운다. **개인정보가 먼저다** — 뒤 단계가 실패해도 보존기간 약속은 이미 지켜져 있어야 한다 |
+| 의존 대상 | 같은 파일 | service가 아니라 **repository**를 받는다. `RateLimitService`를 거치면 정리가 그 설정에 묶여서, rate limit을 끄고 HMAC 비밀을 내리면 개인정보 삭제까지 같이 멈춘다 |
+| 주기 실행 | `RetentionScheduler` | 첫 실행을 미루지 않는다. 배포 직후 한 주기를 통째로 기다리면 그동안은 보존기간이 지켜지지 않는 상태로 서비스가 떠 있는 것이다. 실패해도 같은 간격으로 재시도 — backoff는 heartbeat 신선도 기준까지 흔든다 |
+| 실행 위치 | `compose.yaml`의 `retention` 서비스 | backend 안의 background task로 넣지 않았다. 워커가 2개라 같은 정리가 동시에 두 번 돌고, API 응답 지연과 정리 지연이 한 프로세스에 얽힌다. 분리하면 API가 죽어도 개인정보 삭제는 계속된다 |
+| 진입점 | `scripts/run_retention_scheduler.py` | 상주 / `--once` / `--check-heartbeat` |
+| 미리보기 | `scripts/cleanup_expired_anonymous_data.py` | 같은 `RetentionRunner`를 쓴다. 미리보기 건수와 스케줄러가 실제로 지우는 건수가 갈라지면 미리보기가 쓸모없어진다 |
+
+**"실패가 조용히 넘어가지 않는다"를 healthcheck로 옮겼다.** 로그만 남기면 아무도 안 본다. 그렇다고 프로세스 liveness를 보면 안 되는데, **계속 실패하는 loop도 프로세스는 살아 있기 때문이다.** 그래서 성공한 실행만 heartbeat 파일에 시각을 쓰고, healthcheck는 그 시각의 나이를 본다. 임계값은 `interval * 2 + 60`초 — 한 주기 놓친 것은 DB 순간 장애지만 두 주기 연속은 실제 고장이다. heartbeat 쓰기는 임시 파일 + `os.replace`로 원자적이다. 그러지 않으면 healthcheck가 쓰는 도중에 읽어 잘린 내용을 보고 멀쩡한 실행을 실패로 판정한다. `--check-heartbeat`는 **DB를 건드리지 않는다** — DB가 흔들릴 때 정리 컨테이너까지 unhealthy로 떨어지면 원인이 흐려진다.
+
+거짓 성공을 두 군데서 막았다. (1) `DATABASE_URL`이 없으면 기동을 거부한다. in-memory 저장소를 상대로 돌면 아무것도 지우지 않으면서 매번 성공을 기록하는데, **"정리가 되고 있다"는 거짓 신호는 정리가 아예 없는 것보다 나쁘다.** (2) 배포 환경에서 `postgresql+psycopg://`가 아니면 거부한다. `compose.https.yaml`이 `retention`의 `APP_ENV`도 production으로 올리는 이유가 이것이다 — 여기만 development로 남으면 정리 컨테이너만 SQLite를 허용하게 된다.
+
+로그는 `adr/0004` 제약을 그대로 따른다. 성공은 건수 4종 + 소요시간, 실패는 **예외 타입만** 남기고 메시지는 버린다. SQLAlchemy는 실패한 문장과 바인딩 값을 `str(exc)`에 붙이는데, 그러면 정리 로그가 개인정보 유출 경로가 된다.
+
+검증 결과:
+
+| 확인 | 방법 | 결과 |
+|---|---|---|
+| 실제로 지워지는가 | SQLite에 만료/활성 데이터를 2건씩 넣고 스케줄러를 실제 프로세스로 기동 | users·profiles·counters 2/2/2 → 1/1/1. 활성 데이터는 살아남음 |
+| 스케줄이 걸려 있는가 | 첫 실행이 sleep보다 먼저인지, 실패 후에도 loop가 이어지는지 | `["cleanup", "sleep:900", "cleanup", "sleep:900"]` 순서 고정 |
+| 실패를 노출하는가 | heartbeat 없음 / 성공 직후 / 5시간 과거로 조작 | `--check-heartbeat` exit 1 → 0 → 1 |
+| 실패가 heartbeat를 오염시키지 않는가 | 실행 실패 후 heartbeat 파일 | 갱신되지 않음. 이전 성공 시각 유지 |
+| 로그에 식별자가 없는가 | 삭제된 사용자 UUID를 스케줄러 stdout에서 검색 | 없음. 건수만 |
+| 예외 메시지가 새지 않는가 | `RuntimeError("session=abc123 user=42 ...")`를 던지는 저장소 | 로그에 `error_type`만. `abc123`·`user=42` 없음 |
+| 설정 오류가 조용히 넘어가지 않는가 | `DATABASE_URL` 없이 기동 | exit 2 + `retention_config_error`. 컨테이너가 죽어서 눈에 띈다 |
+| compose 렌더링 | `docker compose config`, https 오버레이 병합 | `retention` 서비스 정상, `APP_ENV: production` 병합 확인 |
+| 회귀 | `pytest -q` | 383 passed, 1 skipped (+31) |
+
+완료 기준("만료 데이터를 넣고 스케줄 주기를 지난 뒤 자동으로 사라지는 것을 실환경에서 확인")은 CI에서 이행한다. 로컬에 Docker 데몬을 띄울 수 없어 위 첫 줄은 SQLite + 실제 subprocess로 확인했고, 컨테이너 확인은 `scripts/verify_compose_runtime.py`의 `verify_retention_schedule()`이 맡는다. **`--once`로 한 번 돌려보는 것으로는 부족하다.** 그건 스크립트가 동작한다는 확인이지 스케줄이 걸려 있다는 확인이 아니고, P0-2가 막고 있던 것은 후자다. 그래서 실제로 세션을 만들고 `expires_at`을 과거로 밀어(TTL이 30일이라 기다려서 만료시킬 수 없다) 한 주기를 기다린 뒤 행이 사라졌는지, `retention` 컨테이너가 `healthy`인지, 로그에 `"status":"succeeded"`가 있고 `user_id`는 없는지를 검사한다. CI는 이를 위해 `FINSHIELD_RETENTION_INTERVAL_SECONDS=60`으로 스택을 띄운다.
+
+남은 것: 정리 실패가 **컨테이너 밖으로** 알려지지 않는다. healthcheck가 unhealthy를 띄워도 그것을 보고 사람에게 알리는 경로는 P1-1이다. 그때까지는 `docker compose ps`를 봐야 안다.
 
 ### P0-3. 백업 자동화와 복원 리허설
 
@@ -242,8 +271,8 @@ Capacitor로 감싸는 선택지는 스토어 등록이 실제로 필요해질 �
 0. 접근성 브랜치 병합 (작업 중 브랜치 정리)
 1. P0-5 의존성 잠금        ← 완료 (2026-08-14)
 2. P0-1 rate limit + 본문 크기 제한   ← 완료 (2026-08-15)
-3. P0-2 만료 데이터 정리 자동화   ← 다음
-4. P0-3 백업 자동화 + 복원 리허설
+3. P0-2 만료 데이터 정리 자동화   ← 완료 (2026-08-15)
+4. P0-3 백업 자동화 + 복원 리허설   ← 다음
 5. PWA (manifest + share_target)  ← 실도메인 직전
 6. P0-4 실도메인·DNS·TLS   ← 공개 배포
 7. P1-1 알림 → P1-5 의존성 상승 관측 → P1-3 배포·롤백 → P1-2 audit log → P1-4 CSP
