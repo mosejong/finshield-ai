@@ -12,18 +12,40 @@ const DEFAULT_TIMEOUT_MS = 8000;
 export class ApiError extends Error {
   readonly status: number;
   readonly kind: "network" | "timeout" | "http" | "schema";
+  /** 429 응답의 `Retry-After` (초). 없거나 해석할 수 없으면 undefined. */
+  readonly retryAfterSeconds?: number;
 
   constructor(
     kind: ApiError["kind"],
     message: string,
     status = 0,
-    options?: { cause?: unknown },
+    options?: { cause?: unknown; retryAfterSeconds?: number },
   ) {
     super(message, options);
     this.name = "ApiError";
     this.kind = kind;
     this.status = status;
+    this.retryAfterSeconds = options?.retryAfterSeconds;
   }
+}
+
+/**
+ * `Retry-After` 를 초로 읽는다.
+ *
+ * 백엔드는 초만 보낸다. HTTP-date 형식은 항상 요일 이름으로 시작하므로
+ * 여기서 NaN 이 되어 자연히 걸러진다.
+ */
+export function parseRetryAfter(headers: Headers): number | undefined {
+  const raw = headers.get("retry-after");
+  if (!raw) return undefined;
+  const seconds = Number.parseInt(raw.trim(), 10);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+}
+
+/** 한도 초과 안내 문구. 기다릴 시간을 알면 함께 알려준다. */
+export function retryHint(seconds?: number): string {
+  const wait = seconds && seconds > 0 ? `${seconds}초 뒤에` : "잠시 후";
+  return `${wait} 다시 시도해 주세요.`;
 }
 
 /** 백엔드 주소. 서버 사이드에서만 읽는다. */
@@ -36,8 +58,9 @@ export async function postJson<T>(
   body: unknown,
   schema: z.ZodType<T>,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  headers: HeadersInit = {},
 ): Promise<T> {
-  return requestJson("POST", path, body, schema, timeoutMs);
+  return requestJson("POST", path, body, schema, timeoutMs, headers);
 }
 
 export async function requestJson<T>(
@@ -82,6 +105,7 @@ export async function requestJson<T>(
       "http",
       `분석 서버가 오류를 반환했습니다. (${response.status})`,
       response.status,
+      { retryAfterSeconds: parseRetryAfter(response.headers) },
     );
   }
 
@@ -131,6 +155,7 @@ export async function requestNoContent(
       "http",
       `서버가 오류를 반환했습니다. (${response.status})`,
       response.status,
+      { retryAfterSeconds: parseRetryAfter(response.headers) },
     );
   }
 }

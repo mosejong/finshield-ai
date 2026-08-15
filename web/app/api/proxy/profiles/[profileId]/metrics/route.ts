@@ -1,22 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { ApiError, requestJson } from "@/lib/api/client";
+import { requestJson } from "@/lib/api/client";
 import { ProfileMetricsResponseSchema } from "@/lib/api/contracts";
-import { forwardedSessionCookie } from "@/lib/api/server-auth";
+import { backendHeaders } from "@/lib/api/server-auth";
+import { upstreamFailure } from "@/lib/api/proxy-response";
 
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Context = { params: Promise<{ profileId: string }> };
-
-
-function upstreamStatus(error: unknown): number {
-  if (error instanceof ApiError && error.status === 401) return 401;
-  if (error instanceof ApiError && error.status === 404) return 404;
-  if (error instanceof ApiError && error.status === 503) return 503;
-  return 502;
-}
 
 
 export async function GET(request: Request, context: Context) {
@@ -36,13 +29,10 @@ export async function GET(request: Request, context: Context) {
       undefined,
       ProfileMetricsResponseSchema,
       8000,
-      forwardedSessionCookie(request),
+      backendHeaders(request, { session: true }),
     );
     return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json(
-      { message: "금융지표를 불러오지 못했습니다." },
-      { status: upstreamStatus(error) },
-    );
+    return upstreamFailure(error, "금융지표를 불러오지 못했습니다.");
   }
 }
