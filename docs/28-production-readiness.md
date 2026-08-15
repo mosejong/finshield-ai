@@ -18,7 +18,8 @@
 | 저장 데이터 보호 | FinancialProfile 애플리케이션 레벨 암호화, 키 로테이션 경로 | `app/security/profile_encryption.py`, `adr/0002` |
 | 로그 개인정보 | 로그 필드 allowlist 고정. 쿼리·본문·경로 파라미터가 구조적으로 로그에 없음 | `app/core/observability.py`, `tests/test_observability.py` |
 | HTTP 보안 경계 | 보안 헤더, same-origin 상태 변경 보호, trusted host | `app/core/http_security.py`, `docs/26` |
-| CI | pytest / 프론트 build·tsc·lint·test / compose 실기동 + backup·restore 검증 | `.github/workflows/ci.yml`, `scripts/verify_compose_runtime.py` |
+| 요청 한도·본문 크기 | IP 기준 rate limit(429 + `Retry-After`), 파싱 이전 본문 상한, 카운터는 HMAC 버킷으로 PostgreSQL 저장 | `app/core/rate_limit.py`, `app/core/request_limits.py`, `web/lib/api/request-body.ts` (2절 P0-1) |
+| CI | pytest / 프론트 build·tsc·lint·test / compose 실기동 + backup·restore + rate limit·본문 상한 검증 | `.github/workflows/ci.yml`, `scripts/verify_compose_runtime.py` |
 
 정리하면 **배포 스택 자체는 이미 프로덕션 형태다.** 남은 것은 스택이 아니라 운영이다.
 
@@ -49,17 +50,61 @@ Mutation 감사에서 **위험 등급 임계값만 통과했다.** `score >= 70`
 
 이 다섯 개를 끝내기 전에는 공개 도메인을 붙이지 않는다.
 
-### P0-1. Rate limiting과 요청 본문 크기 제한
+### P0-1. Rate limiting과 요청 본문 크기 제한 — 완료 (2026-08-15)
 
-`POST /api/v1/analyze`에는 인증 의존성이 없다 (`app/api/routes/analysis.py:9`). `POST /api/v1/auth/session`도 익명 세션을 무제한으로 만들 수 있다. 공개 즉시 두 가지가 동시에 터진다. 분석 엔드포인트는 CPU를 소모하고, 세션 엔드포인트는 DB에 행을 쌓는다. 스키마 상한(`text` 10000자)은 요청 **한 건**의 크기만 막을 뿐 **빈도**를 막지 못한다.
+문제였던 것: `POST /api/v1/analyze`에는 인증 의존성이 없고 (`app/api/routes/analysis.py:9`), `POST /api/v1/auth/session`은 익명 세션을 무제한으로 만들 수 있었다. 분석은 CPU를, 세션은 DB 행을 소모한다. 스키마 상한(`text` 10000자)은 요청 **한 건**의 크기만 막을 뿐 **빈도**를 막지 못한다.
 
-- 대상: `/api/v1/analyze`, `/api/v1/auth/session`, 그 외 쓰기 엔드포인트
-- 식별자는 IP 단독이 아니라 익명 세션 + IP 조합으로 두되, 세션 발급 자체가 제한 대상이라는 순환을 고려한다
-- 초과 응답은 `429` + `Retry-After`. 위험 분석이 막혔다는 사실이 "안전하다"로 읽히지 않게 프론트 문구를 함께 정한다
-- HTTP 경계에서 본문 전체 크기 제한을 추가한다 (스키마 검증 이전에 잘라야 의미가 있다)
-- 완료 기준: 제한 초과 시 429 반환, 정상 사용자 흐름 무영향, 카운터가 worker 재시작을 지나 유지되는지 확인, 회귀 테스트
+**식별자는 계획을 바꿔 IP 단독으로 갔다.** 당초 이 문서는 "익명 세션 + IP 조합"을 적었지만, 세션은 공격자가 스스로 발급받을 수 있다. 세션마다 따로 세면 세션을 n개 만들어 한도를 n배로 늘린다. 세션 발급 자체를 제한해도 그 한도가 곧 실질 상한이 되어 계층이 하나 늘 뿐이다. IP는 공격자가 임의로 바꿀 수 없는 유일한 축이라, 여기서의 상한이 실제 상한이 된다. 대가는 CGNAT·회사망에서 여러 사용자가 한 버킷을 공유하는 것이고, 그래서 한도를 넉넉히 잡았다. 목적은 공정 분배가 아니라 "한 명이 서비스를 갈아버리는 것"의 차단이다 (`app/services/rate_limits.py` 모듈 docstring).
 
-`docs/26`에서 관측성 단계로 미뤄둔 항목이다. 관측성은 끝났으므로 이제 차례다.
+정책 (위에서부터 먼저 맞는 하나만 적용, `/health`·`/readyz` 는 어떤 정책에도 걸리지 않음):
+
+| 이름 | 대상 | 한도 | 이유 |
+|---|---|---|---|
+| `auth_session` | `POST /api/v1/auth/session` | 20 / 1시간 | 호출마다 users·auth_sessions 행이 생긴다. 정상 사용자는 브라우저당 한 번 |
+| `analyze` | `POST /api/v1/analyze` | 30 / 1분 | 가장 비싸고 인증이 없는 경로 |
+| `write` | `/api/v1/` 쓰기 | 60 / 1분 | |
+| `read` | `/api/v1/` 나머지 | 240 / 1분 | |
+
+구조:
+
+| 부분 | 파일 | 판단 |
+|---|---|---|
+| client IP 해석 | `app/core/client_identity.py` | `X-Forwarded-For`를 **오른쪽에서** 홉 수만큼 센다. `FINSHIELD_TRUSTED_PROXY_HOPS` 기본 0 = 헤더 불신, TCP peer 사용 |
+| 본문 크기 (백엔드) | `app/core/request_limits.py` | 순수 ASGI. `receive`를 감싸 바이트를 세야 해서 `BaseHTTPMiddleware`를 쓸 수 없다. `Content-Length`는 빠른 거부에만 쓰고 실제 판단은 흘러오는 바이트로 |
+| 본문 크기 (web) | `web/lib/api/request-body.ts` | Route Handler에는 본문 크기 기본 상한이 **없다.** 배포 경로가 Caddy → web → backend라 노출된 쪽은 web이고, `request.json()`을 그냥 부르면 100MB 본문도 다 담은 뒤에야 zod에서 거부한다 |
+| 카운터 저장 | `app/repositories/rate_limits.py` | InMemory(로컬) / SQLAlchemy(배포). 배포에서 SQLite면 기동 거부 — 워커 간 카운터가 안 공유돼 한도가 워커 수만큼 헐거워지는데 겉으로는 정상으로 보인다 |
+| 버킷 키 | `app/services/rate_limits.py` | `HMAC(secret, policy|ip)`. IPv4는 값이 2^32개뿐이라 단순 해시는 표로 되돌릴 수 있다. 저장된 행이 접속 기록이 되면 안 된다 |
+| 저장소 장애 | 같은 파일 | **통과시킨다.** DB 장애 때문에 위험한 문자를 확인 못 하게 만드는 쪽이 그동안 한도가 열리는 것보다 나쁘다. `app/domain/fraud/sources.py`와 같은 판단 |
+| 만료 행 정리 | `scripts/cleanup_expired_anonymous_data.py` | 닫힌 window 행은 다시 조회되지 않는다. 지우지 않으면 요청 수만큼 무한히 쌓인다. 개인정보 정리 **뒤에** 둔다 |
+
+홉 수가 실제로 맞는지가 이 기능의 정확성을 좌우한다. 경로는 Caddy → web → backend다.
+
+- Caddy는 `header_up X-Forwarded-For {remote_host}` 로 클라이언트가 미리 적어 보낸 체인을 **이어붙이지 않고 덮어쓴다** (`deploy/Caddyfile`). 인터넷에 직접 붙어 있으므로 믿을 수 있는 주소는 TCP peer 하나뿐이다.
+- web은 그 값을 **그대로 넘기고 자기 홉을 덧붙이지 않는다** (`web/lib/api/server-auth.ts`). Route Handler는 TCP peer를 볼 수 없어서 덧붙일 값이 없다.
+- 따라서 맨 오른쪽 항목 = 실제 클라이언트이고 `FINSHIELD_TRUSTED_PROXY_HOPS=1` 이다 (`compose.https.yaml`). 앞단에 CDN을 두면 Caddyfile과 이 값을 함께 고쳐야 한다.
+
+web이 체인을 다듬을 때 **오른쪽 기준 인덱스가 절대 밀리지 않는 변형만** 한다. 왼쪽에서만 자르고(최대 8개), 형식이 이상한 항목은 삭제가 아니라 `unknown`으로 치환해 자리를 유지한다. 항목을 지우면 홉 인덱스가 밀려 공격자가 심어둔 값이 선택될 수 있다.
+
+프론트 문구는 429가 "안전하다"로 읽히지 않게 고정했다. "요청이 많아 분석을 잠시 멈췄습니다. **아직 위험 여부는 확인되지 않았습니다.**" + 급하면 112 / 1394 안내. `web/lib/api/analysis.test.ts`가 전 실패 종류의 문구에 `/안전|이상 없음|위험 없음|정상입니다/`가 없음을 회귀로 고정한다. 429를 502로 덮지 않는 것도 같은 이유다 — 502는 "서버가 고장났다"로 읽혀서 사용자가 계속 재시도한다 (`web/lib/api/proxy-response.ts`).
+
+검증 결과:
+
+| 확인 | 방법 | 결과 |
+|---|---|---|
+| 한도 초과 | 백엔드 직접 31회 POST | 30회 200, 31번째 429 + `Retry-After: 22` + `RateLimit-Limit: 30` |
+| 버킷 분리 | 다른 `X-Forwarded-For` | 200, `RateLimit-Remaining: 29` |
+| 홉 위조 | `198.51.100.7, 203.0.113.10` | 429 유지. 왼쪽에 심은 값으로 버킷을 못 바꾼다 |
+| 본문 상한 (백엔드) | 200KB 본문 | 413, 파싱 전 차단 |
+| 본문 상한 (web) | 프록시로 200KB | 413. zod 400으로 가려지지 않음 |
+| healthcheck 영향 | `/health/ready` 연속 호출 | 전부 200. 스스로를 unhealthy로 만들지 않음 |
+| 프록시 경유 문구 | web → backend 30회 | 429 + 한국어 문구 + `Retry-After` 전달 |
+| 회귀 | `pytest -q` / `vitest` | 352 passed 1 skipped / 80 passed |
+
+로컬에 Docker 데몬을 띄울 수 없어 컨테이너 실기동 대신 uvicorn + `next dev`로 같은 경로를 세워 확인했다. `docker compose config`로 base/https 병합 결과(`FINSHIELD_TRUSTED_PROXY_HOPS` 0/1)는 별도 확인했다.
+
+컨테이너에서의 확인은 CI에 넣었다. `container-runtime` job이 `FINSHIELD_RATE_LIMIT_ENABLED=1`로 스택을 띄우고, `scripts/verify_compose_runtime.py`가 (1) 200KB 본문이 400이 아니라 **413**으로 잘리는지 — 400이면 스키마가 거부했다는 뜻이고 그건 이 방어가 동작하지 않았다는 뜻이다 — (2) 31번째 요청에서 429 + 유효한 `Retry-After`가 나오는지, (3) 카운터가 PostgreSQL 행으로 남는지 — 프로세스 메모리에 있으면 재시작 한 번으로 초기화되고 워커가 여러 개면 워커 수만큼 헐거워진다 — (4) 그 행의 `bucket_key`가 64자 hex인지, 즉 **IP가 그대로 저장되지 않는지**를 검사한다.
+
+남은 것: 실제 다중 워커 구성에서의 카운터 공유는 현재 backend가 단일 워커라 아직 측정 대상이 아니다. 워커를 늘릴 때 다시 확인해야 한다.
 
 ### P0-2. 만료 데이터 정리 자동 실행
 
@@ -196,8 +241,8 @@ Capacitor로 감싸는 선택지는 스토어 등록이 실제로 필요해질 �
 ```
 0. 접근성 브랜치 병합 (작업 중 브랜치 정리)
 1. P0-5 의존성 잠금        ← 완료 (2026-08-14)
-2. P0-1 rate limit + 본문 크기 제한   ← 다음
-3. P0-2 만료 데이터 정리 자동화
+2. P0-1 rate limit + 본문 크기 제한   ← 완료 (2026-08-15)
+3. P0-2 만료 데이터 정리 자동화   ← 다음
 4. P0-3 백업 자동화 + 복원 리허설
 5. PWA (manifest + share_target)  ← 실도메인 직전
 6. P0-4 실도메인·DNS·TLS   ← 공개 배포

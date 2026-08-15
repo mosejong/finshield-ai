@@ -331,6 +331,8 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 
 보안 경계 v0.1이 적용되었다. 브라우저·API 보안 헤더, 쿠키 기반 상태 변경 요청의 same-origin 검사, production trusted host fail-closed, loopback 내부 포트, Caddy HTTPS 공개 구성을 포함한다. 실제 공개 완료에는 도메인·DNS·인증서 외부 검증이 남아 있다. 운영법과 제한은 `docs/26-http-security-https.md`를 따른다.
 
+요청 한도와 본문 크기 제한이 적용되었다. 식별자는 client IP 단독이며(세션은 공격자가 스스로 발급할 수 있어 한도를 무력화한다), 카운터는 IP를 그대로 담지 않도록 HMAC 버킷 키로 PostgreSQL에 저장한다. 초과 시 `429` + `Retry-After`를 돌려주고, 프론트는 그것을 "안전하다"가 아니라 "아직 확인되지 않았다"로 표현한다. 본문 상한은 스키마 검증 이전에 backend와 web 양쪽에서 적용된다. 신뢰 proxy 홉 수는 기본 0(헤더 불신)이며 배포에서 명시해야 한다. 설계 판단과 검증 결과는 `docs/28-production-readiness.md` 2절 P0-1을 따른다.
+
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측

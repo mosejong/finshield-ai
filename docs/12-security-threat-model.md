@@ -14,5 +14,8 @@ Next proxy: unrelated cookie leakage -> forward only `finshield_session`; never 
 State-changing proxy requests: CSRF/cross-site form submission -> require an allowed `Origin`; reject missing or `Sec-Fetch-Site: cross-site` requests.
 Public HTTP boundary: Host-header injection/TLS bypass/clickjacking -> explicit production trusted hosts, loopback-only internal ports, Caddy HTTPS-only public entry, CSP/frame denial/HSTS.
 Observability: financial text/profile/session leakage and unbounded labels -> allowlisted structured fields only, route templates, no body/query/header logging, runtime secret non-disclosure test.
+Unauthenticated API abuse: analyze CPU burn, unbounded anonymous session rows, oversized bodies -> per-IP rate limits with `429`+`Retry-After`, byte-counting body limits before schema validation at both the web proxy and the API, shared PostgreSQL counters, fail-open on counter-storage outage because blocking a fraud check is worse than a temporarily open limit.
+Forged client address: `X-Forwarded-For` spoofing to escape or poison a rate-limit bucket -> count hops from the right, trust zero hops by default, edge proxy replaces rather than appends the chain, and chain trimming never shifts a right-anchored index.
+Rate-limit counters as an access log: stored identifiers reversible for IPv4's 2^32 space -> HMAC bucket keys with a deployment secret, no identifier in failure logs, closed windows deleted by the retention job.
 ## Security test backlog
 Prompt-injection golden set; PII logging regression; malicious URL; oversized payload; stale provider; schema drift; unsupported financial claim benchmark.
