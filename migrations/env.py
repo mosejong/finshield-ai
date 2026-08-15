@@ -16,7 +16,10 @@ from app.core.runtime_secrets import (
 config = context.config
 load_dotenv(override=False)
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # `disable_existing_loggers` 기본값은 True 다. alembic 을 같은 프로세스
+    # 안에서 부르면(운영 스크립트, 테스트) 그 순간 앱 로거가 전부 꺼져서
+    # 이후 경고가 조용히 사라진다.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 try:
     database_url = resolve_database_url(os.environ)
