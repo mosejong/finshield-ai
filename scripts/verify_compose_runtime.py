@@ -22,6 +22,11 @@ ANALYZE_PAYLOAD = {"text": "계좌를 빌려주시면 수수료를 드립니다"
 # HMAC-SHA256 hex. IP 나 세션 값이 그대로 저장되면 이 형태가 아니다.
 BUCKET_KEY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
+# 정리가 "돌 수 있다" 가 아니라 "스케줄에 따라 실제로 지웠다" 를 확인하려면
+# 한 주기를 기다려야 한다. 기본 3600초로는 검증이 끝나지 않는다.
+RETENTION_INTERVAL = int(os.getenv("FINSHIELD_RETENTION_INTERVAL_SECONDS", "3600"))
+MAX_VERIFIABLE_RETENTION_INTERVAL = 120
+
 PROFILE = {
     "ageBand": "20_29",
     "employmentStatus": "employed",
@@ -169,6 +174,69 @@ def verify_rate_limit() -> dict[str, object]:
     return {"limited_at": limited_at, "retry_after_seconds": int(retry_after)}
 
 
+def verify_retention_schedule(
+    opener: urllib.request.OpenerDirector,
+) -> dict[str, object]:
+    """만료된 데이터가 아무도 부르지 않아도 사라지는지 본다.
+
+    `--once` 로 한 번 돌려보는 것으로는 부족하다. 그건 스크립트가 동작한다는
+    확인이지, 스케줄이 걸려 있다는 확인이 아니다. P0-2 가 막고 있던 것은
+    후자다. 그래서 실제로 한 주기를 기다린다.
+    """
+    if RETENTION_INTERVAL > MAX_VERIFIABLE_RETENTION_INTERVAL:
+        raise RuntimeError(
+            "FINSHIELD_RETENTION_INTERVAL_SECONDS must be at most "
+            f"{MAX_VERIFIABLE_RETENTION_INTERVAL} for this run; "
+            f"got {RETENTION_INTERVAL}"
+        )
+
+    status, _ = request_json(opener, "POST", "/api/proxy/auth/session")
+    if status != 201:
+        raise RuntimeError("retention verification could not create a session")
+    user_id = db_shell(
+        'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc '
+        "'SELECT user_id FROM users LIMIT 1'",
+        capture=True,
+    )
+    if not user_id:
+        raise RuntimeError("retention verification session was not persisted")
+
+    # TTL 이 30일이라 기다려서 만료시킬 수 없다. 만료 시각만 과거로 옮긴다.
+    db_shell(
+        'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc '
+        "\"UPDATE auth_sessions SET expires_at = now() - interval '1 day'\""
+    )
+
+    deadline = time.monotonic() + RETENTION_INTERVAL * 2 + 30
+    while time.monotonic() < deadline:
+        remaining = db_shell(
+            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc '
+            "'SELECT count(*) FROM users'",
+            capture=True,
+        )
+        if remaining == "0":
+            break
+        time.sleep(2)
+    else:
+        raise RuntimeError(
+            "expired anonymous data survived the retention interval"
+        )
+
+    health = compose(
+        "ps", "--format", "{{.Service}}|{{.Health}}", capture=True
+    )
+    if "retention|healthy" not in health:
+        raise RuntimeError(f"retention container did not report healthy: {health}")
+
+    logs = compose("logs", "--no-color", "retention", capture=True)
+    if '"status":"succeeded"' not in logs:
+        raise RuntimeError("retention did not emit a structured success log")
+    if user_id in logs:
+        raise RuntimeError("retention logs exposed the identifier it deleted")
+
+    return {"deleted_within_interval_seconds": RETENTION_INTERVAL, "healthy": True}
+
+
 def main() -> int:
     if BACKUP_PATH.parent != BACKUP_DIR:
         raise RuntimeError("backup target escaped the repository backup directory")
@@ -287,6 +355,10 @@ def main() -> int:
         if counts != "0|0|0":
             raise RuntimeError("runtime verification left personal data in PostgreSQL")
 
+        # 여기서부터는 DB 가 비어 있다. 만료 데이터를 새로 하나 넣고,
+        # 아무도 부르지 않아도 사라지는지 본다.
+        retention = verify_retention_schedule(opener)
+
         print(
             json.dumps(
                 {
@@ -299,6 +371,7 @@ def main() -> int:
                     "oversized_body_rejected": True,
                     "rate_limit": rate_limit,
                     "rate_limit_counters_hashed": True,
+                    "retention_schedule": retention,
                     "web_health": True,
                     "web_proxy_e2e": True,
                 },

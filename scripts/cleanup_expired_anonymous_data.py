@@ -1,10 +1,22 @@
+"""만료 데이터 정리를 사람이 직접 한 번 돌리는 도구.
+
+주기 실행은 `run_retention_scheduler.py` 가 한다. 삭제 경로는 둘이 같은
+`RetentionRunner` 를 쓴다 - 미리보기에서 본 건수와 스케줄러가 실제로 지우는
+건수가 갈라지면 미리보기가 쓸모없어진다.
+"""
+
 import argparse
 import json
+from dataclasses import asdict
 
 from dotenv import load_dotenv
 
-from app.core.auth_sessions import build_auth_session_service
-from app.core.rate_limit import build_rate_limit_service
+from app.core.data_retention import (
+    RetentionConfigurationError,
+    build_retention_runner,
+)
+from app.repositories.auth_sessions import AuthSessionStorageError
+from app.repositories.rate_limits import RateLimitStorageError
 
 
 def main() -> int:
@@ -23,26 +35,24 @@ def main() -> int:
 
     load_dotenv(override=False)
 
-    # 개인정보 보존기간이 먼저다. 뒤이은 정리가 실패해도 이건 이미 끝나 있어야
-    # 한다. rate limit 카운터는 식별자를 담지 않으므로 순서상 뒤에 둔다.
-    sessions = build_auth_session_service().cleanup_expired(execute=args.execute)
-    # 닫힌 window 행은 다시 조회되지 않는다. 지우지 않으면 요청 수만큼
-    # 무한히 쌓이기만 한다.
-    counters = build_rate_limit_service().cleanup_expired(execute=args.execute)
+    try:
+        runner = build_retention_runner()
+    except RetentionConfigurationError as exc:
+        # DATABASE_URL 이 없으면 in-memory 저장소를 상대로 0 건을 세고
+        # 끝난다. "지울 것이 없다" 와 "아무 데도 안 봤다" 는 다른 결과인데
+        # 출력만 보면 구분되지 않는다.
+        print(json.dumps({"error": str(exc)}, ensure_ascii=False))
+        return 2
 
-    print(
-        json.dumps(
-            {
-                "executed": sessions.executed,
-                "expired_sessions": sessions.expired_sessions,
-                "anonymous_users": sessions.anonymous_users,
-                "financial_profiles": sessions.financial_profiles,
-                "rate_limit_counters": counters.counters,
-            },
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-    )
+    try:
+        summary = runner.run_once(execute=args.execute)
+    except (AuthSessionStorageError, RateLimitStorageError) as exc:
+        # 대부분은 migration 이 안 올라간 DB 를 가리키고 있는 경우다.
+        # traceback 을 뱉으면 그 사실이 묻힌다.
+        print(json.dumps({"error": str(exc)}, ensure_ascii=False))
+        return 1
+
+    print(json.dumps(asdict(summary), ensure_ascii=False, sort_keys=True))
     return 0
 
 

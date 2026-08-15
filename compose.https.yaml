@@ -9,6 +9,12 @@ services:
       # 앞단에 CDN 같은 프록시를 하나 더 두면 이 값도 함께 올려야 한다.
       FINSHIELD_TRUSTED_PROXY_HOPS: "1"
 
+  # backend 와 같은 APP_ENV 여야 한다. 여기가 development 로 남으면 정리
+  # 컨테이너만 SQLite 를 허용하게 되고, 그러면 운영 DB 가 아닌 곳을 비운다.
+  retention:
+    environment:
+      APP_ENV: production
+
   web:
     environment:
       FINSHIELD_ALLOWED_ORIGINS: https://${FINSHIELD_DOMAIN:?FINSHIELD_DOMAIN is required}

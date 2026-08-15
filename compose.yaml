@@ -97,6 +97,42 @@ services:
       start_period: 10s
     <<: *runtime-security
 
+  # 보존기간을 실제로 이행하는 쪽. 문서에만 있는 정책은 지켜지지 않는다.
+  #
+  # backend 안의 background task 로 넣지 않았다. worker 가 2 개라 같은 정리가
+  # 동시에 두 번 돌고, API 응답 지연과 정리 지연이 한 프로세스에 얽힌다.
+  # 따로 두면 API 가 죽어도 개인정보 삭제는 계속된다.
+  retention:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *backend-environment
+      FINSHIELD_RETENTION_INTERVAL_SECONDS: ${FINSHIELD_RETENTION_INTERVAL_SECONDS:-3600}
+    secrets: *backend-secrets
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    command: ["python", "-m", "scripts.run_retention_scheduler"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    # 마지막으로 "성공한" 정리 시각을 본다. 계속 실패하는 loop 도 프로세스는
+    # 살아 있으므로, 살아 있음만으로는 정리가 되고 있다는 증거가 못 된다.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - scripts.run_retention_scheduler
+        - --check-heartbeat
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    <<: *runtime-security
+
   web:
     build:
       context: ./web
