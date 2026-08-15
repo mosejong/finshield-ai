@@ -9,5 +9,12 @@
 		-Server
 	}
 
-	reverse_proxy web:3000
+	reverse_proxy web:3000 {
+		# 클라이언트가 미리 적어 보낸 X-Forwarded-For 체인을 이어붙이지 않고
+		# 버린다. 이 Caddy 가 인터넷에 직접 붙어 있으므로 믿을 수 있는 주소는
+		# TCP peer 하나뿐이고, 남겨두면 backend 가 세는 홉 수만 흔들린다.
+		# 앞단에 CDN 을 두게 되면 이 줄과 backend 의
+		# FINSHIELD_TRUSTED_PROXY_HOPS 를 함께 고쳐야 한다.
+		header_up X-Forwarded-For {remote_host}
+	}
 }

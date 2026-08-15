@@ -79,7 +79,9 @@ jobs:
           caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
           caddy validate --config /etc/caddy/Caddyfile
       - run: docker compose build
-      - run: docker compose up --detach
+      # APP_ENV 가 development 라 rate limit 은 기본으로 꺼져 있다. 이 job 은
+      # 컨테이너에서 429 가 실제로 나오는지를 확인하는 자리이므로 켜서 띄운다.
+      - run: FINSHIELD_RATE_LIMIT_ENABLED=1 docker compose up --detach
       - run: python scripts/verify_compose_runtime.py
       - if: always()
         run: docker compose ps && docker compose logs --no-color --tail=200

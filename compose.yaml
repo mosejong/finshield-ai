@@ -10,10 +10,19 @@ x-backend-environment: &backend-environment
   DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
   PROFILE_ENCRYPTION_KEYS_FILE: /run/secrets/profile_encryption_keys
   FINSHIELD_TRUSTED_HOSTS: ${FINSHIELD_TRUSTED_HOSTS:-backend,localhost,127.0.0.1}
+  # 이 파일만으로 띄우면 proxy 가 없다. 브라우저가 web:3000 에 바로 붙으므로
+  # 믿을 forwarded 홉이 없다. HTTPS 배포는 compose.https.yaml 에서 1 로 올린다.
+  FINSHIELD_TRUSTED_PROXY_HOPS: ${FINSHIELD_TRUSTED_PROXY_HOPS:-0}
+  # 비워두면 APP_ENV 를 따른다 (development/test 는 끔, 나머지는 켬).
+  # 로컬에서 429 를 실제로 확인하거나 CI 실기동 검증을 돌릴 때 1 로 준다.
+  FINSHIELD_RATE_LIMIT_ENABLED: ${FINSHIELD_RATE_LIMIT_ENABLED:-}
+  FINSHIELD_RATE_LIMIT_SECRET_FILE: /run/secrets/rate_limit_secret
+  FINSHIELD_MAX_REQUEST_BYTES: ${FINSHIELD_MAX_REQUEST_BYTES:-131072}
 
 x-backend-secrets: &backend-secrets
   - postgres_password
   - profile_encryption_keys
+  - rate_limit_secret
 
 x-runtime-security: &runtime-security
   cap_drop:
@@ -96,6 +105,10 @@ services:
     environment:
       FINSHIELD_API_URL: http://backend:8000
       FINSHIELD_ALLOWED_ORIGINS: http://127.0.0.1:${WEB_PORT:-13000},http://localhost:${WEB_PORT:-13000}
+      # backend 와 같은 값을 준다. web 이 인터넷에 노출된 쪽이라 본문은 여기서
+      # 먼저 끊긴다. 한쪽만 올리면 정상 요청이 web 에서 막히거나, backend 가
+      # 어차피 거부할 본문을 web 이 통째로 메모리에 담는다.
+      FINSHIELD_MAX_REQUEST_BYTES: ${FINSHIELD_MAX_REQUEST_BYTES:-131072}
       NODE_ENV: production
     depends_on:
       backend:
@@ -126,3 +139,5 @@ secrets:
     file: ./secrets/postgres_password.txt
   profile_encryption_keys:
     file: ./secrets/profile_encryption_keys.txt
+  rate_limit_secret:
+    file: ./secrets/rate_limit_secret.txt

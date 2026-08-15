@@ -2,6 +2,7 @@ import http.cookiejar
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import time
 import urllib.error
@@ -14,6 +15,12 @@ BACKUP_PATH = (BACKUP_DIR / "runtime-verify.dump").resolve()
 RESTORE_DATABASE = "finshield_restore_verify"
 BACKEND_URL = f"http://127.0.0.1:{os.getenv('BACKEND_PORT', '18000')}"
 WEB_URL = f"http://127.0.0.1:{os.getenv('WEB_PORT', '13000')}"
+
+# analyze 정책은 30회/분이다 (`app/services/rate_limits.py`).
+ANALYZE_LIMIT = 30
+ANALYZE_PAYLOAD = {"text": "계좌를 빌려주시면 수수료를 드립니다", "state": "received_only"}
+# HMAC-SHA256 hex. IP 나 세션 값이 그대로 저장되면 이 형태가 아니다.
+BUCKET_KEY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 PROFILE = {
     "ageBand": "20_29",
@@ -83,6 +90,85 @@ def db_shell(command: str, *, capture: bool = False) -> str:
     return compose("exec", "-T", "db", "sh", "-ec", command, capture=capture)
 
 
+def backend_post(path: str, payload: bytes) -> tuple[int, str | None]:
+    """web 을 거치지 않고 backend 포트로 직접 보낸다.
+
+    이 경로의 client IP 는 docker gateway 라서, web 컨테이너를 통해 오는
+    프록시 호출과 다른 bucket 에 들어간다. 아래 프로필·세션 검증 흐름의
+    한도를 소모하지 않는다.
+    """
+    request = urllib.request.Request(
+        f"{BACKEND_URL}{path}",
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            response.read()
+            return response.status, response.headers.get("Retry-After")
+    except urllib.error.HTTPError as exc:
+        exc.read()
+        return exc.code, exc.headers.get("Retry-After")
+
+
+def verify_request_size_limit() -> None:
+    """스키마 검증 이전에 잘리는지 본다.
+
+    `text` 상한은 10000자다. 400 이 돌아오면 본문을 끝까지 읽은 뒤 스키마가
+    거부했다는 뜻이고, 그건 이 방어가 동작하지 않았다는 뜻이다.
+    """
+    oversized = json.dumps({"text": "가" * 200_000}).encode("utf-8")
+    status, _ = backend_post("/api/v1/analyze", oversized)
+    if status != 413:
+        raise RuntimeError(
+            f"oversized request body was not rejected at the HTTP boundary: {status}"
+        )
+
+
+def verify_rate_limit() -> dict[str, object]:
+    payload = json.dumps(ANALYZE_PAYLOAD).encode("utf-8")
+    limited_at = None
+    retry_after = None
+    for attempt in range(1, ANALYZE_LIMIT + 11):
+        status, header = backend_post("/api/v1/analyze", payload)
+        if status == 200:
+            continue
+        if status != 429:
+            raise RuntimeError(f"unexpected status while probing rate limit: {status}")
+        limited_at = attempt
+        retry_after = header
+        break
+    if limited_at is None:
+        raise RuntimeError(
+            "rate limit never engaged; FINSHIELD_RATE_LIMIT_ENABLED must be set for this run"
+        )
+    if limited_at <= ANALYZE_LIMIT:
+        raise RuntimeError(f"rate limit engaged too early at attempt {limited_at}")
+    if not retry_after or not retry_after.isdigit() or int(retry_after) <= 0:
+        raise RuntimeError("429 response did not carry a usable Retry-After")
+
+    # 카운터가 프로세스 메모리에 있으면 backend 재시작 한 번으로 한도가
+    # 초기화된다. 워커가 여러 개면 아예 워커 수만큼 헐거워진다. 행이
+    # PostgreSQL 에 있다는 것이 그 두 가지가 아니라는 증거다.
+    row = db_shell(
+        'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc '
+        "'SELECT bucket_key, hit_count FROM rate_limit_counters "
+        "ORDER BY hit_count DESC LIMIT 1'",
+        capture=True,
+    )
+    if not row:
+        raise RuntimeError("rate limit counters were not stored in PostgreSQL")
+    bucket_key, _, hit_count = row.partition("|")
+    if int(hit_count) <= ANALYZE_LIMIT:
+        raise RuntimeError("stored counter does not match the requests that were sent")
+    # 저장된 행이 접속 기록이 되면 안 된다.
+    if not BUCKET_KEY_PATTERN.match(bucket_key):
+        raise RuntimeError("rate limit bucket key was not a hashed identifier")
+
+    return {"limited_at": limited_at, "retry_after_seconds": int(retry_after)}
+
+
 def main() -> int:
     if BACKUP_PATH.parent != BACKUP_DIR:
         raise RuntimeError("backup target escaped the repository backup directory")
@@ -121,6 +207,8 @@ def main() -> int:
 
         wait_for(f"{BACKEND_URL}/health")
         wait_for(WEB_URL)
+        verify_request_size_limit()
+        rate_limit = verify_rate_limit()
         status, _ = request_json(opener, "POST", "/api/proxy/auth/session")
         if status != 201:
             raise RuntimeError("anonymous session was not created")
@@ -208,6 +296,9 @@ def main() -> int:
                     "logs_exclude_profile_and_session_values": True,
                     "structured_request_logs": True,
                     "account_delete_counts": counts,
+                    "oversized_body_rejected": True,
+                    "rate_limit": rate_limit,
+                    "rate_limit_counters_hashed": True,
                     "web_health": True,
                     "web_proxy_e2e": True,
                 },

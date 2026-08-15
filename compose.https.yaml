@@ -3,6 +3,11 @@ services:
     environment:
       APP_ENV: production
       FINSHIELD_TRUSTED_HOSTS: backend,localhost,127.0.0.1
+      # 경로는 Caddy -> web -> backend 다. Caddy 가 X-Forwarded-For 를 실제
+      # 접속 주소 하나로 덮어쓰고(deploy/Caddyfile), web 은 그 값을 그대로
+      # 넘기며 자기 홉을 덧붙이지 않는다. 그래서 맨 오른쪽 = 실제 클라이언트다.
+      # 앞단에 CDN 같은 프록시를 하나 더 두면 이 값도 함께 올려야 한다.
+      FINSHIELD_TRUSTED_PROXY_HOPS: "1"
 
   web:
     environment:
