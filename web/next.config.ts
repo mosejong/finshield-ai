@@ -31,7 +31,20 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      {
+        // 서비스 워커는 캐시하지 않는다. 기기에 옛 사본이 남으면 잘못된 워커를
+        // 되돌릴 방법이 사실상 없다 - 그 워커가 새 워커 내려받기까지 가로챈다.
+        // 등록 쪽 `updateViaCache: "none"` 과 짝이다.
+        source: "/sw.js",
+        headers: [
+          ...securityHeaders,
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+    ];
   },
 };
 
