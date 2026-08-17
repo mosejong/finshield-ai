@@ -135,8 +135,17 @@ export type BackendAnalyzeResponse = z.infer<
 /* 사기 분석 — 프론트 계약                                              */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 분석에 보낼 수 있는 원문 길이 상한.
+ *
+ * 입력 화면의 글자 수 표시, 공유 시트로 들어온 내용의 절단, 요청 스키마가
+ * 모두 이 값을 봐야 한다. 세 곳에 따로 적으면 공유로 들어온 긴 메시지가
+ * 입력창에는 들어가고 전송에서만 거부되는 식으로 어긋난다.
+ */
+export const ANALYZE_TEXT_MAX_LENGTH = 10_000;
+
 export const AnalyzeRequestSchema = z.object({
-  text: z.string().min(1).max(10000),
+  text: z.string().min(1).max(ANALYZE_TEXT_MAX_LENGTH),
   persona: PersonaSchema.default("unknown"),
   state: UserStateSchema.default("received_only"),
   url: z.string().optional(),

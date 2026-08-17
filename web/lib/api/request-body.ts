@@ -40,6 +40,42 @@ export type JsonBodyResult =
   | { ok: true; value: unknown }
   | { ok: false; response: NextResponse };
 
+export type LimitedBodyResult =
+  // `Uint8Array<ArrayBuffer>` 로 좁혀 둔다. 기본 `ArrayBufferLike` 는
+  // SharedArrayBuffer 도 포함해서 `new Response(bytes)` 에 그대로 넘길 수 없다.
+  | { ok: true; bytes: Uint8Array<ArrayBuffer> }
+  | { ok: false; reason: "too_large" | "unreadable" };
+
+/**
+ * 상한을 지키며 본문을 바이트로 읽는다.
+ *
+ * JSON 이 아닌 본문을 다루는 곳(공유 시트가 보내는 multipart)이 쓴다. 응답을
+ * 만들지 않고 이유만 돌려주는 이유는, 그런 곳은 JSON 오류 형식이 아니라 사람이
+ * 읽는 HTML 로 답해야 하기 때문이다.
+ */
+export async function readLimitedBody(
+  request: Request,
+  maxBytes: number = maxProxyBodyBytes(),
+): Promise<LimitedBodyResult> {
+  const declared = Number.parseInt(
+    request.headers.get("content-length") ?? "",
+    10,
+  );
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    // 한 바이트도 읽지 않고 끊는다.
+    return { ok: false, reason: "too_large" };
+  }
+
+  try {
+    return { ok: true, bytes: await readLimited(request, maxBytes) };
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) {
+      return { ok: false, reason: "too_large" };
+    }
+    return { ok: false, reason: "unreadable" };
+  }
+}
+
 /**
  * 프록시 라우트의 본문 읽기 진입점. 실패하면 그대로 돌려보낼 응답을 준다.
  * `rejectCrossSiteRequest` 와 같은 사용 방식이다.
@@ -54,27 +90,16 @@ export async function readJsonBody(
   request: Request,
   maxBytes: number = maxProxyBodyBytes(),
 ): Promise<JsonBodyResult> {
-  const declared = Number.parseInt(
-    request.headers.get("content-length") ?? "",
-    10,
-  );
-  if (Number.isFinite(declared) && declared > maxBytes) {
-    // 한 바이트도 읽지 않고 끊는다.
-    return { ok: false, response: tooLarge() };
-  }
-
-  let raw: string;
-  try {
-    raw = await readLimited(request, maxBytes);
-  } catch (error) {
-    if (error instanceof BodyTooLargeError) {
-      return { ok: false, response: tooLarge() };
-    }
-    return { ok: false, response: malformed() };
+  const body = await readLimitedBody(request, maxBytes);
+  if (!body.ok) {
+    return {
+      ok: false,
+      response: body.reason === "too_large" ? tooLarge() : malformed(),
+    };
   }
 
   try {
-    return { ok: true, value: JSON.parse(raw) };
+    return { ok: true, value: JSON.parse(new TextDecoder().decode(body.bytes)) };
   } catch {
     return { ok: false, response: malformed() };
   }
@@ -82,11 +107,14 @@ export async function readJsonBody(
 
 class BodyTooLargeError extends Error {}
 
-async function readLimited(request: Request, maxBytes: number): Promise<string> {
+async function readLimited(
+  request: Request,
+  maxBytes: number,
+): Promise<Uint8Array<ArrayBuffer>> {
   const stream = request.body;
   if (!stream) {
-    // 본문 없는 요청. 아래 JSON.parse 가 400 으로 처리한다.
-    return "";
+    // 본문 없는 요청. 호출자가 빈 본문으로 처리한다.
+    return new Uint8Array(0);
   }
 
   const reader = stream.getReader();
@@ -106,10 +134,10 @@ async function readLimited(request: Request, maxBytes: number): Promise<string> 
     await reader.cancel().catch(() => {});
   }
 
-  return new TextDecoder().decode(merge(chunks, received));
+  return merge(chunks, received);
 }
 
-function merge(chunks: Uint8Array[], total: number): Uint8Array {
+function merge(chunks: Uint8Array[], total: number): Uint8Array<ArrayBuffer> {
   const merged = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) {
