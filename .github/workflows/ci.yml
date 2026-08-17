@@ -71,11 +71,31 @@ jobs:
       - run: python -m pip install --require-hashes -r requirements.txt
       - run: python scripts/create_local_docker_secrets.py
       - run: docker compose config --quiet
-      - run: FINSHIELD_DOMAIN=finshield.example.com docker compose -f compose.yaml -f compose.https.yaml config --quiet
+      - run: >-
+          FINSHIELD_DOMAIN=finshield.example.com
+          FINSHIELD_ACME_EMAIL=ci@finshield.example.com
+          docker compose -f compose.yaml -f compose.https.yaml config --quiet
+      # 예행연습 override 도 함께 본다. 실제로 쓰는 날은 첫 발급 직전이고,
+      # 그때 오타가 나면 운영 발급 한도를 태우면서 알게 된다.
+      - run: >-
+          FINSHIELD_DOMAIN=finshield.example.com
+          FINSHIELD_ACME_EMAIL=ci@finshield.example.com
+          docker compose -f compose.yaml -f compose.https.yaml -f compose.acme-staging.yaml config --quiet
       - run: >-
           docker run --rm
           -e FINSHIELD_DOMAIN=finshield.example.com
+          -e FINSHIELD_ACME_EMAIL=ci@finshield.example.com
           -v "${{ github.workspace }}/deploy/Caddyfile:/etc/caddy/Caddyfile:ro"
+          caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+          caddy validate --config /etc/caddy/Caddyfile
+      # staging 파일이 mount 된 상태도 문법 검사를 받아야 한다. import glob 은
+      # 파일이 없으면 경고만 내고 넘어가므로, 위 검사는 이 파일을 보지 않는다.
+      - run: >-
+          docker run --rm
+          -e FINSHIELD_DOMAIN=finshield.example.com
+          -e FINSHIELD_ACME_EMAIL=ci@finshield.example.com
+          -v "${{ github.workspace }}/deploy/Caddyfile:/etc/caddy/Caddyfile:ro"
+          -v "${{ github.workspace }}/deploy/acme-staging.caddy:/etc/caddy/acme/staging.caddy:ro"
           caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
           caddy validate --config /etc/caddy/Caddyfile
       - run: docker compose build
