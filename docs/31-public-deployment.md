@@ -49,7 +49,7 @@ wrong argument count or unexpected line ending after 'email'
 
 ### 3-1. 서버와 DNS
 
-1. 80/443 을 인터넷에 열 수 있는 서버를 준비한다. ACME HTTP-01 검증이 80 을 쓴다.
+1. 80/443 을 인터넷에 열 수 있는 서버를 준비한다. ACME HTTP-01 검증이 80 을 쓴다. GCP 로 간다면 11절에 이 스택에 맞춘 설정이 있다.
 2. DNS 에 A 레코드(IPv6 가 있으면 AAAA 도)를 서버 주소로 건다.
 3. **전파를 확인한 다음에 스택을 올린다.** 순서를 바꾸면 0절의 두 번째 실패가 그대로 일어난다.
 
@@ -206,3 +206,94 @@ HTTPS 를 통째로 내리려면 `compose.https.yaml` 없이 올린다. 그러�
 - 외부 TLS 등급 측정(SSL Labs 등)은 공개된 도메인이 있어야 돌릴 수 있다.
 - 갱신 감시를 cron 이 아니라 알림으로 옮기는 것은 `docs/28` P1-1.
 - CAA 레코드는 발급자가 확정된 뒤에 건다. 지금 걸면 ZeroSSL 대체 발급 경로를 스스로 막는다.
+
+## 11. 부록 — GCP Compute Engine
+
+### 11-0. 왜 Compute Engine 인가
+
+| 후보 | 판단 |
+|---|---|
+| **Compute Engine VM** | 지금 스택 그대로 올라간다. `docker compose` + PostgreSQL 볼륨 + `./backups` bind mount + Caddy 인증서 볼륨이 전부 필요한데, 이걸 다 만족하는 가장 단순한 형태다 |
+| Cloud Run | 안 된다. 파일시스템이 요청 단위로 사라지고 상시 실행 루프(retention, backup)를 둘 수 없다. PostgreSQL 을 Cloud SQL 로 빼고 백업을 GCS 로 다시 짜야 한다 — 스택을 다시 만드는 일이다 |
+| GKE | 컨테이너 6개에 control plane 비용을 얹을 이유가 없다 |
+
+Cloud Run 으로 옮기는 것 자체는 나중에 검토할 수 있지만, **공개를 그 재작업 뒤로 미룰 이유는 없다.**
+
+### 11-1. 사양
+
+| 항목 | 값 | 이유 |
+|---|---|---|
+| 리전 | `asia-northeast3` (서울) | 사용자가 한국에 있다. us-central1 은 왕복이 150ms 대다 |
+| 머신 | `e2-medium` (2 vCPU, 4GB) | 상시 사용량은 800MB 남짓인데 **`docker compose build` 의 Next 빌드가 2GB 이상 쓴다.** 여기서 OOM 나면 빌드가 조용히 죽는다 |
+| 디스크 | `pd-balanced` 30GB | 기본 10GB 는 PostgreSQL + 이미지 4개 + 백업 7세대를 담기에 빠듯하다 |
+| OS | Debian 12 (bookworm) | Container-Optimized OS 는 루트가 읽기 전용이고 compose plugin 이 기본으로 없다. 이 스택은 `deploy/*.sh` 와 `./backups` 를 bind mount 한다 |
+| 외부 IP | **고정(static)** | 아래 참조 |
+
+**always-free 등급인 `e2-micro`(1GB)로는 안 된다.** 상시 실행은 아슬아슬하게 되더라도 Next 빌드에서 반드시 죽는다. 굳이 작은 머신을 쓰려면 이미지를 GitHub Actions 에서 빌드해 Artifact Registry 에 올리고 VM 은 pull 만 하게 해야 하는데, 그건 `docs/28` P1-3(배포·롤백) 작업이다.
+
+비용은 e2-medium + 30GB 기준 **월 3~4만원 선**이다. 신규 계정 $300 크레딧(90일)으로 충분히 덮인다. 정확한 값은 요금이 바뀌므로 Pricing Calculator 로 확인한다.
+
+### 11-2. 고정 IP를 먼저 잡는다
+
+기본값인 ephemeral IP 는 인스턴스를 정지했다 켜면 **바뀐다.** 그러면 DNS 가 죽은 주소를 가리키고, Caddy 는 계속 재시도하며, ACME 검증 실패가 0절의 시간당 5회 한도를 태운다. 도메인을 붙이기 전에 잡아 둔다.
+
+```bash
+gcloud config set project <PROJECT_ID>
+gcloud compute addresses create finshield-ip --region=asia-northeast3
+gcloud compute addresses describe finshield-ip --region=asia-northeast3 --format='value(address)'
+```
+
+인스턴스에 붙어 있고 실행 중이면 요금이 없다. 정지된 인스턴스에 붙어 있거나 아무 데도 안 붙어 있으면 과금되므로, 안 쓰게 되면 지운다.
+
+### 11-3. 인스턴스와 방화벽
+
+```bash
+gcloud compute instances create finshield \
+  --zone=asia-northeast3-a \
+  --machine-type=e2-medium \
+  --image-family=debian-12 --image-project=debian-cloud \
+  --boot-disk-size=30GB --boot-disk-type=pd-balanced \
+  --address=finshield-ip \
+  --tags=finshield-web
+```
+
+GCP 기본 VPC 는 **인그레스를 막는다.** `default-allow-http` / `default-allow-https` 규칙이 있긴 하지만 `http-server` / `https-server` 태그가 붙은 인스턴스에만 적용되고, **둘 다 TCP 만 연다.**
+
+```bash
+gcloud compute firewall-rules create finshield-web \
+  --allow=tcp:80,tcp:443,udp:443 \
+  --target-tags=finshield-web \
+  --description="Caddy HTTP/HTTPS + HTTP/3"
+```
+
+`udp:443` 을 빼먹기 쉽다. `compose.https.yaml` 이 `443:443/udp` 를 열고 Caddy 가 HTTP/3 리스너를 띄우는데, UDP 가 막혀 있으면 **브라우저가 HTTP/3 를 시도했다가 TCP 로 되돌아온다.** 겉으로는 동작해서 눈치채기 어렵고, 첫 접속마다 왕복이 한 번 더 붙는다.
+
+`gcloud compute ssh finshield --zone=asia-northeast3-a` 로 붙는다. 별도 키 설정은 필요 없다 — gcloud 가 OS Login 으로 처리한다.
+
+### 11-4. VM 안에서
+
+```bash
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
+sudo usermod -aG docker $USER && exec newgrp docker
+
+git clone https://github.com/mosejong/finshield-ai.git && cd finshield-ai
+python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.txt
+.venv/bin/python scripts/create_local_docker_secrets.py
+```
+
+이름은 `create_local_docker_secrets` 지만 생성값은 운영에 써도 되는 강도다(`token_urlsafe(32)`, `Fernet.generate_key()`). 이미 있는 파일은 절대 덮어쓰지 않는다.
+
+> **여기서 멈추고 `secrets/profile_encryption_keys.txt` 를 다른 곳에 복사한다.**
+> 프로필이 하나라도 저장된 뒤에 이 키를 잃으면 백업 7세대가 전부 열리지 않는 바이트열이 된다(`docs/29` 0절). 백업 파일과 **같은 곳에 두지 않는다** — 그러면 백업 하나 유출로 프로필이 통째로 열린다.
+
+그 다음 3절로 돌아간다. DNS A 레코드를 11-2 의 고정 IP 로 걸고, 전파를 확인하고, staging 예행연습부터 한다.
+
+### 11-5. GCP 라서 달라지는 것
+
+| 항목 | 내용 |
+|---|---|
+| 검증기 실행 위치 | VM 안에서 돌리면 안 된다(3-4절). 로컬 PC 에서 `--domain` 만 주고 돌린다. VM 안에서는 내부 포트가 열려 보이고 방화벽도 이미 통과한 뒤다 |
+| 백업이 같은 디스크 | `./backups` 는 부트 디스크 위에 있다. 디스크가 날아가면 DB 와 백업이 같이 날아간다. GCS 버킷 + VM 서비스 계정으로 반출하는 것이 자연스러운 다음 단계다 (`docs/28` P0-3 의 남은 항목). **암호화 키는 그 버킷에 넣지 않는다** |
+| 스냅샷 | 디스크 스냅샷 스케줄은 `pg_dump` 백업을 대체하지 않는다. 스냅샷은 실행 중인 PostgreSQL 의 순간 상태라 복구 시 복구 모드를 거치고, 무엇보다 **복호화되는지를 확인하지 않는다.** 둘 다 두되 합격 기준은 `docs/29` 를 따른다 |
+| Cloud DNS | 필수가 아니다. 등록기관 DNS 에 A 레코드만 걸면 된다. Cloud DNS 는 존당 월 요금이 붙는다 |
+| 요금 알림 | Billing 예산 알림을 걸어 둔다. 크레딧이 끝나는 시점을 모르고 지나가면 인스턴스가 정지되고, 그러면 고정 IP 에 과금이 시작된다 |
