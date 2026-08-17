@@ -190,6 +190,23 @@ services:
       retries: 3
       start_period: 30s
     <<: *runtime-security
+    # 이 컨테이너만 cap_drop: ALL 에서 하나를 되돌린다.
+    #
+    # 이 서비스는 root 로 돈다(postgres 이미지가 USER 를 지정하지 않는다).
+    # 그런데 root 의 "아무 파일이나 쓴다" 는 uid 0 이라서가 아니라
+    # CAP_DAC_OVERRIDE 때문이다. cap_drop: ALL 로 그걸 뺐으니, 호스트 사용자가
+    # 소유한 ./backups (0755) 에 대해서는 일반 사용자와 똑같은 검사를 받는다 -
+    # 읽고 들어갈 수는 있어도 파일을 만들 수는 없다.
+    #
+    # 리눅스 CI 에서 실제로 이렇게 깨졌다. 매 주기 pg_dump 가
+    # "could not open output file /backups/...: Permission denied" 로 실패했다.
+    # Windows/macOS 의 Docker Desktop 은 bind mount 권한을 흉내만 내기 때문에
+    # 로컬에서는 드러나지 않는다.
+    #
+    # uid 를 호스트에 맞추는 방법도 있지만, 그러면 배포하는 사람이 매번 uid 를
+    # 정확히 넘겨야 하고 안 넘기면 지금과 똑같이 조용히 실패한다.
+    cap_add:
+      - DAC_OVERRIDE
 
   web:
     build:

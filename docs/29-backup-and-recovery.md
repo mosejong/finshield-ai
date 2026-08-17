@@ -36,6 +36,14 @@ backend 이미지에 postgres client를 넣는 선택지도 있었다. 그러면
 
 이 컨테이너만 root로 돈다. postgres 이미지는 `USER`를 지정하지 않고, 여기에 uid를 강제하면 호스트 bind mount 소유권과 어긋나 백업이 조용히 실패한다. 대신 `cap_drop: ALL` / `no-new-privileges` / `read_only` / 포트 미개방으로 막았다. 하는 일은 `pg_dump` 호출 하나다.
 
+### 왜 `cap_add: DAC_OVERRIDE` 하나만 되돌렸는가
+
+root가 아무 파일이나 쓸 수 있는 것은 uid가 0이라서가 아니라 **`CAP_DAC_OVERRIDE`를 갖고 있어서**다. `cap_drop: ALL`이 그걸 빼면 root도 일반 권한 검사를 그대로 받는다. `./backups`는 배포하는 사람이 `git clone`한 디렉터리라 그 사람 소유(0755)이고, uid 0은 "others"에 걸려 **들어가고 읽을 수는 있어도 파일을 만들 수는 없다.**
+
+리눅스 CI에서 실제로 이렇게 깨졌다. 컨테이너는 `Up`인 채로 매 주기 `pg_dump: could not open output file ...: Permission denied`만 남겼다. Windows·macOS의 Docker Desktop은 bind mount 권한을 흉내만 내기 때문에 로컬에서는 드러나지 않는다.
+
+uid를 호스트에 맞추는 방법도 있지만, 그러면 배포할 때마다 정확한 uid를 넘겨야 하고 안 넘기면 지금과 똑같이 조용히 실패한다. 되돌린 능력은 이 하나뿐이고, `:ro` 마운트는 DAC가 아니라 마운트 플래그로 막히므로 영향받지 않는다.
+
 ### 왜 sh인가
 
 postgres 이미지에는 python이 없다. `apk`로 넣으면 해시 고정된 의존성 정책(`docs/28` P0-5)에 구멍이 난다. 그래서 루프는 `sh`로 최소한만 두고, **진짜 확인이 필요한 "복원과 복호화가 되는가"는 backend 이미지에서 python이 맡는다.**
@@ -58,6 +66,10 @@ DB 비밀번호는 `PGPASSWORD`로 넘기지 않는다. 환경변수는 `docker 
 호스트의 `./backups`를 컨테이너 `/backups`에 bind mount한다. `postgres-data` 볼륨 **밖**이므로 `docker compose down --volumes`나 볼륨 손상으로 백업이 함께 사라지지 않는다.
 
 파일명은 `finshield-<UTC>.dump` (예: `finshield-20260815T031500Z.dump`), 형식은 `pg_dump --format=custom`이다.
+
+호스트에서 이 파일들은 **root 소유 `0644`**로 보인다(컨테이너가 root로 만든다). 호스트 밖으로 복사하는 데는 `sudo`가 필요 없고, 지우거나 옮기는 데는 필요하다.
+
+기동할 때 루프가 이 디렉터리에 탐침 파일을 하나 만들어 보고 지운다. `[ -w ]`로는 확인이 안 되기 때문이다 — busybox의 `test`는 euid가 0이면 모드를 보지도 않고 참을 돌려준다. 못 쓰면 `{"status":"misconfigured","reason":"backup_dir_not_writable"}`을 남기고 **exit 2로 죽는다.**
 
 **아직 같은 호스트 안이다.** 호스트가 통째로 사라지면 백업도 같이 사라진다. 호스트 밖 반출은 5절에 남은 작업으로 적었다.
 
@@ -127,6 +139,7 @@ python scripts/rehearse_backup_restore.py --dump finshield-20260815T031500Z.dump
 | 세대 회전이 최신 N개만 남긴다 | `tests/test_backup_loop.py` |
 | 실패한 덤프가 멀쩡한 세대를 지우지 않는다 | 같은 파일 |
 | 마지막 **성공** 시각이 healthcheck에 반영된다 | 같은 파일 |
+| 쓸 수 없는 백업 디렉터리에서 루프가 **기동을 거부한다** | 같은 파일 (권한이 강제되는 POSIX 환경에서만) |
 | 복원된 행이 실제로 열린다 | `tests/test_backup_verification.py`, 리허설 |
 | 키를 잃은 백업이 **실패로 나온다** | `tests/test_backup_verification.py` |
 
@@ -152,3 +165,17 @@ SELECT position('2800000' in encode(encrypted_profile, 'escape')) = 0 FROM finan
 - 행이 0건이면 실패다. 스키마만 돌아온 복원은 복구 가능성에 대해 아무것도 증명하지 않는다
 
 표본만 열어보지 않고 전체를 훑는 것도 같은 이유다. 키 로테이션 중이면 특정 세대 키로 쓰인 행만 안 열리는 상황이 실제로 생긴다.
+
+### 같은 함정을 사전 점검에서 한 번 더 밟았다
+
+루프 기동부에 이 줄이 있었다.
+
+```sh
+[ -w "$BACKUP_DIR" ] || fail_config "backup_dir_not_writable"
+```
+
+읽으면 "쓸 수 있는지 확인한다"로 읽힌다. 실제로는 busybox의 `test`가 euid 0을 특별 취급해 모드를 보지도 않고 참을 돌려주므로, 이 컨테이너에서는 **어떤 경우에도 실패할 수 없는 검사**였다. 그래서 권한이 없는 상태로 루프가 정상 기동했고, 고장은 매 주기 `pg_dump` 실패로만 나타났다.
+
+지금은 실제로 파일을 하나 만들어 보고 지운다. 판정 방법을 `pg_dump`가 할 일과 같은 동작으로 맞춘 것이다.
+
+두 사례의 공통점은 "검사가 없었다"가 아니라 **"검사가 있었는데 통과가 아무것도 증명하지 않았다"**는 것이다. 검사를 추가할 때는 그 검사가 어떤 입력에서 실패하는지를 함께 적는다.

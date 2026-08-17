@@ -54,7 +54,20 @@ if [ "$KEEP" -lt 1 ] || [ "$KEEP" -gt "$MAX_KEEP" ]; then
 fi
 [ -r "$PASSWORD_FILE" ] || fail_config "password_file_unreadable"
 mkdir -p "$BACKUP_DIR" || fail_config "backup_dir_not_writable"
-[ -w "$BACKUP_DIR" ] || fail_config "backup_dir_not_writable"
+
+# 여기에 `[ -w "$BACKUP_DIR" ]` 를 쓰면 안 된다. busybox 의 test 는 euid 가 0
+# 이면 모드를 보지도 않고 "root 는 뭐든 읽고 쓸 수 있다" 며 참을 돌려준다.
+# 이 컨테이너는 root 지만 cap_drop: ALL 로 CAP_DAC_OVERRIDE 가 없어서, 호스트
+# 사용자가 소유한 bind mount 에는 실제로 파일을 못 만든다. 그래서 이 검사는
+# 통과해 놓고 pg_dump 만 매 주기 "Permission denied" 로 실패했다 - 절대 실패할
+# 수 없는 검사가 고장을 세 시간이든 며칠이든 가려주는, 이 저장소가 반복해서
+# 겪은 그 형태다.
+#
+# 판정은 실제로 하나 만들어 보고 내린다. pg_dump 가 할 일과 같은 동작이다.
+probe="$BACKUP_DIR/.finshield-write-probe.$$"
+rm -f -- "$probe"
+touch "$probe" 2>/dev/null || fail_config "backup_dir_not_writable"
+rm -f -- "$probe"
 
 # 비밀번호를 환경변수(PGPASSWORD)로 넘기지 않는다. 환경변수는 `docker inspect`
 # 와 자식 프로세스 전체에 그대로 노출된다. pgpass 파일은 tmpfs 에만 두고

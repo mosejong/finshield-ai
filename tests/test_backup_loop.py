@@ -40,6 +40,25 @@ def _locate_shell() -> str | None:
 SHELL = _locate_shell()
 requires_shell = pytest.mark.skipif(SHELL is None, reason="POSIX sh is unavailable")
 
+
+def _can_deny_directory_writes() -> bool:
+    """디렉터리 쓰기 권한을 실제로 뺏을 수 있는 환경인가.
+
+    Windows 에서 `chmod 0o555` 는 디렉터리에 파일을 만드는 것을 막지 못하고,
+    root 로 돌리면 CAP_DAC_OVERRIDE 가 모드를 무시한다. 둘 중 하나라도
+    해당되면 검사 자체가 통과할 수밖에 없으므로 skip 한다 - 이 파일이 잡으려는
+    것이 바로 "실패할 수 없는 검사" 다.
+    """
+    if os.name == "nt":
+        return False
+    return os.geteuid() != 0
+
+
+requires_enforced_permissions = pytest.mark.skipif(
+    not _can_deny_directory_writes(),
+    reason="이 환경에서는 디렉터리 쓰기 권한을 실제로 뺏을 수 없다",
+)
+
 FAKE_DUMP = """#!/bin/sh
 target=""
 for arg in "$@"; do
@@ -274,6 +293,51 @@ def test_an_unreadable_password_file_stops_the_loop(harness: BackupHarness) -> N
 
     assert result.returncode == 2
     assert '"reason":"password_file_unreadable"' in result.stdout
+
+
+@requires_shell
+def test_a_backup_dir_that_is_not_a_directory_stops_the_loop(harness: BackupHarness) -> None:
+    occupied = harness.root / "occupied"
+    occupied.write_text("not a directory", encoding="utf-8")
+
+    result = harness.run("--once", FINSHIELD_BACKUP_DIR=occupied.as_posix())
+
+    assert result.returncode == 2
+    assert '"reason":"backup_dir_not_writable"' in result.stdout
+
+
+@requires_shell
+@requires_enforced_permissions
+def test_an_unwritable_backup_dir_stops_the_loop(harness: BackupHarness) -> None:
+    """`[ -w ]` 로는 이 상황이 잡히지 않는다.
+
+    busybox 의 test 는 euid 가 0 이면 모드를 보지도 않고 "root 는 뭐든 쓸 수
+    있다" 며 참을 돌려준다. 컨테이너는 root 로 돌지만 `cap_drop: ALL` 로
+    CAP_DAC_OVERRIDE 가 없어서 실제로는 못 쓴다. 그래서 사전 점검은 통과하고
+    매 주기 pg_dump 만 "Permission denied" 로 실패했다 (리눅스 CI 에서 확인).
+
+    판정은 실제로 파일을 하나 만들어 보고 내려야 한다.
+    """
+    harness.backups.chmod(0o555)
+    try:
+        result = harness.run("--once")
+    finally:
+        # 실패해도 tmp_path 정리가 되도록 되돌린다.
+        harness.backups.chmod(0o755)
+
+    assert result.returncode == 2
+    assert '"reason":"backup_dir_not_writable"' in result.stdout
+    assert harness.dumps() == []
+
+
+@requires_shell
+def test_the_write_probe_leaves_nothing_behind(harness: BackupHarness) -> None:
+    """탐침 파일이 남으면 세대 수 계산과 회전에 끼어든다."""
+    harness.run("--once")
+
+    leftovers = sorted(path.name for path in harness.backups.iterdir())
+    assert len(leftovers) == 1
+    assert leftovers[0].startswith("finshield-")
 
 
 @requires_shell

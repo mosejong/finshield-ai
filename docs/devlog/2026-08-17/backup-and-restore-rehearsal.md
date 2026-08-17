@@ -186,6 +186,51 @@ CI는 이를 위해 `FINSHIELD_BACKUP_INTERVAL_SECONDS=60`으로 스택을 띄�
 그 뒤 secrets가 재생성됐다. 볼륨에 사용자 데이터가 0건인 것을 확인한 뒤 볼륨을 지우는 대신
 `ALTER ROLE`로 비밀번호만 맞췄다.
 
+## 후속 — 리눅스 CI에서 처음 드러난 것: root인데 쓸 수 없었다
+
+이 브랜치를 처음 push했을 때 `container-runtime` 잡이 이렇게 죽었다.
+
+```
+RuntimeError: backup service did not produce a dump within its interval
+```
+
+컨테이너 로그를 보니 원인은 분명했다.
+
+```
+pg_dump: error: could not open output file "/backups/finshield-...dump.tmp": Permission denied
+{"event":"backup_run","status":"failed","stage":"dump"}
+```
+
+**root로 도는 컨테이너가 파일을 못 만들었다.** root의 그 능력은 uid 0이 아니라 `CAP_DAC_OVERRIDE`에서 나오는데, 위에서 자랑스럽게 붙인 `cap_drop: ALL`이 그걸 뺐다. `./backups`는 CI runner(uid 1001) 소유 `0755`라 uid 0은 "others"에 걸린다.
+
+같은 이미지로 재현했다. `chown 1001:1001` 한 디렉터리에 `--cap-drop=ALL`로 붙어서:
+
+```
+uid=0(root) gid=0(root)
+TEST_W_SAYS_WRITABLE
+REAL_WRITE_DENIED
+```
+
+윗줄이 두 번째 발견이다. 루프 기동부의 `[ -w "$BACKUP_DIR" ]`는 **통과했다.** busybox의 `test`는 euid가 0이면 모드를 보지 않고 "root는 뭐든 읽고 쓸 수 있다"며 참을 돌려준다. 이 컨테이너에서 그 줄은 어떤 입력에서도 실패할 수 없는 검사였고, 그래서 설정 오류가 `misconfigured` exit 2(즉시, 눈에 띄게)가 아니라 3분 넘게 이어지는 주기 실패로 나타났다. 이 문서 위쪽에서 SQL 검사를 두고 쓴 것과 **정확히 같은 형태**다.
+
+Windows·macOS Docker Desktop은 bind mount 권한을 흉내만 내기 때문에 로컬 실기동에서는 통과했다. 이 브랜치의 P0-3 커밋들이 push된 적이 없어 CI에서 리눅스로 처음 돈 것이 이번이었다.
+
+고친 것은 둘이다.
+
+| 무엇 | 어떻게 |
+|---|---|
+| 실제 권한 | `backup` 서비스에만 `cap_add: DAC_OVERRIDE`. uid를 호스트에 맞추는 방법은 배포할 때마다 정확히 넘겨야 하고, 안 넘기면 지금과 똑같이 조용히 실패한다 |
+| 거짓말하는 점검 | `[ -w ]` 대신 탐침 파일을 실제로 만들고 지운다. `pg_dump`가 할 일과 같은 동작 |
+
+같은 이미지에서 고친 스크립트로 다시 확인했다.
+
+| 조건 | 결과 |
+|---|---|
+| `--cap-drop=ALL`, 남의 소유 디렉터리 | `{"status":"misconfigured","reason":"backup_dir_not_writable"}`, exit 2 |
+| `--cap-drop=ALL --cap-add=DAC_OVERRIDE` | 점검 통과 후 `pg_dump`까지 진행(DB 없는 임시 컨테이너라 연결 실패), 탐침 파일 잔여 없음 |
+
+회귀 테스트 3개를 `tests/test_backup_loop.py`에 넣었다. 디렉터리 자리에 일반 파일이 있는 경우는 어디서나 돌고, 모드를 실제로 뺏는 경우는 권한이 강제되는 POSIX 환경에서만 돈다 — Windows나 root로 돌리면 그 테스트 자체가 실패할 수 없는 검사가 되므로 통과시키는 대신 skip한다.
+
 ## 남은 것
 
 **백업이 아직 같은 호스트 안이다.** `./backups`는 `postgres-data` 볼륨 밖이라 볼륨 손상이나
