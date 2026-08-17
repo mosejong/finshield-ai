@@ -82,14 +82,19 @@ jobs:
       # APP_ENV 가 development 라 rate limit 은 기본으로 꺼져 있다. 이 job 은
       # 컨테이너에서 429 가 실제로 나오는지를 확인하는 자리이므로 켜서 띄운다.
       #
-      # 정리 주기는 기본 1시간이다. 그대로 두면 "스케줄에 따라 실제로 지워진다"
-      # 를 CI 시간 안에 확인할 수 없어 60초로 줄인다.
+      # 정리 주기는 기본 1시간, 백업 주기는 기본 하루다. 그대로 두면 "스케줄에
+      # 따라 실제로 지워진다 / 실제로 백업이 남는다" 를 CI 시간 안에 확인할 수
+      # 없어 각각 60초로 줄인다.
       - run: >-
           FINSHIELD_RATE_LIMIT_ENABLED=1
           FINSHIELD_RETENTION_INTERVAL_SECONDS=60
+          FINSHIELD_BACKUP_INTERVAL_SECONDS=60
           docker compose up --detach
       # 스크립트도 같은 주기를 알아야 얼마나 기다릴지 정할 수 있다.
-      - run: FINSHIELD_RETENTION_INTERVAL_SECONDS=60 python scripts/verify_compose_runtime.py
+      - run: >-
+          FINSHIELD_RETENTION_INTERVAL_SECONDS=60
+          FINSHIELD_BACKUP_INTERVAL_SECONDS=60
+          python scripts/verify_compose_runtime.py
       - if: always()
         run: docker compose ps && docker compose logs --no-color --tail=200
       - if: always()

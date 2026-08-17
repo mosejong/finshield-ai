@@ -4,15 +4,13 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BACKUP_DIR = (ROOT / "backups").resolve()
-BACKUP_PATH = (BACKUP_DIR / "runtime-verify.dump").resolve()
-RESTORE_DATABASE = "finshield_restore_verify"
 BACKEND_URL = f"http://127.0.0.1:{os.getenv('BACKEND_PORT', '18000')}"
 WEB_URL = f"http://127.0.0.1:{os.getenv('WEB_PORT', '13000')}"
 
@@ -26,6 +24,12 @@ BUCKET_KEY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 # 한 주기를 기다려야 한다. 기본 3600초로는 검증이 끝나지 않는다.
 RETENTION_INTERVAL = int(os.getenv("FINSHIELD_RETENTION_INTERVAL_SECONDS", "3600"))
 MAX_VERIFIABLE_RETENTION_INTERVAL = 120
+
+# 백업도 같다. 여기서 확인할 것은 "pg_dump 를 부를 수 있다" 가 아니라
+# "backup 서비스가 제 주기에 파일을 남겼다" 이다. 기본 하루로는 못 기다린다.
+BACKUP_INTERVAL = int(os.getenv("FINSHIELD_BACKUP_INTERVAL_SECONDS", "86400"))
+MAX_VERIFIABLE_BACKUP_INTERVAL = 120
+DUMP_NAME_PATTERN = re.compile(r"^finshield-(\d{8}T\d{6}Z)\.dump$")
 
 PROFILE = {
     "ageBand": "20_29",
@@ -93,6 +97,10 @@ def request_json(
 
 def db_shell(command: str, *, capture: bool = False) -> str:
     return compose("exec", "-T", "db", "sh", "-ec", command, capture=capture)
+
+
+def backup_shell(command: str, *, capture: bool = False) -> str:
+    return compose("exec", "-T", "backup", "sh", "-ec", command, capture=capture)
 
 
 def backend_post(path: str, payload: bytes) -> tuple[int, str | None]:
@@ -237,17 +245,93 @@ def verify_retention_schedule(
     return {"deleted_within_interval_seconds": RETENTION_INTERVAL, "healthy": True}
 
 
+def newest_dump() -> str:
+    listing = backup_shell(
+        "ls -1t /backups/finshield-*.dump 2>/dev/null || true", capture=True
+    )
+    names = [line.strip().rsplit("/", 1)[-1] for line in listing.splitlines() if line.strip()]
+    return names[0] if names else ""
+
+
+def verify_backup_schedule(profile_id: str) -> dict[str, object]:
+    """스케줄이 실제로 백업을 남기고, 그 백업에서 프로필이 열리는지 본다.
+
+    이전 버전은 여기서 직접 `pg_dump` 를 부르고, 복원된 행에 알려진 금융 값이
+    평문으로 보이지 않는지만 확인했다. 두 가지가 틀렸다.
+
+    1. 검증 스크립트가 부르는 dump 는 운영 백업이 아니다. 백업 스케줄이 아예
+       없어도 이 검사는 통과했다 (P0-2 에서 정리 스케줄에 대해 겪은 것과 같다).
+    2. "평문이 안 보인다" 는 무작위 바이트열도 통과한다. 키를 잃은 백업이
+       초록불로 나온다. 합격 기준은 **복호화까지** 가야 한다.
+
+    그래서 여기서는 아무것도 직접 뜨지 않고, backup 컨테이너가 제 주기에 남긴
+    최신 파일을 기다린 다음 복원 리허설에 넘긴다.
+    """
+    if BACKUP_INTERVAL > MAX_VERIFIABLE_BACKUP_INTERVAL:
+        raise RuntimeError(
+            "FINSHIELD_BACKUP_INTERVAL_SECONDS must be at most "
+            f"{MAX_VERIFIABLE_BACKUP_INTERVAL} for this run; got {BACKUP_INTERVAL}"
+        )
+
+    # 기준 시각을 컨테이너 시계로 잡는다. 이 시점 이후에 생긴 파일이라야
+    # 방금 만든 프로필이 그 안에 들어 있다. 기동 직후의 빈 백업으로 통과하는
+    # 것을 막는 것도 같은 조건이다.
+    marker = backup_shell("date -u +%Y%m%dT%H%M%SZ", capture=True)
+
+    deadline = time.monotonic() + BACKUP_INTERVAL * 2 + 60
+    while time.monotonic() < deadline:
+        candidate = newest_dump()
+        matched = DUMP_NAME_PATTERN.match(candidate) if candidate else None
+        if matched and matched.group(1) >= marker:
+            break
+        time.sleep(2)
+    else:
+        raise RuntimeError("backup service did not produce a dump within its interval")
+
+    health = compose("ps", "--format", "{{.Service}}|{{.Health}}", capture=True)
+    if "backup|healthy" not in health:
+        raise RuntimeError(f"backup container did not report healthy: {health}")
+
+    logs = compose("logs", "--no-color", "backup", capture=True)
+    if '"status":"succeeded"' not in logs:
+        raise RuntimeError("backup did not emit a structured success log")
+    for secret in ("2800000", profile_id):
+        if secret in logs:
+            raise RuntimeError("backup logs exposed runtime verification personal data")
+
+    # 리허설이 임시 DB 생성·복원·복호화·정리를 전부 맡는다. 여기서 다시
+    # 구현하면 운영에서 쓰는 절차와 CI 에서 검증하는 절차가 갈라진다.
+    rehearsal = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "rehearse_backup_restore.py"), "--dump", candidate],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if rehearsal.returncode != 0:
+        raise RuntimeError(
+            f"restore rehearsal failed: {rehearsal.stdout.strip()} {rehearsal.stderr.strip()}"
+        )
+
+    report = json.loads(rehearsal.stdout.strip().splitlines()[-1])
+    if not report.get("recoverable"):
+        raise RuntimeError(f"restored profiles could not be decrypted: {report}")
+    if report.get("decrypted") != 1:
+        raise RuntimeError(f"rehearsal decrypted an unexpected number of profiles: {report}")
+
+    return {
+        "dump": candidate,
+        "decrypted": report["decrypted"],
+        "healthy": True,
+        "scheduled_within_interval_seconds": BACKUP_INTERVAL,
+    }
+
+
 def main() -> int:
-    if BACKUP_PATH.parent != BACKUP_DIR:
-        raise RuntimeError("backup target escaped the repository backup directory")
-    if BACKUP_PATH.exists():
-        raise RuntimeError("runtime verification backup already exists; refusing overwrite")
-    BACKUP_DIR.mkdir(exist_ok=True)
     cookie_jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(
         urllib.request.HTTPCookieProcessor(cookie_jar)
     )
-    restore_created = False
     session_created = False
     account_deleted = False
 
@@ -262,15 +346,6 @@ def main() -> int:
         if initial_counts != "0|0|0":
             raise RuntimeError(
                 "runtime verification requires an empty database and will not delete existing data"
-            )
-        restore_exists = db_shell(
-            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc '
-            f'"SELECT count(*) FROM pg_database WHERE datname = \'{RESTORE_DATABASE}\'"',
-            capture=True,
-        )
-        if restore_exists != "0":
-            raise RuntimeError(
-                "restore verification database already exists; refusing destructive reuse"
             )
 
         wait_for(f"{BACKEND_URL}/health")
@@ -300,31 +375,7 @@ def main() -> int:
         if status != 200 or not restored_resource:
             raise RuntimeError("profile did not survive backend restart")
 
-        db_shell(
-            'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" '
-            "--format=custom --file=/backups/runtime-verify.dump"
-        )
-        db_shell(f'createdb -U "$POSTGRES_USER" {RESTORE_DATABASE}')
-        restore_created = True
-        db_shell(
-            f'pg_restore -U "$POSTGRES_USER" -d {RESTORE_DATABASE} '
-            "/backups/runtime-verify.dump"
-        )
-        restored_count = db_shell(
-            f'psql -U "$POSTGRES_USER" -d {RESTORE_DATABASE} -Atc '
-            "'SELECT count(*) FROM financial_profiles'",
-            capture=True,
-        )
-        if restored_count != "1":
-            raise RuntimeError("restored database did not contain the encrypted profile")
-        plaintext_absent = db_shell(
-            f'psql -U "$POSTGRES_USER" -d {RESTORE_DATABASE} -Atc '
-            '"SELECT position(\'2800000\' in encode(encrypted_profile, \'escape\')) = 0 '
-            'FROM financial_profiles"',
-            capture=True,
-        )
-        if plaintext_absent != "t":
-            raise RuntimeError("backup unexpectedly exposed a known financial value")
+        backup = verify_backup_schedule(profile_id)
 
         backend_logs = compose("logs", "--no-color", "backend", capture=True)
         for secret in ("2800000", profile_id, session_tokens[0]):
@@ -363,8 +414,7 @@ def main() -> int:
             json.dumps(
                 {
                     "backend_restart_persistence": True,
-                    "backup_restore": True,
-                    "encrypted_backup_plaintext_absent": True,
+                    "backup_schedule": backup,
                     "logs_exclude_profile_and_session_values": True,
                     "structured_request_logs": True,
                     "account_delete_counts": counts,
@@ -385,15 +435,9 @@ def main() -> int:
                 request_json(opener, "DELETE", "/api/proxy/auth/account")
             except (OSError, urllib.error.URLError):
                 pass
-        if restore_created:
-            try:
-                db_shell(
-                    f'dropdb -U "$POSTGRES_USER" --if-exists {RESTORE_DATABASE}'
-                )
-            except (OSError, subprocess.SubprocessError):
-                pass
-        if BACKUP_PATH.exists():
-            BACKUP_PATH.unlink()
+        # 임시 복원 DB 는 리허설 스크립트가 자기 finally 에서 정리한다.
+        # 백업 파일은 지우지 않는다. 검증이 남긴 산출물이 아니라 backup
+        # 서비스가 제 주기에 만든 것이고, 세대 회전이 알아서 걷어간다.
 
 
 if __name__ == "__main__":
