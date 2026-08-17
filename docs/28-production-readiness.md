@@ -13,7 +13,8 @@
 | 컨테이너 이미지 | base 이미지 digest 고정, non-root uid 10001, `read_only`, `cap_drop: ALL`, `no-new-privileges` | `Dockerfile`, `web/Dockerfile`, `compose.yaml` |
 | 파이썬 의존성 | 해시 고정 universal lock, 런타임·개발 분리, CI가 lock 드리프트 차단 | `requirements.in`, `requirements.txt`, `.github/workflows/ci.yml` (2절 P0-5) |
 | 프로세스 경계 | db / migration / backend / web 분리, 내부 포트 loopback 전용, healthcheck 기반 기동 순서 | `compose.yaml` |
-| HTTPS 진입점 | Caddy 자동 인증서, HTTP→HTTPS, HSTS, `FINSHIELD_DOMAIN` 필수 | `compose.https.yaml`, `deploy/Caddyfile`, `docs/26` |
+| HTTPS 진입점 | Caddy 자동 인증서, HTTP→HTTPS, HSTS, `FINSHIELD_DOMAIN`·`FINSHIELD_ACME_EMAIL` 필수, SNI healthcheck | `compose.https.yaml`, `deploy/Caddyfile`, `docs/26` |
+| 공개 배포 절차 | ACME staging 예행연습 경로, 외부 검증기(리다이렉트·HSTS·헤더·인증서 만료·내부 포트), 갱신 감시 cron | `deploy/acme-staging.caddy`, `scripts/verify_public_deployment.py`, `docs/31` (2절 P0-4) |
 | 비밀값 관리 | `*_FILE` 우선 조회 + Docker file secrets. 이미지·환경변수·저장소에 값이 남지 않음 | `app/core/runtime_secrets.py` |
 | 저장 데이터 보호 | FinancialProfile 애플리케이션 레벨 암호화, 키 로테이션 경로 | `app/security/profile_encryption.py`, `adr/0002` |
 | 로그 개인정보 | 로그 필드 allowlist 고정. 쿼리·본문·경로 파라미터가 구조적으로 로그에 없음 | `app/core/observability.py`, `tests/test_observability.py` |
@@ -205,7 +206,7 @@ SELECT position('2800000' in encode(encrypted_profile, 'escape')) = 0 FROM finan
 
 남은 것 두 가지. **(1) 백업이 아직 같은 호스트 안이다.** `./backups`는 `postgres-data` 볼륨 밖이라 볼륨 손상에는 안전하지만 호스트가 통째로 사라지면 같이 사라진다. 호스트 밖 반출은 P0-4 이후 작업이다. **(2) 암호화 키 보관은 사람이 하는 절차이고 자동 점검이 없다.** 리허설이 통과하는 이유는 지금 이 호스트에 키가 있기 때문이지 키가 안전하게 보관돼 있기 때문이 아니다. 키를 덤프와 같은 곳에 두면 백업 하나 유출로 프로필이 통째로 열리므로, 자동화 대신 `docs/29` 0절에 절차로 적었다.
 
-### P0-4. 실도메인·DNS·TLS 실환경 검증
+### P0-4. 실도메인·DNS·TLS 실환경 검증 — 도메인 없는 부분 완료 (2026-08-17)
 
 `docs/devlog/2026-08-13/`가 명시한 미완료 항목이다. Caddy 설정과 compose는 검증됐지만 실제 도메인·DNS·인증서 발급은 한 번도 돌지 않았다. 자동 인증서는 DNS가 실제로 가리키기 전에는 검증할 수 없다.
 
@@ -213,6 +214,24 @@ SELECT position('2800000' in encode(encrypted_profile, 'escape')) = 0 FROM finan
 - 외부에서 HTTP→HTTPS 리다이렉트, HSTS, TLS 등급 측정
 - 인증서 갱신 실패 시 알림 경로 (갱신은 60일 뒤에 조용히 실패한다)
 - 완료 기준: 외부 네트워크에서 실제 도메인으로 전 주요 화면 동작
+
+#### 도메인 없이 끝낸 것 (2026-08-17)
+
+도메인은 사용자가 정해야 하지만, **도메인이 정해진 날 무엇을 어떻게 하고 무엇으로 확인할지**는 미리 만들 수 있다. 절차 전체는 `31-public-deployment.md`.
+
+| 부분 | 파일 | 왜 지금 하는가 |
+|---|---|---|
+| ACME 연락처 필수화 | `deploy/Caddyfile`, `compose.https.yaml` | 갱신 실패를 알려 줄 유일한 통로다. 선택값으로 두면 아무도 안 보는 주소로 배포가 성공한다. 비면 Caddy가 기동을 거부하는 것까지 확인했다 |
+| staging 예행연습 경로 | `deploy/acme-staging.caddy`, `compose.acme-staging.yaml` | Let's Encrypt 운영 한도(검증 실패 5회/시간, 중복 인증서 5장/주)는 **한도를 태운 뒤에** 알게 된다. 첫 발급 당일에 만들 수 있는 물건이 아니다 |
+| proxy healthcheck | `compose.https.yaml` | 실제 SNI로 자기 자신에 붙는다. "프로세스는 살아 있는데 발급에 실패한" 상태를 healthy로 보고하지 않는다 |
+| 외부 검증기 | `scripts/verify_public_deployment.py` | 완료 기준을 문장이 아니라 종료코드로 만든다 |
+| 판정 기준 | `app/core/public_deployment.py`, `tests/test_public_deployment.py` | 판정을 순수 함수로 빼서 네트워크 없이 기준 자체를 테스트한다 (P0-3의 교훈) |
+
+`acme_ca`를 기본값으로 박지 않은 것이 이 설계의 핵심이다. 명시하면 기본 발급자 **두 개(Let's Encrypt + ZeroSSL 대체)가 모두 그 하나로 대체된다.** adapt 결과로 확인했다. 그래서 staging은 환경변수가 아니라 mount되는 파일이고, 연습 중이라는 사실이 `-f` 하나의 존재로 드러난다.
+
+localhost 예행연습(Caddy 내부 CA, ACME 무관) 실측: 27개 검사 중 4개 실패, 그 4개는 전부 예행연습 고유 항목(12시간짜리 내부 인증서 1개 + 로컬 개발용으로 publish된 내부 포트 3개)이었다. 리다이렉트·HSTS·보안 헤더·주요 화면 9개·PWA 3종·공유 시트 왕복은 전부 통과했다. 액세스 로그가 요청 경로를 남기지 않는 것도 같은 실행에서 확인했다(`adr/0004`).
+
+남은 것: **도메인과 서버.** 3절 전체와 `certificate_trusted` 실측, 외부 TLS 등급 측정이 여기 묶여 있다.
 
 ### P0-5. 파이썬 의존성 잠금 — 완료 (2026-08-14)
 
@@ -355,11 +374,13 @@ Capacitor로 감싸는 선택지는 스토어 등록이 실제로 필요해질 �
 3. P0-2 만료 데이터 정리 자동화   ← 완료 (2026-08-15)
 4. P0-3 백업 자동화 + 복원 리허설   ← 완료 (2026-08-17)
 5. PWA (manifest + share_target)  ← 완료 (2026-08-17)
-6. P0-4 실도메인·DNS·TLS   ← 다음, 공개 배포
+6. P0-4 실도메인·DNS·TLS   ← 준비 완료 (2026-08-17), 도메인·서버 대기
 7. P1-1 알림 → P1-5 의존성 상승 관측 → P1-3 배포·롤백 → P1-2 audit log → P1-4 CSP
 8. P2-1 평가 하네스 → P2-2 LLM 계층
 ```
 
 P0-5를 맨 앞에 둔 이유는 의존성이 고정돼야 이후 rate limit·백업 검증 결과가 재현되기 때문이다. P0-4를 마지막에 두는 이유는 공개 노출이 되돌리기 가장 어려운 단계라서다.
+
+6번은 코드·구성·검증기가 모두 준비됐고 `localhost` 예행연습까지 끝났다(`31-public-deployment.md`). **막힌 것은 도메인과 서버 하나뿐이다.** 정해지는 대로 31 문서 3절을 그대로 따라가면 되고, 그 사이에는 7번을 먼저 진행해도 순서가 어긋나지 않는다 — P1-1 알림이 먼저 붙으면 인증서 갱신 감시를 cron 대신 알림으로 시작할 수 있다.
 
 대회 일정이 공개 URL보다 우선한다면 P2-1(평가 하네스)을 P0-1 다음으로 올린다. Rule-only 베이스라인 측정은 배포 상태와 무관하게 지금 바로 가능하다.

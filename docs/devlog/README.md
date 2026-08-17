@@ -65,6 +65,7 @@
 
 - `backup-and-restore-rehearsal.md` — 백업 주기 실행·세대 회전·복호화까지 확인하는 복원 리허설
 - `pwa-share-target.md` — PWA manifest·POST 공유 시트 인계·오프라인 셸·설치 유도
+- `public-deployment-tls.md` — ACME 연락처 필수화·staging 예행연습 경로·외부 공개 배포 검증기
 
 ## 작성 규칙
 
