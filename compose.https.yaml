@@ -24,9 +24,33 @@ services:
     restart: unless-stopped
     environment:
       FINSHIELD_DOMAIN: ${FINSHIELD_DOMAIN:?FINSHIELD_DOMAIN is required}
+      # 발급기관이 만료 임박을 알릴 수 있는 유일한 통로다. 없이 올리는 것을
+      # 막으려고 필수로 둔다 (deploy/Caddyfile).
+      FINSHIELD_ACME_EMAIL: ${FINSHIELD_ACME_EMAIL:?FINSHIELD_ACME_EMAIL is required}
     depends_on:
       web:
         condition: service_healthy
+    # 실제 SNI 로 자기 자신에게 붙어 본다. 인증서가 없으면 handshake 가 실패하므로
+    # "Caddy 프로세스는 살아 있는데 인증서 발급에 실패한" 상태가 healthy 로 보이지
+    # 않는다. 만료까지 잡지는 못한다 - `-k` 로 검증을 건너뛰기 때문이고, 만료는
+    # `python -m scripts.verify_public_deployment --certificate-only` 가 본다.
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsk
+        - --max-time
+        - "5"
+        - --resolve
+        - ${FINSHIELD_DOMAIN:?FINSHIELD_DOMAIN is required}:443:127.0.0.1
+        - -o
+        - /dev/null
+        - https://${FINSHIELD_DOMAIN:?FINSHIELD_DOMAIN is required}/
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      # 첫 인증서 발급은 DNS 전파와 ACME 검증을 기다린다.
+      start_period: 120s
     ports:
       - "80:80"
       - "443:443"

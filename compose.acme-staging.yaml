@@ -1,0 +1,11 @@
+# 첫 발급 연습용 override. compose.https.yaml 뒤에 얹어서 쓴다.
+#
+#   docker compose -f compose.yaml -f compose.https.yaml -f compose.acme-staging.yaml up -d
+#
+# 왜 별도 파일인가. 기본 경로에 staging 을 섞어 두면 "연습 중"인지 "운영 중"인지가
+# 환경변수 하나에 숨는다. 브라우저가 믿지 않는 인증서로 공개돼 있는 상태를
+# 파일 하나의 존재로 드러나게 한다. 이유는 deploy/acme-staging.caddy 에 적었다.
+services:
+  proxy:
+    volumes:
+      - ./deploy/acme-staging.caddy:/etc/caddy/acme/staging.caddy:ro
