@@ -20,6 +20,7 @@
 | HTTP 보안 경계 | 보안 헤더, same-origin 상태 변경 보호, trusted host | `app/core/http_security.py`, `docs/26` |
 | 요청 한도·본문 크기 | IP 기준 rate limit(429 + `Retry-After`), 파싱 이전 본문 상한, 카운터는 HMAC 버킷으로 PostgreSQL 저장 | `app/core/rate_limit.py`, `app/core/request_limits.py`, `web/lib/api/request-body.ts` (2절 P0-1) |
 | 만료 데이터 정리 | 전용 컨테이너가 주기 실행. 성공 시각 heartbeat 기반 healthcheck, 로그는 건수·성공 여부만 | `app/services/data_retention.py`, `scripts/run_retention_scheduler.py`, `compose.yaml` (2절 P0-2) |
+| 모바일 진입 | PWA manifest, 공유 시트 `share_target`(POST — 원문을 주소에 싣지 않는다), 오프라인 셸, 설치 유도 | `web/app/manifest.ts`, `web/app/check/shared/route.ts`, `web/public/sw.js` (5절) |
 | CI | pytest / 프론트 build·tsc·lint·test / compose 실기동 + backup·restore + rate limit·본문 상한 + 정리 스케줄 검증 | `.github/workflows/ci.yml`, `scripts/verify_compose_runtime.py` |
 
 정리하면 **배포 스택 자체는 이미 프로덕션 형태다.** 남은 것은 스택이 아니라 운영이다.
@@ -296,7 +297,7 @@ P0-5로 버전은 고정했지만, 고정은 그 자체로 위험을 만든다. 
 
 구조적 자동 회귀는 `web/components/a11y.test.tsx`가 상시 실행 중이다. 남은 것은 스크린리더 낭독, 명도대비 AA 실측, 실기기 iOS Safari 확인이다. 상세는 `docs/13` 9절.
 
-## 5. 모바일 전략 — PWA 우선, 네이티브는 나중
+## 5. 모바일 전략 — PWA 우선, 네이티브는 나중 (PWA 완료 2026-08-17)
 
 사용자 대부분이 폰으로 쓸 것이라는 전제는 타당하다. 의심 문자를 받은 순간 쓰는 서비스이므로 폰이 기본 환경이다. 다만 **지금 필요한 것은 안드로이드 앱이 아니라 PWA다.**
 
@@ -310,7 +311,38 @@ PWA는 같은 오리진에서 돌기 때문에 지금 인증 모델을 그대로
 
 포기하는 것: iOS의 공유 시트·푸시 제약, `READ_SMS` 자동 수집. 후자는 Play Store 제한 권한이라 어차피 심사를 통과하기 어렵고, `CLAUDE.md`의 PII 최소화 원칙과도 정면으로 충돌한다. 자동 수집은 하지 않는다.
 
-작업 범위: manifest, 아이콘, `share_target` 라우트, 오프라인 셸(분석 결과는 캐시하지 않는다 — 민감 데이터다), 설치 유도 UI. **실도메인(P0-4) 앞에 넣는다.** HTTPS가 PWA 설치 요건이고, 공개 직후 바로 폰에 설치되는 편이 낫기 때문이다.
+작업 범위였던 것: manifest, 아이콘, `share_target` 라우트, 오프라인 셸(분석 결과는 캐시하지 않는다 — 민감 데이터다), 설치 유도 UI. **실도메인(P0-4) 앞에 넣는다.** HTTPS가 PWA 설치 요건이고, 공개 직후 바로 폰에 설치되는 편이 낫기 때문이다.
+
+### 구현 결과 (2026-08-17)
+
+전 범위 구현했다. 상세는 `docs/30`. 설계에서 하나가 계획과 달라졌다.
+
+**`share_target`을 GET이 아니라 POST로 만들었다.** 일반적인 예제는 `method: "GET"`에 쿼리스트링으로 `text`를 받는다. 그러면 사용자가 받은 문자 원문이 브라우저 주소 기록·액세스 로그·`Referer`에 그대로 복사된다. `app/core/observability.py`가 쿼리와 본문을 구조적으로 로그에서 빼 둔 것(`docs/27`, `adr/0004`)이 프론트에서 무효화되는 셈이다. POST로 받고, 응답 문서에 실행되지 않는 JSON 태그로 담아 sessionStorage를 거쳐 `/check`로 넘긴다. 대가는 App Router의 `page.tsx`가 POST를 못 받아 Route Handler를 따로 만들어야 했다는 것뿐이다.
+
+| 부분 | 파일 | 판단 |
+|---|---|---|
+| manifest | `web/app/manifest.ts` | `MetadataRoute.Manifest`가 `share_target`·`shortcuts`를 타입으로 보증한다 |
+| 공유 수신 | `web/app/check/shared/route.ts` | 상태 변경·백엔드 호출·저장이 모두 없어서 **CSRF로 악용할 대상 자체가 없다**. 응답은 `no-store` + `noindex` |
+| 본문 상한 | `web/lib/api/request-body.ts` | `request.formData()`를 바로 부르면 P0-1의 상한을 건너뛴다. 64KB까지 읽고 그 바이트만 파싱한다 |
+| 서비스 워커 | `web/public/sw.js` | GET이 아닌 요청·교차 출처·`/api/*`에는 개입하지 않고, 화면 HTML은 캐시하지 않는다. 캐시에 남는 것은 해시 붙은 자산·아이콘·오프라인 화면뿐 |
+| 오프라인 화면 | `web/app/offline/page.tsx` | "확인하지 못했다는 것이 안전하다는 뜻은 아닙니다"를 먼저 적는다 |
+| 설치 유도 | `web/components/pwa/InstallHint.tsx` | 홈이 아니라 결과 화면에. 설치 가능 신호가 있을 때만 |
+
+검증 결과:
+
+| 확인 | 방법 | 결과 |
+|---|---|---|
+| manifest | 프로덕션 서버 `GET /manifest.webmanifest` | `share_target`이 POST/multipart, 아이콘 3종 |
+| 공유 왕복 | 한글 문자 + URL multipart POST | 200, 원문 일치. 값은 주소가 아니라 본문 JSON 태그 안 |
+| 적대적 입력 | `</script><script>alert(1)</script>` 공유 | 원문 그대로 왕복, 문서의 `</script>`는 2개 그대로 |
+| 응답 잔존 | 헤더 검사 | `no-store, must-revalidate`, `noindex, nofollow`, `set-cookie` 없음 |
+| 크기 상한 | 60,000자 multipart | 413, 파싱 전 거절 |
+| 주소창 직접 접근 | `GET /check/shared` | 303 → `/check` |
+| 워커 배포 | `/sw.js` 헤더 | `no-cache, no-store, must-revalidate` + `Service-Worker-Allowed: /` |
+| 프론트 회귀 | `npm test` / `tsc --noEmit` / `lint` / `build` | 103 passed, 나머지 전부 통과 |
+| 백엔드 무변경 | `pytest -q` | 417 passed, 1 skipped |
+
+남은 것: **공유 시트에서 실제로 고르는 것은 아직 확인되지 않았다.** 설치와 서비스 워커는 HTTPS를 요구하므로 P0-4 이후에야 실기기에서 검증된다. iOS Safari는 `share_target`을 구현하지 않아 홈 화면 추가와 오프라인 화면까지만 얻는다.
 
 Capacitor로 감싸는 선택지는 스토어 등록이 실제로 필요해질 때 다시 판단한다. 그 시점의 선결 조건은 위에 적은 토큰 기반 인증이다.
 
@@ -322,8 +354,8 @@ Capacitor로 감싸는 선택지는 스토어 등록이 실제로 필요해질 �
 2. P0-1 rate limit + 본문 크기 제한   ← 완료 (2026-08-15)
 3. P0-2 만료 데이터 정리 자동화   ← 완료 (2026-08-15)
 4. P0-3 백업 자동화 + 복원 리허설   ← 완료 (2026-08-17)
-5. PWA (manifest + share_target)  ← 다음, 실도메인 직전
-6. P0-4 실도메인·DNS·TLS   ← 공개 배포
+5. PWA (manifest + share_target)  ← 완료 (2026-08-17)
+6. P0-4 실도메인·DNS·TLS   ← 다음, 공개 배포
 7. P1-1 알림 → P1-5 의존성 상승 관측 → P1-3 배포·롤백 → P1-2 audit log → P1-4 CSP
 8. P2-1 평가 하네스 → P2-2 LLM 계층
 ```

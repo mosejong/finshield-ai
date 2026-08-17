@@ -64,6 +64,7 @@
 ## 2026-08-17
 
 - `backup-and-restore-rehearsal.md` — 백업 주기 실행·세대 회전·복호화까지 확인하는 복원 리허설
+- `pwa-share-target.md` — PWA manifest·POST 공유 시트 인계·오프라인 셸·설치 유도
 
 ## 작성 규칙
 

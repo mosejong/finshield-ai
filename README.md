@@ -337,6 +337,8 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 
 백업이 자동 실행되고, 복원 리허설의 합격 기준은 "복호화됐다"이다. compose의 `backup` 서비스가 주기적으로 `pg_dump`를 뜨고(기본 하루) 세대를 회전하며, 새 dump마다 `pg_restore --list`로 읽히는지 확인한 뒤에만 파일을 확정한다. 프로필은 애플리케이션 레벨로 암호화되어 있어 **DB만 복원하고 키를 잃으면 백업은 쓸모가 없다** — 기존 CI 검사("알려진 금융 값이 평문으로 안 보인다")는 무작위 바이트열도 통과시켰다. `scripts/rehearse_backup_restore.py`는 임시 DB로 복원한 뒤 프로필을 실제로 복호화해야 통과하고, 키가 없으면 어느 세대 key id가 없는지 짚어준다. 복구 절차와 한계는 `docs/29-backup-and-recovery.md`, 설계 판단은 `docs/28-production-readiness.md` 2절 P0-3을 따른다.
 
+PWA로 설치되고 문자 앱 공유 시트에서 바로 들어온다. manifest의 `share_target`은 **GET이 아니라 POST**다. 사용자가 공유하는 값은 본인이 받은 문자 원문이라, 쿼리스트링으로 받으면 브라우저 주소 기록·액세스 로그·`Referer`에 원문이 그대로 복사되어 로그 allowlist(`docs/27`, `adr/0004`)가 무의미해진다. 받은 값은 실행되지 않는 JSON 태그에 담아 sessionStorage를 거쳐 `/check`에 채워 넣고 자동 분석하지는 않는다 — "이미 하신 행동"은 사용자만 안다. 서비스 워커는 화면 HTML과 `/api/*`를 캐시하지 않고 공유 POST에 개입하지 않으며, 캐시에 남는 것은 해시 붙은 자산·아이콘·오프라인 안내뿐이다. 오프라인 화면은 "확인하지 못했다는 것이 안전하다는 뜻은 아닙니다"를 먼저 말한다. 설계 판단과 검증은 `docs/30-pwa-and-share-target.md`를 따른다. 실기기 공유 시트 확인은 실도메인(P0-4) 이후로 남아 있다.
+
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측

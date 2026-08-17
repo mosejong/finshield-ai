@@ -39,6 +39,7 @@
 - [x] 재테크 기초 가이드 v0.1 (공식 금융교육 근거, 입력·종목·매매 추천 없음)
 - [x] API latency instrumentation (exact JSON duration + process histogram; dashboard pending)
 - [x] privacy-safe request logging / PII non-disclosure regression
+- [x] PWA 설치 + 문자 앱 공유 시트 진입 (`share_target`은 원문을 주소에 싣지 않도록 POST, 오프라인 셸, 설치 유도) — 실기기 공유 확인은 실도메인 이후
 - [ ] account-level audit log (requires identity and retention policy)
 
 ## P2 — 본선/Stretch
