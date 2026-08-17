@@ -65,19 +65,29 @@ docker compose -f compose.yaml -f compose.public-data.yaml --env-file .env.docke
 
 `scripts/verify_compose_runtime.py`는 실명·계좌번호가 없는 고정 합성 profile만 사용한다.
 실행 전 원본 3개 table이 모두 0건인지 확인하며 한 건이라도 있으면 기존 데이터를 지우지 않고 중단한다.
-고정 backup 파일이나 복원 DB가 이미 있어도 덮어쓰거나 삭제하지 않고 중단한다.
 
 1. backend와 web health 확인
-2. Next same-origin proxy를 통해 익명 세션과 암호화 profile 생성, metrics 조회
-3. backend container 재시작 후 같은 세션으로 profile 재조회
-4. PostgreSQL custom-format backup 생성
-5. 고정 임시 DB `finshield_restore_verify`에 restore
-6. 복원 DB의 profile row 존재와 알려진 금융 값의 평문 부재 확인
+2. 200KB 본문이 파싱 이전에 413으로 잘리는지, 한도 초과가 429 + `Retry-After`가 되는지
+3. Next same-origin proxy를 통해 익명 세션과 암호화 profile 생성, metrics 조회
+4. backend container 재시작 후 같은 세션으로 profile 재조회
+5. `backup` service가 **제 주기에** 남긴 최신 dump를 기다린 뒤 복원 리허설로 넘겨 **복호화까지** 확인
+6. backend·backup log에 profile 값과 식별자가 없는지 확인
 7. 익명 계정 전체 삭제 후 기존 세션 401 확인
 8. 원본 DB의 users, auth_sessions, financial_profiles 0건 확인
-9. 임시 복원 DB와 검증 backup 삭제
+9. 만료 데이터가 `retention` 주기 안에 자동으로 사라지는지 확인
 
-실패해도 임시 복원 DB와 고정 검증 backup 정리를 시도한다. 일반 사용자 backup을 삭제하지 않는다.
+5번은 검증기가 직접 `pg_dump`를 부르지 않는다. 직접 부르면 백업 스케줄이 아예 없어도 통과한다.
+임시 복원 DB는 `scripts/rehearse_backup_restore.py`가 자기 정리 구간에서 지운다. backup 파일은
+검증기가 만든 산출물이 아니라 `backup` service의 산출물이므로 지우지 않고 세대 회전에 맡긴다.
+
+기본 주기(정리 1시간, 백업 하루)로는 5·9번을 기다릴 수 없다. 두 검증을 돌리려면 스택과 검증기에
+같은 짧은 주기를 준다 (CI는 각각 60초).
+
+```powershell
+$env:FINSHIELD_RETENTION_INTERVAL_SECONDS = "60"; $env:FINSHIELD_BACKUP_INTERVAL_SECONDS = "60"
+docker compose --env-file .env.docker up --detach --build
+.\.venv\Scripts\python.exe scripts\verify_compose_runtime.py
+```
 
 ## 종료와 데이터 삭제
 

@@ -34,8 +34,9 @@
 
 - 장점: 사용자에게 삭제 범위를 명확히 알리고, 접근 불가능한 금융정보가 장기 잔존하는 것을 방지한다.
 - 비용: 정기 스케줄러와 백업 보존·파기 운영 절차가 필요하다. 스케줄러는 2026-08-15에 compose의
-  `retention` 서비스로 이행했다 (`app/services/data_retention.py`, `docs/24`). 성공한 실행만 heartbeat를
-  갱신하고 healthcheck가 그 나이를 보므로, 정리가 멈춘 상태가 정상으로 보이지 않는다. 백업 보존·파기
-  절차는 아직 남아 있다 (`28-production-readiness.md` P0-3).
+  `retention` 서비스로 이행했다 (`app/services/data_retention.py`, `docs/24`). 백업 보존은 2026-08-17에
+  compose의 `backup` 서비스로 이행했다 (`deploy/backup-loop.sh`, `docs/29`) — 세대 수를
+  `FINSHIELD_BACKUP_KEEP`으로 정하고 그보다 오래된 dump는 회전이 삭제한다. 두 서비스 모두 성공한
+  실행만 heartbeat를 갱신하고 healthcheck가 그 나이를 보므로, 멈춘 상태가 정상으로 보이지 않는다.
 - 한계: 온라인 삭제 직후 기존 백업·WAL의 선택적 레코드 파기까지 보장하지 않는다. 정식 계정 전환과
   데이터 복구는 별도 설계가 필요하다.

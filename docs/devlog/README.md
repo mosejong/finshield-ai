@@ -61,6 +61,10 @@
 - `rate-limiting-request-limits.md` — IP 기준 요청 한도·본문 크기 상한·홉 신뢰 경계·429 문구
 - `expired-data-retention-schedule.md` — 만료 데이터 정리 주기 실행·heartbeat healthcheck·거짓 성공 차단
 
+## 2026-08-17
+
+- `backup-and-restore-rehearsal.md` — 백업 주기 실행·세대 회전·복호화까지 확인하는 복원 리허설
+
 ## 작성 규칙
 
 상세한 필수 항목과 PR 흐름은 `docs/14-development-workflow.md`를 따른다.

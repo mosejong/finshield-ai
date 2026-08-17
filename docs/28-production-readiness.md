@@ -146,14 +146,63 @@ web이 체인을 다듬을 때 **오른쪽 기준 인덱스가 절대 밀리지 
 
 남은 것: 정리 실패가 **컨테이너 밖으로** 알려지지 않는다. healthcheck가 unhealthy를 띄워도 그것을 보고 사람에게 알리는 경로는 P1-1이다. 그때까지는 `docker compose ps`를 봐야 안다.
 
-### P0-3. 백업 자동화와 복원 리허설
+### P0-3. 백업 자동화와 복원 리허설 — 완료 (2026-08-17)
 
-`pg_dump`/restore 로직은 현재 `scripts/verify_compose_runtime.py` 안, 즉 CI 검증 경로에만 있다. 운영 백업 스케줄은 없다. 저장 데이터가 암호화된 프로필이라 **DB만 복원하고 키를 잃으면 백업은 쓸모가 없다.**
+문제였던 것이 둘이다. 하나는 알고 있던 것이고, 하나는 작업하다 발견했다.
 
-- 주기적 dump + 보존 세대 관리 + 저장 위치(볼륨 밖)
-- 암호화 키와 DB 백업의 복구 절차를 한 문서에 함께 적는다. 둘 중 하나만 있으면 복구 불가라는 점을 명시
-- 정기 복원 리허설. "백업이 생성된다"가 아니라 "복원이 성공한다"가 완료 기준
-- 완료 기준: 빈 환경에서 백업만으로 서비스를 기동해 프로필 복호화까지 성공
+**(1) 운영 백업 스케줄이 없었다.** `pg_dump`/restore 로직은 `scripts/verify_compose_runtime.py` 안, 즉 CI 검증 경로에만 있었다. 백업이 없는 상태와 "백업 코드가 있는" 상태는 복구 시점에 같은 결과가 된다.
+
+**(2) 기존 복원 검사는 실패할 수 없었다.** 검사 조건이 이거였다.
+
+```sql
+SELECT position('2800000' in encode(encrypted_profile, 'escape')) = 0 FROM financial_profiles
+```
+
+"알려진 금융 값이 평문으로 보이지 않는다"만 본다. **무작위 바이트열도 통과한다.** 암호화가 됐다는 것만 확인할 뿐 되돌릴 수 있다는 것은 확인하지 못한다. 프로필은 애플리케이션 레벨 암호화라 키를 잃으면 DB를 완벽히 복원해도 열 수 없는 바이트열만 남는데, **그 상태의 백업이 이 검사에서 초록불로 나왔다.** 즉 P0-3이 요구한 "복원이 성공한다"를 기존 검사는 측정할 능력이 없었다.
+
+구조:
+
+| 부분 | 파일 | 판단 |
+|---|---|---|
+| 백업 루프 | `deploy/backup-loop.sh` | 주기 dump + 세대 회전 + 성공 heartbeat. 회전은 **dump 성공 뒤에만** 돈다 — 먼저 지우면 실패한 날 멀쩡한 세대를 하나 잃는다 |
+| 컨테이너 | `compose.yaml`의 `backup` | `db`와 **같은 이미지 digest**. `pg_dump`는 서버보다 major 버전이 낮으면 거부하므로 `x-postgres-image` anchor 한 곳에서만 정의해 어긋날 수 없게 했다 |
+| 무결성 확인 | 같은 루프 | 새 dump에 `pg_restore --list`를 걸어 TOC가 읽히는지 본다. `pg_dump`가 0으로 끝나도 파일이 온전하다는 보장은 아니고, 여기서 안 걸러지면 **복원해야 하는 날에야** 알게 된다 |
+| 복원 리허설 | `scripts/rehearse_backup_restore.py` | 임시 DB 생성 → 복원 → 복호화 → 정리. `pg_restore --exit-on-error` — 기본값은 오류를 세면서 계속 진행하고 0으로 끝나 **절반만 복원된 DB를 성공으로 읽는다** |
+| 복호화 검증 | `app/services/backup_verification.py` | 합격 기준이 "행이 돌아왔다"가 아니라 **"행을 복호화했다"** |
+| 운영 절차 | `docs/29` | DB 덤프와 암호화 키 중 **하나만 있으면 복구 불가**라는 점을 표로 먼저 적었다 |
+
+**왜 sh와 python으로 갈랐는가.** postgres 이미지에는 python이 없다. `apk`로 넣으면 P0-5의 해시 고정 의존성 정책에 구멍이 난다. 그렇다고 backend 이미지에 postgres client를 넣으면 인터넷에 노출된 API 이미지에 덤프 도구가 실리고 서버와 맞출 버전이 하나 더 생긴다. 그래서 루프는 `sh`로 최소한만 두고, 진짜 확인이 필요한 복호화는 backend 이미지에서 python이 맡는다.
+
+비밀번호는 `PGPASSWORD`로 넘기지 않는다. 환경변수는 `docker inspect`와 자식 프로세스 전체에 그대로 보인다. tmpfs 위의 `0600` pgpass 파일을 쓰고, 경로는 compose `environment:`에 둔다 — `docker compose exec`는 루프의 환경을 물려받지 않아서, 스크립트 안에서 export만 하면 복원 리허설의 `psql`이 비밀번호를 찾지 못한다.
+
+이 컨테이너만 root로 돈다. postgres 이미지는 `USER`를 지정하지 않고, uid를 강제하면 호스트 bind mount 소유권과 어긋나 **백업이 조용히 실패한다.** 대신 `cap_drop: ALL` / `no-new-privileges` / `read_only` / 포트 미개방으로 막았다.
+
+검증 결과:
+
+| 확인 | 방법 | 결과 |
+|---|---|---|
+| 실제로 백업이 뜨는가 | 짧은 주기로 compose 기동 | `{"status":"succeeded","bytes":8093,"generations":1,"pruned":0}` |
+| 세대 회전 | 가짜 `pg_dump`를 PATH 앞에 두고 실제 `sh`로 구동 | `KEEP=3`에서 오래된 것부터 삭제, 최신 3개 유지 |
+| 실패가 세대를 지우지 않는가 | dump 실패 주입 | 기존 3세대 그대로. `.tmp` 잔여물 없음 |
+| 중단된 쓰기 | `*.tmp`를 세대로 세는지 | 세지 않음. 세면 실제 보관 수가 조용히 줄어든다 |
+| 깨진 dump | `pg_restore --list` 실패 주입 | 파일 폐기, `"stage":"verify"` |
+| heartbeat | 실패 → 성공 → 실패 | 성공만 기록. 실패는 이전 성공 시각을 건드리지 않음 |
+| healthcheck | heartbeat 없음 / 신선 / 두 주기 경과 / 손상 | exit 1 → 0 → 1 → 1 |
+| 설정 오류 | 주기 5초, `keep=0`, 정수 아닌 값, 비밀번호 파일 없음 | 전부 exit 2 + `"status":"misconfigured"` |
+| 비밀번호 노출 | 로그·stdout에서 검색 | 없음. pgpass 파일에만 존재 |
+| **키를 잃은 백업** | 다른 키로 복원 검증 | `failed=1`, `unavailable_key_ids`에 해당 key id. **옛 검사는 여기서 통과했다** |
+| 무작위 바이트열 | 옛 기준 / 새 기준 대조 | 옛 기준 통과, 새 기준 실패 |
+| 빈 복원 | 행 0건 | `recoverable=false`. 증명한 게 없으면 합격이 아니다 |
+| 행 결합 파손 | 봉투의 `profile_id`를 다르게 | 실패. 키는 멀쩡하므로 `unavailable_key_ids`는 비어 있음 |
+| 키 로테이션 | 두 세대 키로 쓰인 행 | 둘 다 있으면 전부 열림. 옛 키를 내리면 그 행만 실패 |
+| 출력 PII | 리허설 출력에서 금융 값 검색 | 건수와 key id뿐. key id는 이미 행에 평문으로 있는 값 |
+| pgpass가 다른 DB에도 통하는가 | 데이터베이스 칸 검사 + `psql -d postgres` | `db:5432:*:finshield_app:…`, `SELECT 1` → `1` |
+| 전체 실기동 | `verify_compose_runtime.py` (주기 60초) | `"backup_schedule": {"decrypted": 1, "dump": "finshield-20260817T022522Z.dump", "healthy": true, "scheduled_within_interval_seconds": 60}` |
+| 회귀 | `pytest -q` | 417 passed, 1 skipped (+34) |
+
+**CI 검증도 갈아치웠다.** `verify_compose_runtime.py`가 직접 `pg_dump`를 부르던 부분을 지우고, `backup` 서비스가 **제 주기에 남긴** 최신 파일을 기다렸다가 복원 리허설에 넘긴다. P0-2에서 배운 것과 같다 — 스크립트를 한 번 돌려보는 것은 스케줄이 걸려 있다는 확인이 아니다. 검증기가 직접 덤프를 뜨면 백업 스케줄이 아예 없어도 통과한다. CI는 이를 위해 `FINSHIELD_BACKUP_INTERVAL_SECONDS=60`으로 스택을 띄운다.
+
+남은 것 두 가지. **(1) 백업이 아직 같은 호스트 안이다.** `./backups`는 `postgres-data` 볼륨 밖이라 볼륨 손상에는 안전하지만 호스트가 통째로 사라지면 같이 사라진다. 호스트 밖 반출은 P0-4 이후 작업이다. **(2) 암호화 키 보관은 사람이 하는 절차이고 자동 점검이 없다.** 리허설이 통과하는 이유는 지금 이 호스트에 키가 있기 때문이지 키가 안전하게 보관돼 있기 때문이 아니다. 키를 덤프와 같은 곳에 두면 백업 하나 유출로 프로필이 통째로 열리므로, 자동화 대신 `docs/29` 0절에 절차로 적었다.
 
 ### P0-4. 실도메인·DNS·TLS 실환경 검증
 
@@ -272,8 +321,8 @@ Capacitor로 감싸는 선택지는 스토어 등록이 실제로 필요해질 �
 1. P0-5 의존성 잠금        ← 완료 (2026-08-14)
 2. P0-1 rate limit + 본문 크기 제한   ← 완료 (2026-08-15)
 3. P0-2 만료 데이터 정리 자동화   ← 완료 (2026-08-15)
-4. P0-3 백업 자동화 + 복원 리허설   ← 다음
-5. PWA (manifest + share_target)  ← 실도메인 직전
+4. P0-3 백업 자동화 + 복원 리허설   ← 완료 (2026-08-17)
+5. PWA (manifest + share_target)  ← 다음, 실도메인 직전
 6. P0-4 실도메인·DNS·TLS   ← 공개 배포
 7. P1-1 알림 → P1-5 의존성 상승 관측 → P1-3 배포·롤백 → P1-2 audit log → P1-4 CSP
 8. P2-1 평가 하네스 → P2-2 LLM 계층

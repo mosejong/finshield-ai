@@ -335,12 +335,13 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 
 만료 데이터 정리가 자동 실행된다. compose의 `retention` 서비스가 만료 세션·소유 프로필·닫힌 rate limit window를 주기적으로 지운다(기본 1시간). 성공한 실행만 heartbeat를 갱신하고 healthcheck가 그 나이를 보므로, 계속 실패하는 상태가 정상으로 보이지 않는다. 로그에는 건수와 성공 여부만 남기고 예외 메시지조차 남기지 않는다 — SQLAlchemy가 바인딩 값을 메시지에 붙이기 때문이다. 운영법은 `docs/24-anonymous-data-lifecycle.md`, 설계 판단은 `docs/28-production-readiness.md` 2절 P0-2를 따른다.
 
+백업이 자동 실행되고, 복원 리허설의 합격 기준은 "복호화됐다"이다. compose의 `backup` 서비스가 주기적으로 `pg_dump`를 뜨고(기본 하루) 세대를 회전하며, 새 dump마다 `pg_restore --list`로 읽히는지 확인한 뒤에만 파일을 확정한다. 프로필은 애플리케이션 레벨로 암호화되어 있어 **DB만 복원하고 키를 잃으면 백업은 쓸모가 없다** — 기존 CI 검사("알려진 금융 값이 평문으로 안 보인다")는 무작위 바이트열도 통과시켰다. `scripts/rehearse_backup_restore.py`는 임시 DB로 복원한 뒤 프로필을 실제로 복호화해야 통과하고, 키가 없으면 어느 세대 key id가 없는지 짚어준다. 복구 절차와 한계는 `docs/29-backup-and-recovery.md`, 설계 판단은 `docs/28-production-readiness.md` 2절 P0-3을 따른다.
+
 - 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
 - 익명 계정 전환·복구와 다중 기기 정책
-- PostgreSQL live·backup restore·다중 worker 검증
 - Starlette `TestClient` 사용 중단 예정 경고 대응
 
 ## Verified official-data direction (2026-08-11)

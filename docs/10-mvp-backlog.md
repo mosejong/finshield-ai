@@ -22,7 +22,7 @@
 - [ ] public MVP deployment (real domain/DNS/certificate verification required) — 선행 조건은 `28-production-readiness.md` 2절 P0-1~P0-5
 - [x] rate limiting + 요청 본문 크기 제한 (인증 없는 `/api/v1/analyze`·세션 발급 보호)
 - [x] 만료 데이터 정리 자동 스케줄 (`adr/0004` 이행)
-- [ ] 운영 backup 스케줄 + 복원 리허설 (현재 pg_dump는 CI 검증 경로에만 존재)
+- [x] 운영 backup 스케줄 + 복원 리허설 (합격 기준은 "복원됐다"가 아니라 "복호화됐다")
 - [x] 파이썬 의존성 해시 잠금 + 런타임·개발 의존성 분리
 
 ## P1 — 경쟁력

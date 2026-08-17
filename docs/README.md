@@ -7,7 +7,7 @@
 
 27 observability/PII masking · `adr/0006-privacy-safe-observability.md`
 26 HTTP security/HTTPS boundary · `adr/0005-http-security-and-https-boundary.md`
-04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · 28 production readiness · ADR 색인 `adr/README.md`
+04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · 28 production readiness · 29 backup and recovery · ADR 색인 `adr/README.md`
 
 ## Security
 
@@ -22,6 +22,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-17/backup-and-restore-rehearsal.md` — 백업 주기 실행·세대 회전·복호화까지 확인하는 복원 리허설
 - `devlog/2026-08-15/expired-data-retention-schedule.md` — 만료 데이터 정리 주기 실행·heartbeat healthcheck·거짓 성공 차단
 - `devlog/2026-08-15/rate-limiting-request-limits.md` — IP 기준 요청 한도·본문 크기 상한·홉 신뢰 경계·429 문구
 - `devlog/2026-08-14/dependency-hash-locking.md` — 해시 고정 universal lock·런타임/개발 분리·CI drift 차단
