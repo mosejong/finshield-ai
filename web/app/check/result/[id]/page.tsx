@@ -18,6 +18,7 @@ import {
 } from "@/components/safety/RiskSignalList";
 import { UserStateRecap } from "@/components/safety/UserStateRecap";
 import { WhyRiskyPanel } from "@/components/safety/WhyRiskyPanel";
+import { InstallHint } from "@/components/pwa/InstallHint";
 import { demoAnalysisFor } from "@/lib/mock/analysis";
 import { clearAnalysis, useStoredAnalysis } from "@/lib/store/analysis-store";
 import { useHydrated } from "@/lib/store/session-store";
@@ -159,6 +160,12 @@ export default function CheckResultPage({
           </button>
         ) : null}
       </div>
+
+      {/*
+        설치 안내는 결과를 한 번 본 뒤에 둔다. 무엇을 해주는 앱인지 알고 난
+        다음이라야 "다음엔 공유 버튼으로"가 제안으로 읽힌다.
+      */}
+      <InstallHint />
 
       <DisclaimerNote>{result.disclaimer}</DisclaimerNote>
     </AppShell>
