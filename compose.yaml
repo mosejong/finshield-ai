@@ -78,7 +78,17 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    environment: *backend-environment
+    environment:
+      <<: *backend-environment
+      # uvicorn 워커 수. 호스트 크기에 따라 달라지는 값이라 이미지가 아니라
+      # 여기서 정한다. 이미지 기본값과 같은 2 이고, 1GB e2-micro 는 `.env` 에서
+      # 1 로 내린다 - 거기서는 2개가 기동 경합에 걸려 백엔드가 영구히 굳었다
+      # (`Dockerfile` 의 CMD 주석, `docs/31` 11-6).
+      #
+      # 변수 이름이 두 개인 이유: uvicorn 이 읽는 이름은 `WEB_CONCURRENCY` 로
+      # 고정인데, 이 파일에는 `web` 이라는 서비스가 따로 있어서 호스트 `.env`
+      # 에 그 이름을 그대로 두면 Next 쪽 설정으로 읽힌다.
+      WEB_CONCURRENCY: ${FINSHIELD_UVICORN_WORKERS:-2}
     secrets: *backend-secrets
     depends_on:
       migration:
@@ -102,9 +112,10 @@ services:
 
   # 보존기간을 실제로 이행하는 쪽. 문서에만 있는 정책은 지켜지지 않는다.
   #
-  # backend 안의 background task 로 넣지 않았다. worker 가 2 개라 같은 정리가
-  # 동시에 두 번 돌고, API 응답 지연과 정리 지연이 한 프로세스에 얽힌다.
-  # 따로 두면 API 가 죽어도 개인정보 삭제는 계속된다.
+  # backend 안의 background task 로 넣지 않았다. worker 가 여러 개면 같은 정리가
+  # 동시에 여러 번 돌고, API 응답 지연과 정리 지연이 한 프로세스에 얽힌다.
+  # 따로 두면 API 가 죽어도 개인정보 삭제는 계속된다. (worker 수는 호스트마다
+  # 다르다 - backend 의 WEB_CONCURRENCY 참고.)
   retention:
     build:
       context: .

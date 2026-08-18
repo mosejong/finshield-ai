@@ -464,6 +464,62 @@ pg_dump: error: connection to server at "db" (172.18.0.6), port 5432 failed: Con
 
 기존 백업 테스트 32건이 이걸 놓친 이유도 분명하다. **전부 `--once` 로 돌아서 `while` 루프의 대기 정책을 한 번도 실행하지 않았다.** 진짜 루프를 띄우는 검사 2건을 추가했다.
 
+#### backend 가 영구히 굳었다 — uvicorn 멀티워커
+
+여기가 이번 배포에서 제일 오래 걸린 부분이다. `APP_ENV=production` 조합으로 처음 `docker compose up -d` 를 했더니 backend 가 **끝내 healthy 가 되지 않았다.** 저절로 낫지도 않았다.
+
+```
+finshield-backend-1  | Waiting for child process [7]
+finshield-backend-1  | Child process [7] died
+finshield-backend-1  | Waiting for child process [9]
+finshield-backend-1  | Child process [9] died
+        (무한 반복)
+```
+
+이 로그가 전부다. **트레이스백이 한 줄도 없다.** healthcheck 는 `exit=-1 Health check exceeded timeout (5s)`, 밖에서 `curl` 하면 `(56) Recv failure: Connection reset by peer`, `docker stats` 는 backend 1694% / db 526% CPU 였다.
+
+진단이 두 번 틀렸다. 기록해 둔다.
+
+| 가설 | 왜 틀렸나 |
+|---|---|
+| OOM 이다 | `dmesg` 에 OOM killer 흔적이 없고 `available` 이 427 MiB 였다 |
+| e2-micro 버스트 크레딧 소진이다 | `load average 0.09`, `vmstat` 의 `st` 가 내내 0. 게다가 워커 2개를 **포그라운드로** 띄우니 2분 동안 `/health/ready` 가 20~30ms 로 멀쩡히 답했다 |
+
+세 번째는 추측을 멈추고 uvicorn 소스를 읽었다. 기여 요인이 셋이다.
+
+1. **워커는 fork 가 아니라 spawn 이다.** `uvicorn/_subprocess.py` 가 `multiprocessing.get_context("spawn")` 을 쓴다. 리눅스에서도 그렇다. 워커 하나마다 인터프리터가 처음부터 부팅되고 FastAPI 앱을 새로 import 한다.
+2. **ping 에 답하는 스레드는 그 부팅이 끝난 뒤에 생긴다.** `Process.target()` 안에서 `always_pong` 스레드를 띄운다. 그 전까지는 **아무도 답하지 않는 창** 이다.
+3. **부모는 5초를 기다리고 SIGKILL 한다.** `Multiprocess.keep_subprocess_alive()` 가 0.5초마다 돌면서 `timeout_worker_healthcheck`(기본 5초) 안에 답이 없으면 `process.kill()` 후 새 워커를 띄운다.
+
+그래서 `up -d` 가 migration·retention·web·backend 를 한꺼번에 올려 부팅이 5초를 넘기는 순간, 부모가 자식을 죽이고 곧바로 **새 인터프리터를 두 개 더** 띄운다. 경합이 원인인데 대응이 경합을 키우는 자기강화 루프다. 한 번 들어가면 나오지 못한다. SIGKILL 이라 파이썬은 아무것도 남기지 못하고, `STARTUP_FAILURE` 분기도 타지 않는다 — uvicorn 은 이걸 "기동 실패" 가 아니라 "굳었다" 로 판정하기 때문이다.
+
+고친 것은 둘이고, 성격이 다르다.
+
+- **`--timeout-worker-healthcheck 30`** (`Dockerfile`) — 이쪽이 결함 수정이다. 기본 5초는 호스트가 무엇이든 기동이 느려지는 순간 위 루프로 들어간다. 30초인 이유는 컨테이너 healthcheck 예산(5초 × 12회 ≈ 60초)보다 짧아야 굳은 워커를 uvicorn 이 먼저 잡기 때문이다.
+- **`FINSHIELD_UVICORN_WORKERS=1`** (`.env`) — 이쪽은 사양 결정이다. 워커가 1개면 uvicorn 은 `Multiprocess` 를 아예 만들지 않고 `server.run()` 을 직접 부른다. ping·SIGKILL 경로가 완화되는 게 아니라 **존재하지 않는다.** 1GB 에서 두 번째 워커는 메모리만 쓰고 처리량을 주지 않는다.
+
+이 값으로 `up -d` 하니 backend 가 **12.4초** 만에 healthy 가 됐고 7개 컨테이너가 전부 올라왔다.
+
+검사는 `tests/test_backend_workers.py` 8건이다. `--workers` 가 CMD 로 돌아오면(그러면 uvicorn 이 `WEB_CONCURRENCY` 를 무시한다) 실패하고, 타임아웃을 기본값으로 되돌려도, 컨테이너 예산 밖으로 늘려도, 이미지 기본값과 compose 기본값이 갈라져도 실패한다.
+
+**한 가지 남는다.** VM 에서 급히 고칠 때 추적되지 않는 `compose.host-small.yaml` 을 직접 만들어 썼다. 위 수정이 배포되면 그 파일을 지우고 `COMPOSE_FILE` 에서 빼야 한다. 안 지우면 저장소 설정과 실제로 도는 설정이 조용히 갈라진다.
+
+#### HTTPS 발급
+
+`compose.acme-staging.yaml` 로 먼저 예행연습했다. 백엔드가 위 문제로 서 있는 동안 proxy 는 아예 뜨지 못했으므로 **발급 시도가 0회였다 — Let's Encrypt 쿼터를 한 건도 쓰지 않았다.** staging 을 먼저 거는 이유가 이것이다.
+
+| | staging | 운영 |
+|---|---|---|
+| challenge | `tls-alpn-01` | `http-01` |
+| issuer | `(STAGING) Baloney Bulgur YE2` | `Let's Encrypt YE2` |
+| 체인 검증 | (신뢰 안 함) | `Verify return code: 0 (ok)` |
+
+Caddy 는 `tls-alpn-01` 을 먼저 시도하고 안 되면 `http-01` 로 내려간다. **80 과 443 이 둘 다 열려 있어야 한다.** 운영 발급이 `http-01` 로 됐다는 것은 80 이 실제로 쓰였다는 뜻이다.
+
+staging→운영 전환은 볼륨을 지우지 않아도 된다. Caddy 가 CA 디렉터리별로 인증서를 따로 보관해서, override 를 빼고 `up -d proxy` 하면 새로 발급받는다.
+
+도메인은 **DuckDNS 무료 서브도메인**을 썼다. 비용이 0 이어야 했다. `duckdns.org` 는 Public Suffix List 에 있어서 Let's Encrypt 주당 발급 제한이 다른 사용자와 공유되지 않는다 (`mooo.com` 은 목록에 없어서 전 세계가 주 50장을 나눠 쓴다 — 무료 도메인이라고 다 같지 않다). 다만 이 도메인 계열은 피싱 호스트로 차단하는 곳이 있다. 사기 방어 제품을 그런 도메인에 올리는 것은 제품으로서 어색하므로, 돈이 생기면 바꾼다.
+
 #### 그밖에 확인된 것
 
 - `docker compose pull` 로 backend 331MB / web 303MB 를 받았다. VM 에서 빌드하지 않는 경로가 실제로 성립한다.
