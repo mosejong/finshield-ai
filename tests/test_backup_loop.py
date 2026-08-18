@@ -9,6 +9,7 @@
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import time
 
@@ -273,6 +274,10 @@ def test_logs_carry_no_credentials(harness: BackupHarness) -> None:
         {"FINSHIELD_BACKUP_INTERVAL_SECONDS": "hourly"},
         {"FINSHIELD_BACKUP_KEEP": "0"},
         {"FINSHIELD_BACKUP_KEEP": "many"},
+        {"FINSHIELD_BACKUP_RETRY_SECONDS": "0"},
+        {"FINSHIELD_BACKUP_RETRY_SECONDS": "soon"},
+        # 재시도가 주기보다 길면 말이 뒤집힌다.
+        {"FINSHIELD_BACKUP_INTERVAL_SECONDS": "60", "FINSHIELD_BACKUP_RETRY_SECONDS": "61"},
     ],
 )
 def test_a_misconfigured_loop_exits_instead_of_idling(
@@ -397,3 +402,139 @@ def test_a_damaged_heartbeat_is_not_read_as_healthy(harness: BackupHarness) -> N
     harness.heartbeat.write_text("not-a-timestamp", encoding="utf-8")
 
     assert harness.healthcheck().returncode == 1
+
+
+# --- 루프 대기 정책 ---------------------------------------------------------
+#
+# 위의 검사들은 전부 `--once` 로 돈다. 그래서 `while` 루프의 대기 정책은 지금까지
+# **한 번도 실행되지 않았다.** 2026-08-18 GCP VM 재부팅에서 그 사각지대가
+# 드러났다: 실패와 성공이 같은 시간을 자고 있었고, 재부팅 경합으로 첫 dump 가
+# 실패하자 다음 시도가 24시간 뒤로 밀렸다.
+
+FLAKY_DUMP = """#!/bin/sh
+target=""
+for arg in "$@"; do
+    case "$arg" in
+        --file=*) target="${{arg#--file=}}" ;;
+    esac
+done
+[ -n "$target" ] || exit 9
+# 첫 호출만 실패한다. 재부팅 직후 db 가 아직 연결을 받지 않는 상황이다.
+if [ ! -f "{marker}" ]; then
+    : > "{marker}"
+    echo 'pg_dump: error: connection to server at "db" failed: Connection refused' >&2
+    exit 1
+fi
+printf '%s' 'PGDMP-fake-dump' > "$target"
+exit 0
+"""
+
+
+def _kill_tree(process: "subprocess.Popen[bytes]") -> None:
+    """셸만 죽이면 안 된다.
+
+    `terminate()` 는 `sh` 만 끝내고 그 자식인 `sleep` 은 그대로 남는다.
+    처음 이 검사를 파이프로 쓰고 `communicate()` 를 불렀더니, 살아있는
+    `sleep` 이 stdout 핸들을 잡고 있어 10초 timeout 으로 죽었다. 그리고
+    성공 경로에서는 `sleep 600` 이 그만큼 고아로 남는다.
+    """
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True
+        )
+    else:
+        try:
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
+def _run_loop(
+    harness: BackupHarness, dump_body: str, *, seconds: float, **overrides: str
+) -> subprocess.CompletedProcess[str]:
+    """진짜 루프를 띄우고 `seconds` 만큼 지켜본 뒤 끝낸다.
+
+    출력은 파이프 대신 파일로 받는다. 끝나지 않고 죽이는 프로세스라,
+    파이프를 쓰면 읽는 쪽과 죽이는 쪽이 서로를 기다리게 된다.
+    """
+    harness._install("pg_dump", dump_body)
+    harness._install("pg_restore", FAKE_RESTORE.format(exit_code=0))
+    assert SHELL is not None
+    out = harness.root / "loop-stdout"
+    err = harness.root / "loop-stderr"
+    with out.open("wb") as stdout, err.open("wb") as stderr:
+        process = subprocess.Popen(
+            [SHELL, LOOP.as_posix()],
+            env=harness.environment(**overrides),
+            stdout=stdout,
+            stderr=stderr,
+            start_new_session=os.name != "nt",
+        )
+        try:
+            time.sleep(seconds)
+        finally:
+            _kill_tree(process)
+    return subprocess.CompletedProcess(
+        process.args,
+        process.returncode,
+        out.read_text(encoding="utf-8"),
+        err.read_text(encoding="utf-8"),
+    )
+
+
+@requires_shell
+def test_a_failed_run_retries_without_waiting_a_whole_interval(
+    harness: BackupHarness,
+) -> None:
+    """재부팅 경합으로 첫 dump 가 실패해도 하루를 기다리지 않는다.
+
+    실제로 겪은 형태 그대로다. `restart: unless-stopped` 로 데몬이 컨테이너를
+    되살릴 때 compose 의 `depends_on` 은 적용되지 않아서, 이 루프가 db 보다 먼저
+    떠서 첫 `pg_dump` 가 "connection refused" 로 죽었다. 고치기 전에는 다음
+    시도가 `INTERVAL` 뒤였다.
+
+    주기를 600초로 두었으므로, 주기를 기다리는 구현에서는 dump 가 하나도 생기지
+    않는다.
+    """
+    marker = (harness.root / "dump-attempted").as_posix()
+
+    result = _run_loop(
+        harness,
+        FLAKY_DUMP.format(marker=marker),
+        seconds=4,
+        FINSHIELD_BACKUP_INTERVAL_SECONDS="600",
+        FINSHIELD_BACKUP_RETRY_SECONDS="1",
+    )
+
+    assert '"status":"failed"' in result.stdout
+    assert '"status":"succeeded"' in result.stdout
+    assert len(harness.dumps()) == 1
+    # 성공한 실행만 heartbeat 를 갱신하므로, 재시도가 healthcheck 를 되살린
+    # 것까지가 이 결함의 완전한 수정이다. heartbeat 는 tmpfs 라 재시작으로
+    # 사라지고, 고치기 전에는 하루 동안 unhealthy 로 남았다.
+    assert harness.healthcheck(FINSHIELD_BACKUP_INTERVAL_SECONDS="600").returncode == 0
+
+
+@requires_shell
+def test_a_successful_run_waits_the_full_interval(harness: BackupHarness) -> None:
+    """재시도 간격이 정상 주기를 대체하지 않는다.
+
+    위 검사만 있으면 `sleep "$RETRY"` 를 무조건 자는 구현도 통과한다. 그러면
+    하루 한 번이어야 할 백업이 1초마다 돌고, 세대 회전이 순식간에 전부 같은
+    시각의 dump 로 덮인다.
+    """
+    result = _run_loop(
+        harness,
+        FAKE_DUMP.format(payload="PGDMP-fake-dump", exit_code=0),
+        seconds=4,
+        FINSHIELD_BACKUP_INTERVAL_SECONDS="600",
+        FINSHIELD_BACKUP_RETRY_SECONDS="1",
+    )
+
+    assert result.stdout.count('"status":"succeeded"') == 1
+    assert len(harness.dumps()) == 1

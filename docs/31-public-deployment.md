@@ -425,3 +425,47 @@ python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.
 | 스냅샷 | 디스크 스냅샷 스케줄은 `pg_dump` 백업을 대체하지 않는다. 스냅샷은 실행 중인 PostgreSQL 의 순간 상태라 복구 시 복구 모드를 거치고, 무엇보다 **복호화되는지를 확인하지 않는다.** 둘 다 두되 합격 기준은 `docs/29` 를 따른다 |
 | Cloud DNS | 필수가 아니다. 등록기관 DNS 에 A 레코드만 걸면 된다. Cloud DNS 는 존당 월 요금이 붙는다 |
 | 요금 알림 | Billing 예산 알림을 걸어 둔다. 크레딧이 없으므로 처음부터 실비 청구다. 정상 상태에서는 고정 IP 월 $3~4 뿐이니, 예산을 그보다 조금 위에 잡아 두면 **의도치 않은 과금이 시작된 순간**을 바로 알 수 있다 |
+
+### 11-6. 실측 (2026-08-18)
+
+도메인 없이 `compose.yaml` + `compose.deploy.yaml` 만으로 한 번 올려 봤다. 포트가 전부 loopback 바인딩이라 외부 노출이 없어서, DNS 와 인증서가 정해지기 전에 해도 되는 검증이다. 여기서 답이 나오는 질문이 두 개다 — **1GB 에서 뜨는가**, 그리고 **재부팅하면 저절로 돌아오는가.**
+
+#### 메모리
+
+| 컨테이너 | 사용 |
+|---|---|
+| backend (uvicorn worker 2) | 155 MiB |
+| web (Next standalone) | 79.7 MiB |
+| retention | 50.3 MiB |
+| db | 40.1 MiB |
+| backup | 0.7 MiB |
+| **합계** | **326 MiB** |
+
+호스트 전체는 `used` 735 MiB / `available` 234 MiB 였다. 컨테이너 밖 약 409 MiB 는 `dockerd`(74MB) · `containerd`(31MB) · shim 5개 · GCE 게스트 에이전트 3종(49MB) · systemd 다. 특별히 큰 것은 없다.
+
+`vmstat 1 5` 의 `si`/`so` 가 전부 0 이라 **활성 스와핑은 없다.** `free` 에 잡힌 swap 은 앞선 `pip install` 이 밀어낸 잔재다 — 리눅스는 여유가 생겨도 swap 페이지를 자동으로 되돌리지 않는다. CPU 는 5개 샘플 중 4개가 idle 92~100% 였다.
+
+**Caddy 는 아직 얹지 않았다.** 30~50 MiB 를 더 쓸 것이므로 `available` 은 190 MiB 근처가 된다. 들어가지만 여유가 그만큼 준다. 그리고 위 숫자는 전부 **idle** 이다 — 부하 시 수치는 모른다.
+
+#### 재부팅
+
+`sudo reboot` 뒤 swap 이 `/etc/fstab` 으로 자동 복구됐고, 컨테이너 5개가 자동 기동해 **39초 만에** `/health/ready` 가 `ready` 를 냈다.
+
+**그런데 여기서 결함이 하나 나왔다.** 데이터도 도메인도 없을 때 재부팅해 본 이유가 이것이다.
+
+```
+pg_dump: error: connection to server at "db" (172.18.0.6), port 5432 failed: Connection refused
+{"event":"backup_run","status":"failed","timestamp":"2026-08-18T10:08:24Z","stage":"dump"}
+```
+
+`restart: unless-stopped` 로 데몬이 컨테이너를 되살릴 때는 compose 의 `depends_on` 이 **적용되지 않는다.** 그건 `docker compose up` 이 해석하는 조건이다. 그래서 backup 이 db 보다 먼저 떴다. 여기까지는 정상적인 경합이고, 문제는 그 다음이었다 — 루프가 실패에도 성공과 같은 `INTERVAL`(기본 24시간)을 자고 있어서 다음 시도가 하루 뒤였다. heartbeat 는 tmpfs 라 재시작으로 사라지므로, 그동안 healthcheck 도 unhealthy 다. **재부팅 한 번이 하루치 백업 공백을 만드는 구조였다.**
+
+`FINSHIELD_BACKUP_RETRY_SECONDS`(기본 60초)로 고쳤다. 상세는 `docs/29` 2절.
+
+기존 백업 테스트 32건이 이걸 놓친 이유도 분명하다. **전부 `--once` 로 돌아서 `while` 루프의 대기 정책을 한 번도 실행하지 않았다.** 진짜 루프를 띄우는 검사 2건을 추가했다.
+
+#### 그밖에 확인된 것
+
+- `docker compose pull` 로 backend 331MB / web 303MB 를 받았다. VM 에서 빌드하지 않는 경로가 실제로 성립한다.
+- 첫 dump 가 `backups/finshield-…Z.dump` (8093B, `root:root`) 로 떨어졌다. **`cap_add: DAC_OVERRIDE` 가 실기에서 처음 검증됐다** — 지금까지 리눅스 CI 에서만 확인한 수정이다.
+- dump 는 `0644`, `backups/` 는 `0755` 라 로컬 사용자면 읽을 수 있다. 지금은 문제가 아니다 — 프로필은 암호화 저장이고 복호화 키는 `secrets/`(`0700`) 안에 있어서 dump 하나로는 아무것도 열리지 않는다. 0절의 분리가 의도대로 작동하는 상태다.

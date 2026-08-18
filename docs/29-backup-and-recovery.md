@@ -53,9 +53,23 @@ postgres 이미지에는 python이 없다. `apk`로 넣으면 해시 고정된 �
 | 환경변수 | 기본값 | 의미 |
 |---|---|---|
 | `FINSHIELD_BACKUP_INTERVAL_SECONDS` | `86400` | 덤프 주기. 30 ~ 604800 |
+| `FINSHIELD_BACKUP_RETRY_SECONDS` | `60` | 실패한 뒤의 재시도 간격. 1 ~ 주기 |
 | `FINSHIELD_BACKUP_KEEP` | `7` | 보관 세대 수. 1 ~ 365 |
 | `FINSHIELD_BACKUP_DIR` | `/backups` | 컨테이너 안 저장 위치 |
 | `FINSHIELD_BACKUP_HEARTBEAT_PATH` | `/tmp/finshield-backup-heartbeat` | 마지막 성공 시각 |
+
+**실패와 성공은 다른 시간을 기다린다.** 2026-08-18 에 GCP VM 을 재부팅해 보고
+찾은 결함이다. `restart: unless-stopped` 로 데몬이 컨테이너를 되살릴 때는 compose 의
+`depends_on` 이 적용되지 않아서, 백업 루프가 db 보다 먼저 떠면 첫 `pg_dump` 가
+`connection refused` 로 죽는다. 그런데 실패도 `INTERVAL` 을 재워서 다음 시도가
+24시간 뒤였고, heartbeat 는 tmpfs 라 재시작으로 사라졌다 — **재부팅 한 번이
+하루치 백업 공백과 하루치 unhealthy 를 만드는 구조였다.** 지금은 실패하면
+`FINSHIELD_BACKUP_RETRY_SECONDS` 만큼만 자고 다시 시도한다. 재시도가 healthcheck 의
+판정을 흐리지는 않는다 — heartbeat 는 **성공한 실행만** 갱신하기 때문이다.
+
+`pg_isready` 로 db 기동을 기다리는 방법도 있지만 택하지 않았다. 그것은 기동
+경합 하나만 막고, 재시도 루프는 db 재시작·일시적 연결 끊김·순간 디스크 오류까지
+같이 덮는다. 같은 일을 하는 장치를 둘 두지 않는다.
 
 범위를 벗어나거나 정수가 아니면 컨테이너가 **exit 2로 죽는다.** 설정 오류는 재시도해도 낫지 않는다. 조용히 아무것도 안 하는 것보다 눈에 띄는 편이 낫다.
 
