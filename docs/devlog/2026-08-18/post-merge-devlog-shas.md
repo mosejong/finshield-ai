@@ -51,7 +51,7 @@ test_analyze_is_limited_end_to_end` 가 깨졌다. 재실행하면 통과하는 
 | 파일 | 변경 |
 |---|---|
 | `docs/28-production-readiness.md` | P1-3 제목·"아직 안 된 것" 갱신, 패키지 공개 범위 문단 정정, rate limit 표에 "창 계산" 행 추가 |
-| `docs/31-public-deployment.md` | 3-2 에 익명 확인 명령 추가·private 단정 제거, 11-1 태그 경로 미검증 명시 |
+| `docs/31-public-deployment.md` | 3-2 에 익명 확인 명령 추가·private 단정 제거, 11-1 태그 경로 미검증 명시, 11-4 VM 설치 절차 정정 |
 | `docs/devlog/2026-08-18/deploy-image-pipeline.md` | 검증 8·9 추가, 위험 항목 갱신 |
 | `docs/devlog/2026-08-18/llm-explanation-contract.md` | main 기준 SHA 로 정정 |
 | `docs/14-development-workflow.md` | 커밋 SHA 기록 규칙 추가 |
@@ -130,7 +130,21 @@ finshield-web     -> HTTP 200
 
 **둘 다 public.** 문서의 단정이 틀렸다.
 
-**4. 전체 테스트 (2회 연속)**
+**4. VM 설치 명령을 실행 전에 확인했다**
+
+VM 이 뜬 뒤(`finshield`, `us-west1-b`, Debian 12) `docs/31` 11-4 를 그대로 붙여넣기
+직전에 패키지 존재 여부를 packages.debian.org 에서 확인했다. **두 개가 틀렸다.**
+
+- `docker-compose-v2` — bookworm 에 **없다** ("No such package"). trixie 부터 들어온다.
+  문서대로 하면 `apt-get install` 이 통째로 실패한다.
+- `python3-venv` — bookworm 에서 **별도 패키지** (3.11.2-1+b1). 없으면 다음 줄의
+  `python3 -m venv` 가 `ensurepip is not available` 로 죽는다.
+
+Docker 공식 설치 절차(docs.docker.com/engine/install/debian)로 교체하고
+`python3-venv` 를 추가했다. `docker-buildx-plugin` 은 이 VM 이 빌드하지 않으므로
+일부러 뺐다. **아직 VM 에서 실행해 보지는 않았다** — 다음 단계다.
+
+**5. 전체 테스트 (2회 연속)**
 
 ```
 553 passed, 2 skipped in 19.22s

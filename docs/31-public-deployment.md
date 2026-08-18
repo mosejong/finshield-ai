@@ -366,19 +366,48 @@ gcloud compute firewall-rules create finshield-web \
 
 ### 11-4. VM 안에서
 
+**swap 을 가장 먼저 만든다.** 뒤이어 오는 apt 와 pip 가 메모리를 쓰는데, 1GB 에는 여유가 없다.
+
 ```bash
-# 1GB 에는 여유가 없다. swap 이 없으면 순간 피크에서 OOM killer 가 돈다.
 sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
 sudo mkswap /swapfile && sudo swapon /swapfile
 echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
 
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
+**Docker 는 배포판 저장소가 아니라 Docker 공식 저장소에서 받는다.** Debian 12(bookworm)에는 `docker-compose-v2` 패키지가 **없다** — compose v2 가 Debian 에 들어온 것은 13(trixie)부터다. `apt-get install docker.io docker-compose-v2` 는 `E: Unable to locate package` 로 실패한다. `docker.io` 만 깔면 엔진은 뜨지만 `docker compose` 가 없어서 이 스택은 한 줄도 못 올린다.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg git python3-venv
+
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/debian
+Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 sudo usermod -aG docker $USER && exec newgrp docker
+```
 
+`docker-buildx-plugin` 은 일부러 뺐다. 이 VM 은 빌드하지 않는다(11-1). 필요해지는 상황이 곧 "VM 에서 빌드하려 하고 있다" 는 신호이므로, 없는 편이 낫다.
+
+`python3-venv` 도 **별도 패키지다.** Debian 은 `venv` 모듈을 python3 본체에서 분리해 놓았고, 없으면 아래 `python3 -m venv` 가 `ensurepip is not available` 로 죽는다.
+
+```bash
 git clone https://github.com/mosejong/finshield-ai.git && cd finshield-ai
 python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.txt
 .venv/bin/python scripts/create_local_docker_secrets.py
 ```
+
+호스트 venv 가 필요한 이유는 앱이 아니라 **스크립트** 다. 앱은 컨테이너 안에서 돈다. 호스트에서 도는 것은 비밀 생성기와 인증서 갱신 감시(6절)뿐이고, 둘 다 `cryptography` 를 쓴다.
 
 이름은 `create_local_docker_secrets` 지만 생성값은 운영에 써도 되는 강도다(`token_urlsafe(32)`, `Fernet.generate_key()`). 이미 있는 파일은 절대 덮어쓰지 않는다.
 
