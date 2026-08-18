@@ -285,7 +285,13 @@ Cloud Run 으로 옮기는 것 자체는 나중에 검토할 수 있지만, **�
 | OS | Debian 12 (bookworm) | Container-Optimized OS 는 루트가 읽기 전용이고 compose plugin 이 기본으로 없다. 이 스택은 `deploy/*.sh` 와 `./backups` 를 bind mount 한다 |
 | 외부 IP | **고정(static)** | 아래 참조. **이것만은 무료가 아니다** |
 
-실제 청구액은 고정 IP 월 $3~4 가 사실상 전부다. e2-medium 구성이 월 3~4만원인 것과의 차이가 이 선택의 이유다. 요금은 바뀌므로 Pricing Calculator 로 확인한다.
+실제 청구액은 고정 IP 월 $3~4 가 사실상 전부다. e2-medium 구성이 월 3~4만원인 것과의 차이가 이 선택의 이유다.
+
+**요율 확인 (2026-08-18).** VM 에 붙은 외부 IPv4 는 **시간당 $0.005** 다 — 2024-02-01 자 인상($0.004 → $0.005)이 그대로다. 월 730시간 기준 **$3.65**, 환율에 따라 ₩5,000 안팎. 출처: [external IPv4 요금 변경 공지](https://cloud.google.com/vpc/pricing-announce-external-ips).
+
+always-free 목록([free-cloud-features](https://docs.cloud.google.com/free/docs/free-cloud-features))에 들어 있는 것은 **인스턴스 1대 / `pd-standard` 30GB-month / 북미발 이그레스 1GB** 뿐이고, 외부 IP 는 목록에도 면제 문구에도 없다. 즉 "always-free VM" 이어도 IP 요금은 나온다. 이 스택은 ACME HTTP-01 검증에 공인 IPv4 가 필요하므로 피할 방법이 없고, 피하려 들 금액도 아니다.
+
+같은 페이지가 **"To use products that have a Free Tier, you need a Google Cloud billing account"** 라고 명시한다. 활성 후불 결제 계정이면 충족이고, $300 체험 크레딧은 요건이 아니다.
 
 무료 이그레스는 **북미발 월 1GB** 다(중국·호주 제외). Next 첫 로드가 수백 KB 이므로 월 수천 페이지뷰 근처에서 넘어가는데, 초과분이 GB 당 $0.12 선이라 금액 자체는 문제가 안 된다. 트래픽이 늘면 비용보다 **1GB RAM 이 먼저 한계에 닿는다.**
 
