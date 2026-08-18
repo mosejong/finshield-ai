@@ -70,6 +70,10 @@
 - `pwa-share-target.md` — PWA manifest·POST 공유 시트 인계·오프라인 셸·설치 유도
 - `public-deployment-tls.md` — ACME 연락처 필수화·staging 예행연습 경로·외부 공개 배포 검증기
 
+## 2026-08-18
+
+- `llm-explanation-contract.md` — 고정 model·prompt·provider 계약, PII 최소화, 출력 검증, 판정 경계 (프로바이더 미연결)
+
 ## 작성 규칙
 
 상세한 필수 항목과 PR 흐름은 `docs/14-development-workflow.md`를 따른다.
