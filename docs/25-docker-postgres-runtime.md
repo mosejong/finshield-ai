@@ -45,7 +45,7 @@ docker compose --env-file .env.docker up --detach --build
 - 기존 개발 서버와 충돌하지 않도록 기본 host 주소는 backend `http://127.0.0.1:18000`, web
   `http://127.0.0.1:13000`이다.
 - 컨테이너끼리는 host port가 아니라 `http://backend:8000`, `db:5432`로 통신한다.
-- `.env.docker`와 `secrets/*.txt`는 Git에서 제외된다.
+- `.env.docker`와 `secrets/` 디렉터리 전체는 Git에서 제외된다. 확장자가 아니라 디렉터리로 거른다 — `secrets/*.txt`로 두면 `.txt`를 안 붙인 키 파일이 커밋 가능해진다. `tests/test_runtime_secrets.py`가 `git check-ignore`로 실제 동작을 확인한다.
 - secret 생성기는 기존 파일이 하나라도 있으면 덮어쓰지 않고 중단한다.
 - Linux에서는 secret 디렉터리를 owner-only `0700`, 내부 파일을 container non-root UID가 읽을 수 있는
   `0644`로 만든다. 다른 host 사용자는 상위 디렉터리를 통과할 수 없다.

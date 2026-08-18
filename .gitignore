@@ -13,7 +13,10 @@ venv/
 data/raw/
 data/private/
 *.sqlite3
-secrets/*.txt
+# 확장자가 아니라 디렉터리 전체를 무시한다. `secrets/*.txt` 로 두면 `.txt` 를
+# 붙이지 않은 키 파일(`keys.pem`, `backup.key`, 확장자 없음)이 그대로 커밋
+# 가능해진다. 아래 `backups/*` 와 같은 형태다.
+secrets/*
 backups/*
 !backups/.gitkeep
 
