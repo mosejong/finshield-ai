@@ -235,8 +235,14 @@ CI 와 같은 명령으로 두 lock 을 재생성했다. `requirements.txt` 무�
 
 ## 커밋 SHA
 
-- `5780df1` — feat: build images outside the VM so a rollback has something to point at
+- **main**: `1809997` — PR #58 squash 병합 (2026-08-18 03:51 UTC)
+- 작업 브랜치: `5780df1` — feat: build images outside the VM so a rollback has
+  something to point at
+
+`5780df1` 은 **main 에서 도달할 수 없다.** #58 이 squash 로 병합돼 36개 커밋이
+`1809997` 하나로 접혔기 때문이다. 원본 객체는 `feature/frontend-accessibility-e2e`
+브랜치가 남아 있는 동안만 살아 있다. 그래서 main 기준 SHA 를 위에 먼저 적는다.
 
 ## PR
 
-- #58 (`feature/frontend-accessibility-e2e`)
+- #58 (`feature/frontend-accessibility-e2e`), squash 병합
