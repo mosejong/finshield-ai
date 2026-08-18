@@ -32,8 +32,8 @@ Scenario Engine을 재현 가능하게 비교한다. bootstrap 개발셋 기준 
 precision 0.973684, recall 0.948718, F1 0.961039, FPR 0.045455이며 action-source
 근거 연결 coverage는 1.0이다. 같은 데이터로 규칙을 교정했으므로 독립 held-out
 성능이나 실서비스 정확도로 주장하지 않는다. LLM-only와 Hybrid 비교도 아직
-수행하지 않았다. 상세 결과와 주장 한계는 `docs/28-fraud-evaluation-benchmark.md`와
-`docs/29-competition-evidence-pack.md`를 따른다.
+수행하지 않았다. 상세 결과와 주장 한계는 `docs/32-fraud-evaluation-benchmark.md`와
+`docs/33-competition-evidence-pack.md`를 따른다.
 프론트 접근성 v0.1은 본문 건너뛰기, 공통 포커스 링, 로딩·비동기 상태 안내,
 움직임 축소 설정과 구조적 회귀 테스트를 포함한다. PM 브라우저 검수에서
 375·768·1280 다크 화면의 가로 overflow·nav 전환과 스킵 링크의 main 포커스를
@@ -153,11 +153,35 @@ web/                Next.js frontend MVP
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
+pip install --require-hashes -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
 Then open `/docs`.
+
+### 의존성
+
+원본은 `requirements.in`(런타임)과 `requirements-dev.in`(개발·CI)이고,
+`requirements*.txt`는 해시가 박힌 생성물이다. `.txt`를 직접 고치지 않는다.
+
+| 파일 | 쓰는 곳 |
+|---|---|
+| `requirements.txt` | 컨테이너 이미지, `container-runtime` CI job |
+| `requirements-dev.txt` | 로컬 개발, `test`·`deps-lock` CI job |
+
+lock은 `--universal`로 만들어 Windows·Linux·macOS가 한 파일을 공유한다.
+플랫폼별 패키지는 marker로 갈린다 (`uvloop`은 non-win32, `colorama`는 win32).
+
+의존성을 바꾸려면 `.in`을 고친 뒤 재생성한다.
+
+```bash
+uv pip compile requirements.in     --universal --generate-hashes --python-version 3.12 -o requirements.txt
+uv pip compile requirements-dev.in --universal --generate-hashes --python-version 3.12 -o requirements-dev.txt
+```
+
+`--upgrade` 없이는 기존 pin을 유지하므로 재생성해도 무관한 패키지가 따라
+올라가지 않는다. 버전을 올릴 때만 `--upgrade` 또는 `--upgrade-package <이름>`을
+붙인다. `.in`만 고치고 lock을 갱신하지 않으면 `deps-lock` CI job이 막는다.
 
 암호화 DB 저장을 사용하려면 `DATABASE_URL`과 `PROFILE_ENCRYPTION_KEYS`를 함께 설정하고
 서버 시작 전에 `alembic upgrade head`를 실행한다. development·test는 SQLite 검증이
@@ -318,13 +342,22 @@ backend 시뮬레이션 결과를 나란히 표시한다. 원리금균등은 정
 
 보안 경계 v0.1이 적용되었다. 브라우저·API 보안 헤더, 쿠키 기반 상태 변경 요청의 same-origin 검사, production trusted host fail-closed, loopback 내부 포트, Caddy HTTPS 공개 구성을 포함한다. 실제 공개 완료에는 도메인·DNS·인증서 외부 검증이 남아 있다. 운영법과 제한은 `docs/26-http-security-https.md`를 따른다.
 
+요청 한도와 본문 크기 제한이 적용되었다. 식별자는 client IP 단독이며(세션은 공격자가 스스로 발급할 수 있어 한도를 무력화한다), 카운터는 IP를 그대로 담지 않도록 HMAC 버킷 키로 PostgreSQL에 저장한다. 초과 시 `429` + `Retry-After`를 돌려주고, 프론트는 그것을 "안전하다"가 아니라 "아직 확인되지 않았다"로 표현한다. 본문 상한은 스키마 검증 이전에 backend와 web 양쪽에서 적용된다. 신뢰 proxy 홉 수는 기본 0(헤더 불신)이며 배포에서 명시해야 한다. 설계 판단과 검증 결과는 `docs/28-production-readiness.md` 2절 P0-1을 따른다.
+
+만료 데이터 정리가 자동 실행된다. compose의 `retention` 서비스가 만료 세션·소유 프로필·닫힌 rate limit window를 주기적으로 지운다(기본 1시간). 성공한 실행만 heartbeat를 갱신하고 healthcheck가 그 나이를 보므로, 계속 실패하는 상태가 정상으로 보이지 않는다. 로그에는 건수와 성공 여부만 남기고 예외 메시지조차 남기지 않는다 — SQLAlchemy가 바인딩 값을 메시지에 붙이기 때문이다. 운영법은 `docs/24-anonymous-data-lifecycle.md`, 설계 판단은 `docs/28-production-readiness.md` 2절 P0-2를 따른다.
+
+백업이 자동 실행되고, 복원 리허설의 합격 기준은 "복호화됐다"이다. compose의 `backup` 서비스가 주기적으로 `pg_dump`를 뜨고(기본 하루) 세대를 회전하며, 새 dump마다 `pg_restore --list`로 읽히는지 확인한 뒤에만 파일을 확정한다. 프로필은 애플리케이션 레벨로 암호화되어 있어 **DB만 복원하고 키를 잃으면 백업은 쓸모가 없다** — 기존 CI 검사("알려진 금융 값이 평문으로 안 보인다")는 무작위 바이트열도 통과시켰다. `scripts/rehearse_backup_restore.py`는 임시 DB로 복원한 뒤 프로필을 실제로 복호화해야 통과하고, 키가 없으면 어느 세대 key id가 없는지 짚어준다. 복구 절차와 한계는 `docs/29-backup-and-recovery.md`, 설계 판단은 `docs/28-production-readiness.md` 2절 P0-3을 따른다.
+
+PWA로 설치되고 문자 앱 공유 시트에서 바로 들어온다. manifest의 `share_target`은 **GET이 아니라 POST**다. 사용자가 공유하는 값은 본인이 받은 문자 원문이라, 쿼리스트링으로 받으면 브라우저 주소 기록·액세스 로그·`Referer`에 원문이 그대로 복사되어 로그 allowlist(`docs/27`, `adr/0004`)가 무의미해진다. 받은 값은 실행되지 않는 JSON 태그에 담아 sessionStorage를 거쳐 `/check`에 채워 넣고 자동 분석하지는 않는다 — "이미 하신 행동"은 사용자만 안다. 서비스 워커는 화면 HTML과 `/api/*`를 캐시하지 않고 공유 POST에 개입하지 않으며, 캐시에 남는 것은 해시 붙은 자산·아이콘·오프라인 안내뿐이다. 오프라인 화면은 "확인하지 못했다는 것이 안전하다는 뜻은 아닙니다"를 먼저 말한다. 설계 판단과 검증은 `docs/30-pwa-and-share-target.md`를 따른다. 실기기 공유 시트 확인은 실도메인(P0-4) 이후로 남아 있다.
+
+공개 배포는 도메인만 남았다. ACME 계정 연락처를 필수로 두어(비면 Caddy가 기동을 거부한다) 인증서 갱신이 조용히 실패해도 발급기관이 알릴 통로가 있게 했고, 첫 발급은 Let's Encrypt staging으로 예행연습한다 — 운영 디렉터리는 검증 실패 5회/시간·중복 인증서 5장/주로 막히는데 **한도를 태운 사실은 준비가 끝난 뒤에 알게 된다.** staging을 환경변수가 아니라 mount되는 파일로 둔 이유는 `acme_ca`를 명시하면 기본 발급자 두 개(Let's Encrypt + ZeroSSL 대체)가 모두 하나로 대체되기 때문이다. `scripts/verify_public_deployment.py`가 외부에서 리다이렉트·HSTS·보안 헤더·인증서 만료·주요 화면·공유 시트·내부 포트를 확인하고, 판정 기준 자체는 `tests/test_public_deployment.py`가 네트워크 없이 고정한다. `localhost` 예행연습으로 경로 전체를 확인했다. 절차와 완료 기준은 `docs/31-public-deployment.md`를 따른다.
+
 - 독립 작성·동결한 held-out fraud golden v0.2 평가
 - 고정 model·prompt·provider 계약 후 LLM-only와 Hybrid 비교
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현
 - 익명 계정 전환·복구와 다중 기기 정책
-- PostgreSQL live·backup restore·다중 worker 검증
 - Starlette `TestClient` 사용 중단 예정 경고 대응
 
 ## Verified official-data direction (2026-08-11)

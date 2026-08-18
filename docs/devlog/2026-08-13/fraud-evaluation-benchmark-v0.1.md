@@ -46,8 +46,8 @@ Scenario Engine → binary/type/signal/policy/action/evidence metrics → JSON r
 - `tests/test_fraud_evaluation.py`
 - `.github/workflows/ci.yml`
 - `docs/05-data-and-evaluation.md`, `docs/10-mvp-backlog.md`
-- `docs/28-fraud-evaluation-benchmark.md`
-- `docs/29-competition-evidence-pack.md`
+- `docs/32-fraud-evaluation-benchmark.md`
+- `docs/33-competition-evidence-pack.md`
 - `docs/adr/0007-bootstrap-fraud-evaluation.md`
 - 문서 색인과 `README.md`
 

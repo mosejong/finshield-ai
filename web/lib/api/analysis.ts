@@ -7,7 +7,7 @@ import {
   type RiskLevel,
   type RiskSignal,
 } from "@/lib/api/contracts";
-import { ApiError, postJson } from "@/lib/api/client";
+import { ApiError, postJson, retryHint } from "@/lib/api/client";
 import { apiMode } from "@/lib/api/mode";
 import { demoAnalysis, headline, stateSummary } from "@/lib/mock/analysis";
 
@@ -117,6 +117,7 @@ export function adaptBackendAnalysis(
 /** 서버 사이드 전용. Route Handler 에서만 호출한다. */
 export async function analyzeOnServer(
   request: AnalyzeRequest,
+  headers: HeadersInit = {},
 ): Promise<AnalysisResult> {
   if (apiMode() === "mock") {
     return demoAnalysis(newAnalysisId(), request.state);
@@ -131,6 +132,8 @@ export async function analyzeOnServer(
       url: request.url ?? null,
     },
     BackendAnalyzeResponseSchema,
+    undefined,
+    headers,
   );
 
   return adaptBackendAnalysis(backend, request);
@@ -207,6 +210,24 @@ export function describeApiError(error: unknown): AnalyzeFailure {
         return {
           message: "분석 서버 응답 형식이 예상과 다릅니다.",
           hint: "백엔드 스키마가 바뀌었을 수 있습니다.",
+        };
+      case "http":
+        // 분석이 "안전하다" 가 아니라 "돌지 않았다" 로 읽히게 쓴다.
+        if (error.status === 429) {
+          return {
+            message: "요청이 많아 분석을 잠시 멈췄습니다. 아직 위험 여부는 확인되지 않았습니다.",
+            hint: `${retryHint(error.retryAfterSeconds)} 지금 급하다면 경찰 112 또는 보이스피싱 통합신고대응센터 1394로 바로 연락하세요.`,
+          };
+        }
+        if (error.status === 413) {
+          return {
+            message: "보낸 내용이 너무 길어 분석하지 못했습니다.",
+            hint: "확인이 필요한 부분만 남기고 다시 붙여넣어 주세요.",
+          };
+        }
+        return {
+          message: error.message,
+          hint: "잠시 후 다시 시도해 주세요.",
         };
       default:
         return {

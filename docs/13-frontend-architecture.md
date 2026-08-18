@@ -36,6 +36,12 @@ finshield-ai/
 | `/profile` 파생지표 | backend 월 현금흐름·상환비율·비상자금 기간 | 구현 |
 | `/` 현재 금융상태 | 저장 profile + backend 파생지표 live 요약 | 구현 |
 | `/evidence/[id]` | 근거 상세 | 미구현 (목록 컴포넌트만 존재) |
+| `/check/shared` | 공유 시트 수신 (POST 전용 Route Handler, 화면 아님) | 구현 |
+| `/offline` | 연결 없음 안내 (서비스 워커 폴백) | 구현 |
+
+`/check/shared` 는 안드로이드 공유 시트가 POST 하는 곳이고 사용자가 머무는 화면이 아니다. 받은 내용을 `/check` 입력창까지 옮기고 곧바로 `location.replace` 로 빠진다. **GET 쿼리스트링을 쓰지 않는 이유**는 공유되는 값이 사용자가 받은 문자 원문이라 주소에 실으면 브라우저 기록·액세스 로그·`Referer` 에 남기 때문이다. 설계와 검증은 `docs/30-pwa-and-share-target.md`.
+
+설치 유도(`components/pwa/InstallHint.tsx`)는 **결과 화면에만** 둔다. Home 은 블록 4개로 고정이고, 설치의 값어치는 결과를 한 번 본 뒤에야 와닿는다.
 
 **`/check` 는 프로필 없이 동작한다.** 의심 문자를 방금 받은 사람에게 온보딩을 먼저 요구하면 이탈한다. 프로필은 개인화 품질만 올리는 선택 요소이며, 있으면 `persona` 만 요청에 실린다.
 
@@ -269,3 +275,4 @@ PM 검수에서 375·768·1280 viewport의 가로 overflow와 nav 전환, 다크
   탭 순서, 라이트 색상 모드. 다크 화면·375/768/1280·스킵 링크 포커스는 PM 확인 완료.
 - 실기기 확인 (지금까지는 헤드리스 Chrome 캡처와 실서버 SSR HTML 확인만). iOS Safari 의 `env(safe-area-inset-bottom)` 과 `100dvh` 동작은 시뮬레이터로 재확인 필요
 - 폼 필드별 `aria-invalid`/오류 개별 연결 (현재는 폼 단위 `role="alert"` 요약)
+- 실기기 PWA 확인 — 홈 화면 설치, 안드로이드 공유 시트에 실제로 뜨는지, 서비스 워커 오프라인 폴백. HTTPS 요건 때문에 실도메인(`docs/28` P0-4) 이후에야 가능하다

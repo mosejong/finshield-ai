@@ -48,6 +48,32 @@
 - `session-data-lifecycle-integration.md` — PR #46 병합·데스크톱 최신화·live 삭제 E2E
 - `docker-postgres-runtime.md` — Compose, PostgreSQL, 다중 worker와 backup/restore 검증
 - `docker-postgres-integration.md` — PR #48 Linux CI 수정·병합·데스크톱 최신화
+- `security-https-boundary.md` — 보안 헤더·CSRF·Host·HTTPS 경계 구현 및 검증
+- `security-https-integration.md` — PR #50 Linux CI·PM 검수·main 통합 기록
+- `observability-pii-masking.md` — 요청 추적·latency·readiness·PII 비노출 구현
+- `observability-integration.md` — PR #52 Linux CI·PII 비노출·main 통합 기록
+- `frontend-accessibility-e2e.md` — 접근성 패스와 구조적 a11y 회귀 검사
+
+## 2026-08-14
+
+- `code-verification-and-fixes.md` — mutation·독립 재계산 검증과 위험 판정·링크·출처 수정
+- `dependency-hash-locking.md` — 해시 고정 universal lock·런타임/개발 분리·CI drift 차단
+
+## 2026-08-15
+
+- `rate-limiting-request-limits.md` — IP 기준 요청 한도·본문 크기 상한·홉 신뢰 경계·429 문구
+- `expired-data-retention-schedule.md` — 만료 데이터 정리 주기 실행·heartbeat healthcheck·거짓 성공 차단
+
+## 2026-08-17
+
+- `backup-and-restore-rehearsal.md` — 백업 주기 실행·세대 회전·복호화까지 확인하는 복원 리허설
+- `pwa-share-target.md` — PWA manifest·POST 공유 시트 인계·오프라인 셸·설치 유도
+- `public-deployment-tls.md` — ACME 연락처 필수화·staging 예행연습 경로·외부 공개 배포 검증기
+
+## 2026-08-18
+
+- `llm-explanation-contract.md` — 고정 model·prompt·provider 계약, PII 최소화, 출력 검증, 판정 경계 (프로바이더 미연결)
+- `deploy-image-pipeline.md` — ghcr 릴리스 워크플로, 배포 override, expand/contract 롤백 전략 (실배포 미검증)
 
 ## 작성 규칙
 

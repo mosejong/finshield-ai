@@ -10,8 +10,13 @@ RUN groupadd --system --gid 10001 finshield \
 
 WORKDIR /app
 
+# 런타임 lock 만 복사한다. requirements-dev.txt 는 이미지에 들어가지 않으므로
+# pytest 같은 개발 도구가 프로덕션 컨테이너에 실리지 않는다.
+#
+# --require-hashes: 모든 패키지가 == 로 고정되고 해시가 일치해야 설치된다.
+# lock 에 빠진 전이 의존성이 있으면 조용히 넘어가지 않고 빌드가 실패한다.
 COPY requirements.txt ./
-RUN python -m pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir --require-hashes -r requirements.txt
 
 COPY alembic.ini ./
 COPY app ./app

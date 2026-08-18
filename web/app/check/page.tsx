@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import type { UserState } from "@/lib/api/contracts";
+import { ANALYZE_TEXT_MAX_LENGTH } from "@/lib/api/contracts";
+import { usePendingShare } from "@/lib/share/pending";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionHeading } from "@/components/common/SectionHeading";
@@ -24,12 +26,24 @@ import { useProfileStore } from "@/lib/store/profile-store";
  * 키워드 검사나 점수 계산을 하지 않는다.
  */
 
-const MAX_LENGTH = 10000;
+const MAX_LENGTH = ANALYZE_TEXT_MAX_LENGTH;
 
 export default function CheckPage() {
   const router = useRouter();
 
-  const [text, setText] = useState("");
+  /**
+   * 공유 시트로 들어온 경우 `/check/shared` 가 sessionStorage 에 놓고 넘겨준
+   * 내용. 자동으로 분석까지 보내지는 않는다 - 어떤 내용이 넘어왔는지 사용자가
+   * 먼저 보고, "이미 하신 행동"을 고를 수 있어야 한다.
+   *
+   * 편집하기 전까지는 공유된 내용을 그대로 보여주고, 한 글자라도 고치면 그때부터
+   * `edited` 가 화면의 값이 된다. 공유 내용을 초기값으로 복사해 넣지 않는 이유는
+   * 하이드레이션 이후에 setState 를 한 번 더 돌려야 하기 때문이다.
+   */
+  const shared = usePendingShare();
+  const [edited, setEdited] = useState<string | null>(null);
+  const text = edited ?? shared ?? "";
+
   const [state, setState] = useState<UserState>("received_only");
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<{
@@ -80,12 +94,21 @@ export default function CheckPage() {
             <span id="check-input">받은 내용</span>
           </SectionHeading>
 
+          {shared ? (
+            <p
+              role="status"
+              className="mb-2 rounded-md border border-border bg-secondary/60 px-3 py-2 text-caption text-muted-foreground"
+            >
+              공유하신 내용을 불러왔습니다. 확인 전에 고치거나 지우셔도 됩니다.
+            </p>
+          ) : null}
+
           <label className="flex flex-col gap-1.5">
             <span className="sr-only">받은 메시지 내용</span>
             <textarea
               id="check-message"
               value={text}
-              onChange={(event) => setText(event.target.value.slice(0, MAX_LENGTH))}
+              onChange={(event) => setEdited(event.target.value.slice(0, MAX_LENGTH))}
               rows={7}
               aria-describedby="check-message-help check-message-count check-message-privacy"
               placeholder="예) 급여 계좌 등록이 필요합니다. 오늘 안에 체크카드를 아래 주소로 보내주세요."

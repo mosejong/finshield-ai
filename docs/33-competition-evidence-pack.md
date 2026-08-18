@@ -30,7 +30,7 @@
 | 평가 구현 | `evaluation/fraud_benchmark.py` |
 | 재현 명령 | `scripts/evaluate_fraud_engine.py` |
 | 기계 판독 결과 | `evaluation/results/fraud-benchmark-v0.1.json` |
-| 평가 해설 | `docs/28-fraud-evaluation-benchmark.md` |
+| 평가 해설 | `docs/32-fraud-evaluation-benchmark.md` |
 | 설계 결정 | `docs/adr/0007-bootstrap-fraud-evaluation.md` |
 | 시간순 개발·리뷰 | `docs/devlog/2026-08-13/fraud-evaluation-benchmark-v0.1.md` |
 

@@ -3,6 +3,17 @@ services:
     environment:
       APP_ENV: production
       FINSHIELD_TRUSTED_HOSTS: backend,localhost,127.0.0.1
+      # 경로는 Caddy -> web -> backend 다. Caddy 가 X-Forwarded-For 를 실제
+      # 접속 주소 하나로 덮어쓰고(deploy/Caddyfile), web 은 그 값을 그대로
+      # 넘기며 자기 홉을 덧붙이지 않는다. 그래서 맨 오른쪽 = 실제 클라이언트다.
+      # 앞단에 CDN 같은 프록시를 하나 더 두면 이 값도 함께 올려야 한다.
+      FINSHIELD_TRUSTED_PROXY_HOPS: "1"
+
+  # backend 와 같은 APP_ENV 여야 한다. 여기가 development 로 남으면 정리
+  # 컨테이너만 SQLite 를 허용하게 되고, 그러면 운영 DB 가 아닌 곳을 비운다.
+  retention:
+    environment:
+      APP_ENV: production
 
   web:
     environment:
@@ -13,9 +24,33 @@ services:
     restart: unless-stopped
     environment:
       FINSHIELD_DOMAIN: ${FINSHIELD_DOMAIN:?FINSHIELD_DOMAIN is required}
+      # 발급기관이 만료 임박을 알릴 수 있는 유일한 통로다. 없이 올리는 것을
+      # 막으려고 필수로 둔다 (deploy/Caddyfile).
+      FINSHIELD_ACME_EMAIL: ${FINSHIELD_ACME_EMAIL:?FINSHIELD_ACME_EMAIL is required}
     depends_on:
       web:
         condition: service_healthy
+    # 실제 SNI 로 자기 자신에게 붙어 본다. 인증서가 없으면 handshake 가 실패하므로
+    # "Caddy 프로세스는 살아 있는데 인증서 발급에 실패한" 상태가 healthy 로 보이지
+    # 않는다. 만료까지 잡지는 못한다 - `-k` 로 검증을 건너뛰기 때문이고, 만료는
+    # `python -m scripts.verify_public_deployment --certificate-only` 가 본다.
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsk
+        - --max-time
+        - "5"
+        - --resolve
+        - ${FINSHIELD_DOMAIN:?FINSHIELD_DOMAIN is required}:443:127.0.0.1
+        - -o
+        - /dev/null
+        - https://${FINSHIELD_DOMAIN:?FINSHIELD_DOMAIN is required}/
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      # 첫 인증서 발급은 DNS 전파와 ACME 검증을 기다린다.
+      start_period: 120s
     ports:
       - "80:80"
       - "443:443"

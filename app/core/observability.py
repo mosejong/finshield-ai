@@ -156,18 +156,27 @@ def _request_id(headers: Mapping[str, str]) -> str:
     return candidate if REQUEST_ID_PATTERN.fullmatch(candidate) else uuid4().hex
 
 
-def _configure_request_logger() -> None:
-    request_logger.setLevel(logging.INFO)
+def configure_json_logger(logger: logging.Logger) -> None:
+    """메시지를 그대로 한 줄씩 내보낸다.
+
+    메시지가 이미 JSON 이라 formatter 가 접두어를 붙이면 파싱이 깨진다.
+    두 번 불러도 handler 가 늘어나지 않아야 한다 - 같은 줄이 여러 번 찍히면
+    로그 수집 쪽에서 건수가 부풀려진다.
+    """
+    logger.setLevel(logging.INFO)
     has_json_handler = any(
-        getattr(handler, "_finshield_json", False)
-        for handler in request_logger.handlers
+        getattr(handler, "_finshield_json", False) for handler in logger.handlers
     )
     if not has_json_handler:
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter("%(message)s"))
         handler._finshield_json = True  # type: ignore[attr-defined]
-        request_logger.addHandler(handler)
-    request_logger.propagate = False
+        logger.addHandler(handler)
+    logger.propagate = False
+
+
+def _configure_request_logger() -> None:
+    configure_json_logger(request_logger)
 
 
 def _route_template(request: Request) -> str:

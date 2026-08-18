@@ -18,6 +18,8 @@ export const MOCK_PROFILE: FinancialProfile = {
   employmentStatus: "employed",
   householdSize: 1,
   dependentsCount: 0,
+  maritalStatus: null,
+  region: null,
 
   monthlyNetIncome: 2_800_000,
   monthlyFixedExpenses: 1_150_000,

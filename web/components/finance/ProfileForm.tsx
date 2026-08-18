@@ -30,6 +30,8 @@ const DEFAULTS: FinancialProfile = {
   employmentStatus: "employed",
   householdSize: 1,
   dependentsCount: 0,
+  maritalStatus: null,
+  region: null,
   monthlyNetIncome: 0,
   monthlyFixedExpenses: 0,
   monthlyVariableExpenses: 0,

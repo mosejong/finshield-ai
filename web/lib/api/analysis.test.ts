@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { adaptBackendAnalysis } from "@/lib/api/analysis";
+import { adaptBackendAnalysis, describeApiError } from "@/lib/api/analysis";
+import { ApiError } from "@/lib/api/client";
 import type { AnalyzeRequest } from "@/lib/api/contracts";
 
 const request: AnalyzeRequest = {
@@ -132,5 +133,43 @@ describe("adaptBackendAnalysis", () => {
         request,
       ),
     ).toThrow();
+  });
+});
+
+describe("describeApiError", () => {
+  it("한도 초과를 '분석이 돌지 않았다'로 말한다", () => {
+    const failure = describeApiError(
+      new ApiError("http", "", 429, { retryAfterSeconds: 30 }),
+    );
+
+    expect(failure.message).toContain("아직 위험 여부는 확인되지 않았습니다");
+    expect(failure.hint).toContain("30초 뒤에");
+    // 기다리는 동안에도 공식 창구는 열려 있다.
+    expect(failure.hint).toContain("112");
+    expect(failure.hint).toContain("1394");
+  });
+
+  it("어떤 실패도 '안전' 이나 '이상 없음' 으로 말하지 않는다", () => {
+    const failures = [
+      describeApiError(new ApiError("http", "", 429)),
+      describeApiError(new ApiError("http", "", 413)),
+      describeApiError(new ApiError("http", "서버 오류", 500)),
+      describeApiError(new ApiError("network", "연결 실패")),
+      describeApiError(new ApiError("timeout", "지연")),
+      describeApiError(new ApiError("schema", "형식 불일치")),
+      describeApiError(new Error("boom")),
+    ];
+
+    for (const failure of failures) {
+      expect(failure.message).not.toMatch(/안전|이상 없음|위험 없음|정상입니다/);
+      expect(failure.message.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("본문 초과는 다시 붙여넣는 방법을 알려준다", () => {
+    const failure = describeApiError(new ApiError("http", "", 413));
+
+    expect(failure.message).toContain("너무 길어");
+    expect(failure.hint).toContain("다시 붙여넣어");
   });
 });

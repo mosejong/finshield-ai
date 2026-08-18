@@ -352,6 +352,7 @@ def test_alembic_migration_round_trip(tmp_path: Path, monkeypatch: pytest.Monkey
         "alembic_version",
         "auth_sessions",
         "financial_profiles",
+        "rate_limit_counters",
         "users",
     }
     assert {column["name"] for column in inspect(engine).get_columns("financial_profiles")} == {
@@ -367,3 +368,27 @@ def test_alembic_migration_round_trip(tmp_path: Path, monkeypatch: pytest.Monkey
     assert "financial_profiles" not in inspect(engine).get_table_names()
     command.upgrade(config, "head")
     assert "financial_profiles" in inspect(engine).get_table_names()
+
+
+def test_migrations_do_not_silence_application_loggers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """alembic 이 앱 로거를 꺼버리면 안 된다.
+
+    `fileConfig` 의 `disable_existing_loggers` 기본값은 True 다. 운영
+    스크립트나 테스트처럼 같은 프로세스에서 migration 을 부르면, 그 뒤로
+    앱이 남기는 경고가 조용히 사라진다. 장애 때 가장 필요한 로그가
+    없어지는 방식이라 눈에 띄지 않는다.
+    """
+    import logging
+
+    logger = logging.getLogger("finshield.migration_probe")
+    assert logger.disabled is False
+
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        f"sqlite+pysqlite:///{(tmp_path / 'logging.sqlite3').as_posix()}",
+    )
+    command.upgrade(Config("alembic.ini"), "head")
+
+    assert logger.disabled is False

@@ -1,0 +1,17 @@
+# Let's Encrypt staging 발급자. 첫 발급을 연습할 때만 쓴다.
+#
+# 운영 디렉터리는 도메인당 검증 실패 5회/시간, 같은 이름 중복 인증서 5장/주로
+# 막힌다. DNS 가 아직 서버를 가리키지 않거나 80 포트가 닫힌 채로 스택을 올리면
+# Caddy 가 재시도하면서 그 한도를 태우고, 정작 준비가 끝난 뒤에 발급을 못 받는다.
+# staging 은 한도가 훨씬 넉넉해서 경로 확인용으로 쓸 수 있다.
+#
+# 켜는 법 (compose.acme-staging.yaml 이 이 파일을 mount 한다):
+#   docker compose -f compose.yaml -f compose.https.yaml -f compose.acme-staging.yaml up -d
+#
+# staging 인증서는 브라우저가 신뢰하지 않는다. 연습이 끝나면 override 를 빼고
+# 다시 올린 뒤, 운영 인증서가 실제로 발급됐는지
+# `python -m scripts.verify_public_deployment` 로 확인한다.
+#
+# 이 파일이 mount 되면 기본 발급자(Let's Encrypt + ZeroSSL 대체)가 이 한 곳으로
+# 대체된다. 대체 발급자가 사라지는 것도 연습 모드에서만 감수하는 부분이다.
+acme_ca https://acme-staging-v02.api.letsencrypt.org/directory

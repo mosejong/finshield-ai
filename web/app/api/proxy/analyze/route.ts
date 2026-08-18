@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { AnalyzeRequestSchema } from "@/lib/api/contracts";
 import { analyzeOnServer, describeApiError } from "@/lib/api/analysis";
+import { ApiError } from "@/lib/api/client";
+import { backendHeaders } from "@/lib/api/server-auth";
+import { upstreamStatus } from "@/lib/api/proxy-response";
+import { readJsonBody } from "@/lib/api/request-body";
 
 /**
  * FastAPI 백엔드로 가는 서버 사이드 프록시.
@@ -17,17 +21,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { message: "요청 형식이 올바르지 않습니다." },
-      { status: 400 },
-    );
-  }
+  const body = await readJsonBody(request);
+  if (!body.ok) return body.response;
 
-  const parsed = AnalyzeRequestSchema.safeParse(body);
+  const parsed = AnalyzeRequestSchema.safeParse(body.value);
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -39,11 +36,16 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await analyzeOnServer(parsed.data);
+    const result = await analyzeOnServer(parsed.data, backendHeaders(request));
     return NextResponse.json(result);
   } catch (error) {
     const failure = describeApiError(error);
-    // 실패를 "위험 없음"으로 바꾸지 않는다. 502 로 명시한다.
-    return NextResponse.json(failure, { status: 502 });
+    // 실패를 "위험 없음"으로 바꾸지 않는다. 상태 코드로 명시한다.
+    // 한도 초과(429)·본문 초과(413)는 백엔드 장애가 아니므로 502 로 덮지 않는다.
+    const response = NextResponse.json(failure, { status: upstreamStatus(error) });
+    const retryAfter =
+      error instanceof ApiError ? error.retryAfterSeconds : undefined;
+    if (retryAfter) response.headers.set("Retry-After", String(retryAfter));
+    return response;
   }
 }

@@ -3,9 +3,11 @@ import {
   BackendFinancialProfileResourceSchema,
   FinancialProfileSchema,
 } from "@/lib/api/contracts";
-import { ApiError, requestJson } from "@/lib/api/client";
+import { requestJson } from "@/lib/api/client";
 import { toBackendProfile } from "@/lib/api/profiles";
-import { forwardedSessionCookie, rejectCrossSiteRequest } from "@/lib/api/server-auth";
+import { backendHeaders, rejectCrossSiteRequest } from "@/lib/api/server-auth";
+import { upstreamFailure } from "@/lib/api/proxy-response";
+import { readJsonBody } from "@/lib/api/request-body";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,14 +16,10 @@ export async function POST(request: Request) {
   const rejected = rejectCrossSiteRequest(request);
   if (rejected) return rejected;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ message: "요청 형식이 올바르지 않습니다." }, { status: 400 });
-  }
+  const body = await readJsonBody(request);
+  if (!body.ok) return body.response;
 
-  const parsed = FinancialProfileSchema.safeParse(body);
+  const parsed = FinancialProfileSchema.safeParse(body.value);
   if (!parsed.success) {
     return NextResponse.json({ message: "금융상태 입력값을 확인해 주세요." }, { status: 400 });
   }
@@ -33,13 +31,10 @@ export async function POST(request: Request) {
       toBackendProfile(parsed.data),
       BackendFinancialProfileResourceSchema,
       8000,
-      forwardedSessionCookie(request),
+      backendHeaders(request, { session: true }),
     );
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    const status = error instanceof ApiError && [401, 503].includes(error.status)
-      ? error.status
-      : 502;
-    return NextResponse.json({ message: "금융상태를 저장하지 못했습니다." }, { status });
+    return upstreamFailure(error, "금융상태를 저장하지 못했습니다.");
   }
 }

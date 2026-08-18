@@ -21,6 +21,8 @@ const PROFILE: FinancialProfile = {
   employmentStatus: "employed",
   householdSize: 2,
   dependentsCount: 1,
+  maritalStatus: null,
+  region: null,
   monthlyNetIncome: 3_500_000,
   monthlyFixedExpenses: 1_200_000,
   monthlyVariableExpenses: 600_000,
@@ -89,6 +91,35 @@ describe("financial profile adapter", () => {
     expect(resource.profile.monthlyNetIncome).toBe(3_500_000);
     expect(resource.profile.persona).toBe("small_business");
     expect(resource.profileId).toBe(BACKEND_RESOURCE.profile_id);
+  });
+
+  it("화면이 입력받지 않는 서버 보관 값을 왕복에서 지우지 않는다", () => {
+    // 이 값들을 어댑터가 흘리면 프로필 수정 한 번에 서버 값이 null 로 덮인다.
+    const parsed = BackendFinancialProfileResourceSchema.parse({
+      ...BACKEND_RESOURCE,
+      profile: {
+        ...BACKEND_RESOURCE.profile,
+        marital_status: "married",
+        region: "서울",
+      },
+    });
+
+    const resource = adaptProfileResource(parsed, "early_career");
+    expect(resource.profile.maritalStatus).toBe("married");
+    expect(resource.profile.region).toBe("서울");
+
+    const roundTripped = toBackendProfile(resource.profile);
+    expect(roundTripped.marital_status).toBe("married");
+    expect(roundTripped.region).toBe("서울");
+  });
+
+  it("백엔드 enum 밖의 값을 조용히 통과시키지 않는다", () => {
+    expect(
+      BackendFinancialProfileResourceSchema.safeParse({
+        ...BACKEND_RESOURCE,
+        profile: { ...BACKEND_RESOURCE.profile, marital_status: "그때그때다름" },
+      }).success,
+    ).toBe(false);
   });
 });
 

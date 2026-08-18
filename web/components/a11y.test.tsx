@@ -31,6 +31,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
+import OfflinePage from "@/app/offline/page";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EvidenceList } from "@/components/evidence/EvidenceList";
@@ -167,6 +168,19 @@ describe("MockBadge 출처 정직성", () => {
   });
 });
 
+describe("오프라인 대체 화면", () => {
+  it("연결이 없어도 걸 수 있는 공식 창구를 tel: 링크로 준다", () => {
+    const html = render(<OfflinePage />);
+    expect(html).toContain('href="tel:112"');
+    expect(html).toContain('href="tel:1332"');
+    expect(html).toContain('href="tel:118"');
+  });
+
+  it("확인하지 못한 것을 안전으로 읽히게 두지 않는다", () => {
+    expect(render(<OfflinePage />)).toContain("안전하다는 뜻은 아닙니다");
+  });
+});
+
 describe("MetricList / ProfileFacts 정의 목록 구조", () => {
   it("파생지표를 dl 없이 ul 목록으로 표현한다", () => {
     const metrics: DerivedMetric[] = [
@@ -189,6 +203,8 @@ describe("MetricList / ProfileFacts 정의 목록 구조", () => {
       employmentStatus: "employed",
       householdSize: 1,
       dependentsCount: 0,
+      maritalStatus: null,
+      region: null,
       monthlyNetIncome: 2_800_000,
       monthlyFixedExpenses: 1_100_000,
       monthlyVariableExpenses: 600_000,

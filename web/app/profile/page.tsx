@@ -161,6 +161,11 @@ export default function ProfilePage() {
               없어 쿠키를 지우거나 다른 브라우저·기기로 열면 다시 불러올 수 없고, 복구
               수단도 없습니다.
             </p>
+            <p className="mt-2 text-caption text-muted-foreground">
+              이 금융상태는 지금 브라우저의 익명 세션에만 연결됩니다. 로그인·이메일이
+              없어 쿠키를 지우거나 다른 브라우저·기기로 열면 다시 불러올 수 없고, 복구
+              수단도 없습니다.
+            </p>
 
             {/* 탭을 닫을 때까지 기다리지 않고 지울 수 있어야 한다 */}
             {hasOwnProfile ? (

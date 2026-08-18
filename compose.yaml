@@ -1,5 +1,9 @@
 name: finshield
 
+# db 와 backup 이 반드시 같은 이미지여야 한다. pg_dump 는 서버보다 major 버전이
+# 낮으면 거부하므로, 한 곳에서만 정의해 어긋날 수 없게 만든다.
+x-postgres-image: &postgres-image postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+
 x-backend-environment: &backend-environment
   APP_ENV: ${APP_ENV:-development}
   AUTH_SESSION_TTL_SECONDS: ${AUTH_SESSION_TTL_SECONDS:-2592000}
@@ -10,10 +14,19 @@ x-backend-environment: &backend-environment
   DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
   PROFILE_ENCRYPTION_KEYS_FILE: /run/secrets/profile_encryption_keys
   FINSHIELD_TRUSTED_HOSTS: ${FINSHIELD_TRUSTED_HOSTS:-backend,localhost,127.0.0.1}
+  # 이 파일만으로 띄우면 proxy 가 없다. 브라우저가 web:3000 에 바로 붙으므로
+  # 믿을 forwarded 홉이 없다. HTTPS 배포는 compose.https.yaml 에서 1 로 올린다.
+  FINSHIELD_TRUSTED_PROXY_HOPS: ${FINSHIELD_TRUSTED_PROXY_HOPS:-0}
+  # 비워두면 APP_ENV 를 따른다 (development/test 는 끔, 나머지는 켬).
+  # 로컬에서 429 를 실제로 확인하거나 CI 실기동 검증을 돌릴 때 1 로 준다.
+  FINSHIELD_RATE_LIMIT_ENABLED: ${FINSHIELD_RATE_LIMIT_ENABLED:-}
+  FINSHIELD_RATE_LIMIT_SECRET_FILE: /run/secrets/rate_limit_secret
+  FINSHIELD_MAX_REQUEST_BYTES: ${FINSHIELD_MAX_REQUEST_BYTES:-131072}
 
 x-backend-secrets: &backend-secrets
   - postgres_password
   - profile_encryption_keys
+  - rate_limit_secret
 
 x-runtime-security: &runtime-security
   cap_drop:
@@ -23,7 +36,7 @@ x-runtime-security: &runtime-security
 
 services:
   db:
-    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    image: *postgres-image
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-finshield}
@@ -33,7 +46,6 @@ services:
       - postgres_password
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./backups:/backups
     healthcheck:
       test:
         - CMD-SHELL
@@ -88,6 +100,114 @@ services:
       start_period: 10s
     <<: *runtime-security
 
+  # 보존기간을 실제로 이행하는 쪽. 문서에만 있는 정책은 지켜지지 않는다.
+  #
+  # backend 안의 background task 로 넣지 않았다. worker 가 2 개라 같은 정리가
+  # 동시에 두 번 돌고, API 응답 지연과 정리 지연이 한 프로세스에 얽힌다.
+  # 따로 두면 API 가 죽어도 개인정보 삭제는 계속된다.
+  retention:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *backend-environment
+      FINSHIELD_RETENTION_INTERVAL_SECONDS: ${FINSHIELD_RETENTION_INTERVAL_SECONDS:-3600}
+    secrets: *backend-secrets
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    command: ["python", "-m", "scripts.run_retention_scheduler"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    # 마지막으로 "성공한" 정리 시각을 본다. 계속 실패하는 loop 도 프로세스는
+    # 살아 있으므로, 살아 있음만으로는 정리가 되고 있다는 증거가 못 된다.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - scripts.run_retention_scheduler
+        - --check-heartbeat
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    <<: *runtime-security
+
+  # 백업을 실제로 뜨는 쪽. pg_dump 는 지금까지 CI 검증 경로 안에만 있었고
+  # 운영 스케줄이 없었다. 백업이 없는 상태와 "백업 코드가 있는" 상태는 복구
+  # 시점에 같은 결과가 된다.
+  #
+  # db 와 같은 이미지를 쓴다 (위 anchor). backend 이미지에 postgres client 를
+  # 넣으면 인터넷에 노출된 API 이미지에 dump 도구가 실리고, 서버와 맞춰야 할
+  # 버전이 하나 더 생긴다.
+  #
+  # 이 컨테이너만 root 로 돈다. postgres 이미지는 USER 를 지정하지 않고, 여기에
+  # uid 를 강제하면 호스트 bind mount 소유권과 어긋나 백업이 조용히 실패한다.
+  # 대신 capability 를 전부 떨어뜨리고 rootfs 를 읽기 전용으로 두며 포트를 열지
+  # 않는다. 하는 일은 pg_dump 호출 하나다.
+  backup:
+    image: *postgres-image
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-finshield}
+      PGUSER: ${POSTGRES_USER:-finshield_app}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      # 루프가 여기에 pgpass 를 쓴다. `docker compose exec` 는 루프의 환경을
+      # 물려받지 않으므로, 경로를 컨테이너 환경에 둬야 복원 리허설의 psql 도
+      # 같은 파일을 찾는다. tmpfs 라 이미지·볼륨에 남지 않는다.
+      PGPASSFILE: /tmp/finshield-pgpass
+      FINSHIELD_BACKUP_INTERVAL_SECONDS: ${FINSHIELD_BACKUP_INTERVAL_SECONDS:-86400}
+      FINSHIELD_BACKUP_KEEP: ${FINSHIELD_BACKUP_KEEP:-7}
+    secrets:
+      - postgres_password
+    depends_on:
+      # 스키마가 올라간 뒤에 첫 dump 를 뜬다. 빈 DB 를 백업해두면 파일은
+      # 생기지만 복원해도 아무것도 없다.
+      migration:
+        condition: service_completed_successfully
+    volumes:
+      - ./deploy/backup-loop.sh:/opt/finshield/backup-loop.sh:ro
+      - ./deploy/backup-healthcheck.sh:/opt/finshield/backup-healthcheck.sh:ro
+      - ./backups:/backups
+    entrypoint: ["/bin/sh", "/opt/finshield/backup-loop.sh"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    # 마지막으로 "성공한" 백업 시각을 본다. 매번 실패하는 루프도 프로세스는
+    # 살아 있으므로, 살아 있음만으로는 백업이 있다는 증거가 못 된다.
+    healthcheck:
+      test:
+        - CMD
+        - /bin/sh
+        - /opt/finshield/backup-healthcheck.sh
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    <<: *runtime-security
+    # 이 컨테이너만 cap_drop: ALL 에서 하나를 되돌린다.
+    #
+    # 이 서비스는 root 로 돈다(postgres 이미지가 USER 를 지정하지 않는다).
+    # 그런데 root 의 "아무 파일이나 쓴다" 는 uid 0 이라서가 아니라
+    # CAP_DAC_OVERRIDE 때문이다. cap_drop: ALL 로 그걸 뺐으니, 호스트 사용자가
+    # 소유한 ./backups (0755) 에 대해서는 일반 사용자와 똑같은 검사를 받는다 -
+    # 읽고 들어갈 수는 있어도 파일을 만들 수는 없다.
+    #
+    # 리눅스 CI 에서 실제로 이렇게 깨졌다. 매 주기 pg_dump 가
+    # "could not open output file /backups/...: Permission denied" 로 실패했다.
+    # Windows/macOS 의 Docker Desktop 은 bind mount 권한을 흉내만 내기 때문에
+    # 로컬에서는 드러나지 않는다.
+    #
+    # uid 를 호스트에 맞추는 방법도 있지만, 그러면 배포하는 사람이 매번 uid 를
+    # 정확히 넘겨야 하고 안 넘기면 지금과 똑같이 조용히 실패한다.
+    cap_add:
+      - DAC_OVERRIDE
+
   web:
     build:
       context: ./web
@@ -96,6 +216,10 @@ services:
     environment:
       FINSHIELD_API_URL: http://backend:8000
       FINSHIELD_ALLOWED_ORIGINS: http://127.0.0.1:${WEB_PORT:-13000},http://localhost:${WEB_PORT:-13000}
+      # backend 와 같은 값을 준다. web 이 인터넷에 노출된 쪽이라 본문은 여기서
+      # 먼저 끊긴다. 한쪽만 올리면 정상 요청이 web 에서 막히거나, backend 가
+      # 어차피 거부할 본문을 web 이 통째로 메모리에 담는다.
+      FINSHIELD_MAX_REQUEST_BYTES: ${FINSHIELD_MAX_REQUEST_BYTES:-131072}
       NODE_ENV: production
     depends_on:
       backend:
@@ -126,3 +250,5 @@ secrets:
     file: ./secrets/postgres_password.txt
   profile_encryption_keys:
     file: ./secrets/profile_encryption_keys.txt
+  rate_limit_secret:
+    file: ./secrets/rate_limit_secret.txt

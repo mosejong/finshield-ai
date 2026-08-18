@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, LargeBinary, String
+from sqlalchemy import BigInteger, DateTime, ForeignKey, LargeBinary, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -45,3 +45,26 @@ class AuthSessionRecord(Base):
         nullable=False,
         index=True,
     )
+
+
+class RateLimitCounterRecord(Base):
+    """고정 window 요청 카운터.
+
+    `bucket_key` 는 식별자의 HMAC 이다. IP 나 세션 토큰 원문을 저장하지 않는다 —
+    rate limit 을 위해 접속 기록을 남기는 꼴이 되면 안 된다.
+    """
+
+    __tablename__ = "rate_limit_counters"
+
+    bucket_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        primary_key=True,
+    )
+    # 지난 window 를 지우려면 시간순 조회가 필요하다.
+    window_end: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    hit_count: Mapped[int] = mapped_column(BigInteger, nullable=False)

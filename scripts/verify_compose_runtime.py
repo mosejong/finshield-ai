@@ -2,18 +2,34 @@ import http.cookiejar
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BACKUP_DIR = (ROOT / "backups").resolve()
-BACKUP_PATH = (BACKUP_DIR / "runtime-verify.dump").resolve()
-RESTORE_DATABASE = "finshield_restore_verify"
 BACKEND_URL = f"http://127.0.0.1:{os.getenv('BACKEND_PORT', '18000')}"
 WEB_URL = f"http://127.0.0.1:{os.getenv('WEB_PORT', '13000')}"
+
+# analyze 정책은 30회/분이다 (`app/services/rate_limits.py`).
+ANALYZE_LIMIT = 30
+ANALYZE_PAYLOAD = {"text": "계좌를 빌려주시면 수수료를 드립니다", "state": "received_only"}
+# HMAC-SHA256 hex. IP 나 세션 값이 그대로 저장되면 이 형태가 아니다.
+BUCKET_KEY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+
+# 정리가 "돌 수 있다" 가 아니라 "스케줄에 따라 실제로 지웠다" 를 확인하려면
+# 한 주기를 기다려야 한다. 기본 3600초로는 검증이 끝나지 않는다.
+RETENTION_INTERVAL = int(os.getenv("FINSHIELD_RETENTION_INTERVAL_SECONDS", "3600"))
+MAX_VERIFIABLE_RETENTION_INTERVAL = 120
+
+# 백업도 같다. 여기서 확인할 것은 "pg_dump 를 부를 수 있다" 가 아니라
+# "backup 서비스가 제 주기에 파일을 남겼다" 이다. 기본 하루로는 못 기다린다.
+BACKUP_INTERVAL = int(os.getenv("FINSHIELD_BACKUP_INTERVAL_SECONDS", "86400"))
+MAX_VERIFIABLE_BACKUP_INTERVAL = 120
+DUMP_NAME_PATTERN = re.compile(r"^finshield-(\d{8}T\d{6}Z)\.dump$")
 
 PROFILE = {
     "ageBand": "20_29",
@@ -83,17 +99,239 @@ def db_shell(command: str, *, capture: bool = False) -> str:
     return compose("exec", "-T", "db", "sh", "-ec", command, capture=capture)
 
 
+def backup_shell(command: str, *, capture: bool = False) -> str:
+    return compose("exec", "-T", "backup", "sh", "-ec", command, capture=capture)
+
+
+def backend_post(path: str, payload: bytes) -> tuple[int, str | None]:
+    """web 을 거치지 않고 backend 포트로 직접 보낸다.
+
+    이 경로의 client IP 는 docker gateway 라서, web 컨테이너를 통해 오는
+    프록시 호출과 다른 bucket 에 들어간다. 아래 프로필·세션 검증 흐름의
+    한도를 소모하지 않는다.
+    """
+    request = urllib.request.Request(
+        f"{BACKEND_URL}{path}",
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            response.read()
+            return response.status, response.headers.get("Retry-After")
+    except urllib.error.HTTPError as exc:
+        exc.read()
+        return exc.code, exc.headers.get("Retry-After")
+
+
+def verify_request_size_limit() -> None:
+    """스키마 검증 이전에 잘리는지 본다.
+
+    `text` 상한은 10000자다. 400 이 돌아오면 본문을 끝까지 읽은 뒤 스키마가
+    거부했다는 뜻이고, 그건 이 방어가 동작하지 않았다는 뜻이다.
+    """
+    oversized = json.dumps({"text": "가" * 200_000}).encode("utf-8")
+    status, _ = backend_post("/api/v1/analyze", oversized)
+    if status != 413:
+        raise RuntimeError(
+            f"oversized request body was not rejected at the HTTP boundary: {status}"
+        )
+
+
+def verify_rate_limit() -> dict[str, object]:
+    payload = json.dumps(ANALYZE_PAYLOAD).encode("utf-8")
+    limited_at = None
+    retry_after = None
+    for attempt in range(1, ANALYZE_LIMIT + 11):
+        status, header = backend_post("/api/v1/analyze", payload)
+        if status == 200:
+            continue
+        if status != 429:
+            raise RuntimeError(f"unexpected status while probing rate limit: {status}")
+        limited_at = attempt
+        retry_after = header
+        break
+    if limited_at is None:
+        raise RuntimeError(
+            "rate limit never engaged; FINSHIELD_RATE_LIMIT_ENABLED must be set for this run"
+        )
+    if limited_at <= ANALYZE_LIMIT:
+        raise RuntimeError(f"rate limit engaged too early at attempt {limited_at}")
+    if not retry_after or not retry_after.isdigit() or int(retry_after) <= 0:
+        raise RuntimeError("429 response did not carry a usable Retry-After")
+
+    # 카운터가 프로세스 메모리에 있으면 backend 재시작 한 번으로 한도가
+    # 초기화된다. 워커가 여러 개면 아예 워커 수만큼 헐거워진다. 행이
+    # PostgreSQL 에 있다는 것이 그 두 가지가 아니라는 증거다.
+    row = db_shell(
+        'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc '
+        "'SELECT bucket_key, hit_count FROM rate_limit_counters "
+        "ORDER BY hit_count DESC LIMIT 1'",
+        capture=True,
+    )
+    if not row:
+        raise RuntimeError("rate limit counters were not stored in PostgreSQL")
+    bucket_key, _, hit_count = row.partition("|")
+    if int(hit_count) <= ANALYZE_LIMIT:
+        raise RuntimeError("stored counter does not match the requests that were sent")
+    # 저장된 행이 접속 기록이 되면 안 된다.
+    if not BUCKET_KEY_PATTERN.match(bucket_key):
+        raise RuntimeError("rate limit bucket key was not a hashed identifier")
+
+    return {"limited_at": limited_at, "retry_after_seconds": int(retry_after)}
+
+
+def verify_retention_schedule(
+    opener: urllib.request.OpenerDirector,
+) -> dict[str, object]:
+    """만료된 데이터가 아무도 부르지 않아도 사라지는지 본다.
+
+    `--once` 로 한 번 돌려보는 것으로는 부족하다. 그건 스크립트가 동작한다는
+    확인이지, 스케줄이 걸려 있다는 확인이 아니다. P0-2 가 막고 있던 것은
+    후자다. 그래서 실제로 한 주기를 기다린다.
+    """
+    if RETENTION_INTERVAL > MAX_VERIFIABLE_RETENTION_INTERVAL:
+        raise RuntimeError(
+            "FINSHIELD_RETENTION_INTERVAL_SECONDS must be at most "
+            f"{MAX_VERIFIABLE_RETENTION_INTERVAL} for this run; "
+            f"got {RETENTION_INTERVAL}"
+        )
+
+    status, _ = request_json(opener, "POST", "/api/proxy/auth/session")
+    if status != 201:
+        raise RuntimeError("retention verification could not create a session")
+    user_id = db_shell(
+        'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc '
+        "'SELECT user_id FROM users LIMIT 1'",
+        capture=True,
+    )
+    if not user_id:
+        raise RuntimeError("retention verification session was not persisted")
+
+    # TTL 이 30일이라 기다려서 만료시킬 수 없다. 만료 시각만 과거로 옮긴다.
+    db_shell(
+        'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc '
+        "\"UPDATE auth_sessions SET expires_at = now() - interval '1 day'\""
+    )
+
+    deadline = time.monotonic() + RETENTION_INTERVAL * 2 + 30
+    while time.monotonic() < deadline:
+        remaining = db_shell(
+            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc '
+            "'SELECT count(*) FROM users'",
+            capture=True,
+        )
+        if remaining == "0":
+            break
+        time.sleep(2)
+    else:
+        raise RuntimeError(
+            "expired anonymous data survived the retention interval"
+        )
+
+    health = compose(
+        "ps", "--format", "{{.Service}}|{{.Health}}", capture=True
+    )
+    if "retention|healthy" not in health:
+        raise RuntimeError(f"retention container did not report healthy: {health}")
+
+    logs = compose("logs", "--no-color", "retention", capture=True)
+    if '"status":"succeeded"' not in logs:
+        raise RuntimeError("retention did not emit a structured success log")
+    if user_id in logs:
+        raise RuntimeError("retention logs exposed the identifier it deleted")
+
+    return {"deleted_within_interval_seconds": RETENTION_INTERVAL, "healthy": True}
+
+
+def newest_dump() -> str:
+    listing = backup_shell(
+        "ls -1t /backups/finshield-*.dump 2>/dev/null || true", capture=True
+    )
+    names = [line.strip().rsplit("/", 1)[-1] for line in listing.splitlines() if line.strip()]
+    return names[0] if names else ""
+
+
+def verify_backup_schedule(profile_id: str) -> dict[str, object]:
+    """스케줄이 실제로 백업을 남기고, 그 백업에서 프로필이 열리는지 본다.
+
+    이전 버전은 여기서 직접 `pg_dump` 를 부르고, 복원된 행에 알려진 금융 값이
+    평문으로 보이지 않는지만 확인했다. 두 가지가 틀렸다.
+
+    1. 검증 스크립트가 부르는 dump 는 운영 백업이 아니다. 백업 스케줄이 아예
+       없어도 이 검사는 통과했다 (P0-2 에서 정리 스케줄에 대해 겪은 것과 같다).
+    2. "평문이 안 보인다" 는 무작위 바이트열도 통과한다. 키를 잃은 백업이
+       초록불로 나온다. 합격 기준은 **복호화까지** 가야 한다.
+
+    그래서 여기서는 아무것도 직접 뜨지 않고, backup 컨테이너가 제 주기에 남긴
+    최신 파일을 기다린 다음 복원 리허설에 넘긴다.
+    """
+    if BACKUP_INTERVAL > MAX_VERIFIABLE_BACKUP_INTERVAL:
+        raise RuntimeError(
+            "FINSHIELD_BACKUP_INTERVAL_SECONDS must be at most "
+            f"{MAX_VERIFIABLE_BACKUP_INTERVAL} for this run; got {BACKUP_INTERVAL}"
+        )
+
+    # 기준 시각을 컨테이너 시계로 잡는다. 이 시점 이후에 생긴 파일이라야
+    # 방금 만든 프로필이 그 안에 들어 있다. 기동 직후의 빈 백업으로 통과하는
+    # 것을 막는 것도 같은 조건이다.
+    marker = backup_shell("date -u +%Y%m%dT%H%M%SZ", capture=True)
+
+    deadline = time.monotonic() + BACKUP_INTERVAL * 2 + 60
+    while time.monotonic() < deadline:
+        candidate = newest_dump()
+        matched = DUMP_NAME_PATTERN.match(candidate) if candidate else None
+        if matched and matched.group(1) >= marker:
+            break
+        time.sleep(2)
+    else:
+        raise RuntimeError("backup service did not produce a dump within its interval")
+
+    health = compose("ps", "--format", "{{.Service}}|{{.Health}}", capture=True)
+    if "backup|healthy" not in health:
+        raise RuntimeError(f"backup container did not report healthy: {health}")
+
+    logs = compose("logs", "--no-color", "backup", capture=True)
+    if '"status":"succeeded"' not in logs:
+        raise RuntimeError("backup did not emit a structured success log")
+    for secret in ("2800000", profile_id):
+        if secret in logs:
+            raise RuntimeError("backup logs exposed runtime verification personal data")
+
+    # 리허설이 임시 DB 생성·복원·복호화·정리를 전부 맡는다. 여기서 다시
+    # 구현하면 운영에서 쓰는 절차와 CI 에서 검증하는 절차가 갈라진다.
+    rehearsal = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "rehearse_backup_restore.py"), "--dump", candidate],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if rehearsal.returncode != 0:
+        raise RuntimeError(
+            f"restore rehearsal failed: {rehearsal.stdout.strip()} {rehearsal.stderr.strip()}"
+        )
+
+    report = json.loads(rehearsal.stdout.strip().splitlines()[-1])
+    if not report.get("recoverable"):
+        raise RuntimeError(f"restored profiles could not be decrypted: {report}")
+    if report.get("decrypted") != 1:
+        raise RuntimeError(f"rehearsal decrypted an unexpected number of profiles: {report}")
+
+    return {
+        "dump": candidate,
+        "decrypted": report["decrypted"],
+        "healthy": True,
+        "scheduled_within_interval_seconds": BACKUP_INTERVAL,
+    }
+
+
 def main() -> int:
-    if BACKUP_PATH.parent != BACKUP_DIR:
-        raise RuntimeError("backup target escaped the repository backup directory")
-    if BACKUP_PATH.exists():
-        raise RuntimeError("runtime verification backup already exists; refusing overwrite")
-    BACKUP_DIR.mkdir(exist_ok=True)
     cookie_jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(
         urllib.request.HTTPCookieProcessor(cookie_jar)
     )
-    restore_created = False
     session_created = False
     account_deleted = False
 
@@ -109,18 +347,11 @@ def main() -> int:
             raise RuntimeError(
                 "runtime verification requires an empty database and will not delete existing data"
             )
-        restore_exists = db_shell(
-            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc '
-            f'"SELECT count(*) FROM pg_database WHERE datname = \'{RESTORE_DATABASE}\'"',
-            capture=True,
-        )
-        if restore_exists != "0":
-            raise RuntimeError(
-                "restore verification database already exists; refusing destructive reuse"
-            )
 
         wait_for(f"{BACKEND_URL}/health")
         wait_for(WEB_URL)
+        verify_request_size_limit()
+        rate_limit = verify_rate_limit()
         status, _ = request_json(opener, "POST", "/api/proxy/auth/session")
         if status != 201:
             raise RuntimeError("anonymous session was not created")
@@ -144,31 +375,7 @@ def main() -> int:
         if status != 200 or not restored_resource:
             raise RuntimeError("profile did not survive backend restart")
 
-        db_shell(
-            'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" '
-            "--format=custom --file=/backups/runtime-verify.dump"
-        )
-        db_shell(f'createdb -U "$POSTGRES_USER" {RESTORE_DATABASE}')
-        restore_created = True
-        db_shell(
-            f'pg_restore -U "$POSTGRES_USER" -d {RESTORE_DATABASE} '
-            "/backups/runtime-verify.dump"
-        )
-        restored_count = db_shell(
-            f'psql -U "$POSTGRES_USER" -d {RESTORE_DATABASE} -Atc '
-            "'SELECT count(*) FROM financial_profiles'",
-            capture=True,
-        )
-        if restored_count != "1":
-            raise RuntimeError("restored database did not contain the encrypted profile")
-        plaintext_absent = db_shell(
-            f'psql -U "$POSTGRES_USER" -d {RESTORE_DATABASE} -Atc '
-            '"SELECT position(\'2800000\' in encode(encrypted_profile, \'escape\')) = 0 '
-            'FROM financial_profiles"',
-            capture=True,
-        )
-        if plaintext_absent != "t":
-            raise RuntimeError("backup unexpectedly exposed a known financial value")
+        backup = verify_backup_schedule(profile_id)
 
         backend_logs = compose("logs", "--no-color", "backend", capture=True)
         for secret in ("2800000", profile_id, session_tokens[0]):
@@ -199,15 +406,22 @@ def main() -> int:
         if counts != "0|0|0":
             raise RuntimeError("runtime verification left personal data in PostgreSQL")
 
+        # 여기서부터는 DB 가 비어 있다. 만료 데이터를 새로 하나 넣고,
+        # 아무도 부르지 않아도 사라지는지 본다.
+        retention = verify_retention_schedule(opener)
+
         print(
             json.dumps(
                 {
                     "backend_restart_persistence": True,
-                    "backup_restore": True,
-                    "encrypted_backup_plaintext_absent": True,
+                    "backup_schedule": backup,
                     "logs_exclude_profile_and_session_values": True,
                     "structured_request_logs": True,
                     "account_delete_counts": counts,
+                    "oversized_body_rejected": True,
+                    "rate_limit": rate_limit,
+                    "rate_limit_counters_hashed": True,
+                    "retention_schedule": retention,
                     "web_health": True,
                     "web_proxy_e2e": True,
                 },
@@ -221,15 +435,9 @@ def main() -> int:
                 request_json(opener, "DELETE", "/api/proxy/auth/account")
             except (OSError, urllib.error.URLError):
                 pass
-        if restore_created:
-            try:
-                db_shell(
-                    f'dropdb -U "$POSTGRES_USER" --if-exists {RESTORE_DATABASE}'
-                )
-            except (OSError, subprocess.SubprocessError):
-                pass
-        if BACKUP_PATH.exists():
-            BACKUP_PATH.unlink()
+        # 임시 복원 DB 는 리허설 스크립트가 자기 finally 에서 정리한다.
+        # 백업 파일은 지우지 않는다. 검증이 남긴 산출물이 아니라 backup
+        # 서비스가 제 주기에 만든 것이고, 세대 회전이 알아서 걷어간다.
 
 
 if __name__ == "__main__":

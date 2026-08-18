@@ -1,0 +1,38 @@
+# 배포용 override — VM 안에서 이미지를 만들지 않는다.
+#
+# e2-micro 는 1GB 다. web 이미지의 Next 빌드는 그 안에서 끝나지 않고, OOM 은
+# 조용히 죽어서 원인도 잘 안 보인다 (`docs/31` 11-1). 그래서 이미지는 GitHub
+# Actions 가 만들어 ghcr.io 로 올리고 VM 은 pull 만 한다.
+#
+# 부수 효과가 원래 목적보다 크다. 태그가 붙은 이미지가 있으면 되돌리기가
+# "이전 태그로 다시 올린다" 가 된다. 지금의 수동 빌드에는 되돌릴 대상 자체가
+# 없었다 (`docs/28` P1-3).
+#
+#   FINSHIELD_IMAGE_TAG=v0.3.0 \
+#   docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml pull
+#
+# `build:` 를 `!reset` 으로 지운다. 남겨두면 `image:` 와 공존해서, 어떤 명령은
+# pull 하고 어떤 명령은 빌드를 시작한다. e2-micro 에서 후자는 죽는다.
+#
+# 태그에 기본값을 주지 않는다. `latest` 로 두면 무엇이 돌고 있는지 모르게 되고,
+# 무엇이 돌고 있는지 모르는 배포는 되돌릴 수도 없다.
+
+x-backend-image: &backend-image
+  ghcr.io/${FINSHIELD_IMAGE_OWNER:-mosejong}/finshield-backend:${FINSHIELD_IMAGE_TAG:?FINSHIELD_IMAGE_TAG 를 지정한다}
+
+services:
+  migration:
+    image: *backend-image
+    build: !reset null
+
+  backend:
+    image: *backend-image
+    build: !reset null
+
+  retention:
+    image: *backend-image
+    build: !reset null
+
+  web:
+    image: ghcr.io/${FINSHIELD_IMAGE_OWNER:-mosejong}/finshield-web:${FINSHIELD_IMAGE_TAG:?FINSHIELD_IMAGE_TAG 를 지정한다}
+    build: !reset null

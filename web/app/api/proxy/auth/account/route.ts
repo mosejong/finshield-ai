@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { backendBaseUrl } from "@/lib/api/client";
-import { forwardedSessionCookie, rejectCrossSiteRequest } from "@/lib/api/server-auth";
+import { backendHeaders, rejectCrossSiteRequest } from "@/lib/api/server-auth";
+import { rateLimitedFromUpstream } from "@/lib/api/proxy-response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export async function DELETE(request: Request) {
   try {
     upstream = await fetch(`${backendBaseUrl()}/api/v1/auth/account`, {
       method: "DELETE",
-      headers: forwardedSessionCookie(request),
+      headers: backendHeaders(request, { session: true }),
       cache: "no-store",
     });
   } catch {
@@ -22,6 +23,8 @@ export async function DELETE(request: Request) {
       { status: 502 },
     );
   }
+
+  if (upstream.status === 429) return rateLimitedFromUpstream(upstream);
 
   const response = upstream.status === 204
     ? new NextResponse(null, { status: 204 })

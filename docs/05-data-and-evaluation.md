@@ -7,7 +7,7 @@ Fraud benchmark v0.1은 예외적으로 팀이 직접 작성한 합성 61건만
 `evaluation/data/`에 저장한다. 실제 피해 메시지나 개인정보가 아니며 외부
 라이선스에 의존하지 않는다. 이 표본은 엔진 수정에도 사용된 bootstrap 개발셋이므로
 `held_out: false`로 표시하고 일반화 성능을 주장하지 않는다. 상세 계약과 결과는
-`docs/28-fraud-evaluation-benchmark.md`를 따른다.
+`docs/32-fraud-evaluation-benchmark.md`를 따른다.
 
 ## Candidate tasks
 ### Fraud/risk classification

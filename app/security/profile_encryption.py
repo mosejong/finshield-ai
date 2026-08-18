@@ -63,6 +63,16 @@ class ProfileEncryptionKeyring:
     def active_key_id(self) -> str:
         return self._active_key_id
 
+    @property
+    def key_ids(self) -> frozenset[str]:
+        """복호화에 쓸 수 있는 key id 전체.
+
+        복원 리허설이 "DB 는 돌아왔는데 이 행을 열 키가 없다" 를 복호화
+        시도 전에 알아내는 데 쓴다. key id 는 이미 행에 평문으로 저장된 값이라
+        노출 범위가 늘지 않는다.
+        """
+        return frozenset(self._ciphers)
+
     def encrypt(self, profile: FinancialProfile, profile_id: UUID) -> EncryptedProfile:
         envelope = {
             "version": 1,
