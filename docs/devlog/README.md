@@ -74,6 +74,7 @@
 
 - `llm-explanation-contract.md` — 고정 model·prompt·provider 계약, PII 최소화, 출력 검증, 판정 경계 (프로바이더 미연결)
 - `deploy-image-pipeline.md` — ghcr 릴리스 워크플로, 배포 override, expand/contract 롤백 전략 (VM 실배포 미검증)
+- `post-merge-devlog-shas.md` — squash 후 SHA 정정, 첫 릴리스 실측과 문서 정정, rate limit 고정 창 flake
 
 ## 작성 규칙
 

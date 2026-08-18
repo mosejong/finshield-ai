@@ -77,6 +77,7 @@ Mutation 감사에서 **위험 등급 임계값만 통과했다.** `score >= 70`
 | 본문 크기 (web) | `web/lib/api/request-body.ts` | Route Handler에는 본문 크기 기본 상한이 **없다.** 배포 경로가 Caddy → web → backend라 노출된 쪽은 web이고, `request.json()`을 그냥 부르면 100MB 본문도 다 담은 뒤에야 zod에서 거부한다 |
 | 카운터 저장 | `app/repositories/rate_limits.py` | InMemory(로컬) / SQLAlchemy(배포). 배포에서 SQLite면 기동 거부 — 워커 간 카운터가 안 공유돼 한도가 워커 수만큼 헐거워지는데 겉으로는 정상으로 보인다 |
 | 버킷 키 | `app/services/rate_limits.py` | `HMAC(secret, policy|ip)`. IPv4는 값이 2^32개뿐이라 단순 해시는 표로 되돌릴 수 있다. 저장된 행이 접속 기록이 되면 안 된다 |
+| 창 계산 | `app/services/rate_limits.py` | **epoch 정렬 고정 창.** 창이 닫히기 직전과 열린 직후에 몰아치면 짧은 순간 한도의 **2배** 가 통과한다. 목적이 공정 분배가 아니라 지속적 남용 차단이라 받아들였고, 가정이 굳지 않도록 `test_a_client_can_burst_twice_the_limit_across_a_boundary` 로 고정했다 |
 | 저장소 장애 | 같은 파일 | **통과시킨다.** DB 장애 때문에 위험한 문자를 확인 못 하게 만드는 쪽이 그동안 한도가 열리는 것보다 나쁘다. `app/domain/fraud/sources.py`와 같은 판단 |
 | 만료 행 정리 | `scripts/cleanup_expired_anonymous_data.py` | 닫힌 window 행은 다시 조회되지 않는다. 지우지 않으면 요청 수만큼 무한히 쌓인다. 개인정보 정리 **뒤에** 둔다 |
 
