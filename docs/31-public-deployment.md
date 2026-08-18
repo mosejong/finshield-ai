@@ -83,7 +83,17 @@ export FINSHIELD_IMAGE_TAG=v0.3.0
 docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml pull
 ```
 
-**여기서 인증 오류가 나면 패키지가 private 이다.** 워크플로가 처음 만든 ghcr 패키지는 저장소가 public 이어도 private 으로 생성된다. 패키지 설정에서 공개로 바꾸거나, `read:packages` 만 가진 PAT 으로 `docker login ghcr.io` 한다. 이미지에 비밀은 없으므로(11-1) 공개로 두는 쪽이 단순하다.
+**패키지 공개 범위는 짐작하지 말고 확인한다.** 첫 실행(2026-08-18, `Release images` #1)에서 만들어진 두 패키지는 **둘 다 public 으로 생성됐다.** 저장소가 public 이고 `GITHUB_TOKEN` 으로 밀었기 때문으로 보이지만 그 인과는 확인하지 못했다 — 확실한 건 관측 결과뿐이다. VM 에 붙기 전에 로그인 없이 확인할 수 있다.
+
+```bash
+img=finshield-backend   # finshield-web 도 같은 방법으로
+tok=$(curl -s "https://ghcr.io/token?scope=repository:mosejong/$img:pull" \
+  | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $tok" \
+  "https://ghcr.io/v2/mosejong/$img/tags/list"
+```
+
+`200` 이면 익명으로 받을 수 있다 = public 이고 VM 에서 `docker login` 이 필요 없다. `401`/`403` 이면 private 이라 위의 `pull` 이 인증 오류로 죽는다. 그때는 패키지 설정에서 공개로 바꾸거나(이미지에 비밀은 없다 — 11-1 참고), `read:packages` 만 가진 PAT 으로 `docker login ghcr.io` 한다.
 
 아래 3-3/3-4 명령에도 `-f compose.deploy.yaml` 을 그대로 붙인다. 빠뜨리면 VM 이 빌드를 시작하고 OOM 으로 조용히 죽는다.
 
@@ -278,7 +288,7 @@ Cloud Run 으로 옮기는 것 자체는 나중에 검토할 수 있지만, **�
 
 | 항목 | 값 | 이유 |
 |---|---|---|
-| 리전 | `us-central1` (아이오와) | **always-free 대상 리전은 `us-west1` / `us-central1` / `us-east1` 뿐이다.** 서울(`asia-northeast3`)에는 무료 등급이 없다. 한국에서 왕복 150ms 대를 감수한다 |
+| 리전 | `us-west1-b` (오리건) | **always-free 대상 리전은 `us-west1` / `us-central1` / `us-east1` 뿐이다.** 서울(`asia-northeast3`)에는 무료 등급이 없다. 셋 중 한국에서 가장 가까운 것을 고른다 — 오리건 왕복 110~130ms 대, 아이오와 150~170ms 대. 무료 조건은 셋이 동일하므로 더 먼 쪽을 고를 이유가 없다 |
 | 머신 | `e2-micro` (공유 vCPU, 1GB) | 월 1대 always-free. 상시 사용량 800MB 남짓이 1GB 안에 아슬아슬하게 들어간다. **빌드는 여기서 하지 않는다**(아래) |
 | 디스크 | `pd-standard` 30GB | always-free 는 **standard** 30GB 까지다. `pd-balanced` 는 무료 대상이 아니다 |
 | swap | 2GB 파일 | 1GB 에는 여유가 없다. 순간 피크에서 OOM killer 가 고르는 것은 대개 가장 큰 프로세스, 즉 PostgreSQL 이다 |
@@ -303,7 +313,7 @@ always-free 목록([free-cloud-features](https://docs.cloud.google.com/free/docs
 - VM 은 `docker compose pull` 만 한다. `compose.yaml` 의 `build:` 를 `image:` 로 바꾸는 배포용 override 가 `compose.deploy.yaml` 이다 (2026-08-18 작성).
 - 이미지에 비밀은 들어가지 않는다. `secrets/` 는 지금도 런타임 마운트라 레지스트리가 공개여도 노출 경로가 생기지 않는다.
 
-**이 때문에 작업 순서가 바뀐다.** `docs/28` P1-3(배포/롤백)은 원래 공개 이후로 미뤄둔 항목인데, e2-micro 를 고른 이상 **P0-4 의 선행조건**이 된다. 손해만 있는 것은 아니다. 지금의 수동 배포에는 롤백 수단이 아예 없는데, 태그된 이미지를 pull 하는 방식에는 되돌릴 지점이 생긴다. → 2026-08-18 에 `release.yml` + `compose.deploy.yaml` 로 착지했다. **다만 아직 한 번도 태그를 밀어 보지 않았다.**
+**이 때문에 작업 순서가 바뀐다.** `docs/28` P1-3(배포/롤백)은 원래 공개 이후로 미뤄둔 항목인데, e2-micro 를 고른 이상 **P0-4 의 선행조건**이 된다. 손해만 있는 것은 아니다. 지금의 수동 배포에는 롤백 수단이 아예 없는데, 태그된 이미지를 pull 하는 방식에는 되돌릴 지점이 생긴다. → 2026-08-18 에 `release.yml` + `compose.deploy.yaml` 로 착지했고, 수동 실행(run #1)으로 두 이미지가 ghcr 에 올라가 pull 까지 되는 것을 확인했다. **다만 `v*` 태그를 밀어 본 적은 아직 없다** — 태그 경로만 미검증이다.
 
 > **결제 계정 확인 (2026-08-18).** 후불 Google Cloud 결제 계정이 활성 상태이고 미결제 잔액 ₩0, 청구 기준액 ₩100,000 이다. always-free `e2-micro` 가 요구하는 것은 활성 결제 계정 하나뿐이므로 **이 절의 선행조건은 충족됐다.** $300 무료 체험 크레딧은 없고, 필요하지도 않다 — always-free 는 체험과 별개 프로그램이다. AI Studio 선불 크레딧 ₩70,000 은 Gemini API 전용이라 Compute Engine 요금에는 쓰이지 않는다.
 
@@ -311,10 +321,20 @@ always-free 목록([free-cloud-features](https://docs.cloud.google.com/free/docs
 
 기본값인 ephemeral IP 는 인스턴스를 정지했다 켜면 **바뀐다.** 그러면 DNS 가 죽은 주소를 가리키고, Caddy 는 계속 재시도하며, ACME 검증 실패가 0절의 시간당 5회 한도를 태운다. 도메인을 붙이기 전에 잡아 둔다.
 
+먼저 프로젝트를 고르고 **Compute Engine API 를 켠다.** 새 프로젝트에서는 꺼져 있고, 켜지 않으면 아래 첫 명령이 `Compute Engine API has not been used in project ... before or it is disabled` 로 그냥 실패한다. 결제 계정이 프로젝트에 연결돼 있어야 켜진다 — always-free 등급도 활성 결제 계정을 요구한다(11-1).
+
 ```bash
+gcloud projects list                       # PROJECT_ID 확인
 gcloud config set project <PROJECT_ID>
-gcloud compute addresses create finshield-ip --region=us-central1
-gcloud compute addresses describe finshield-ip --region=us-central1 --format='value(address)'
+gcloud beta billing projects describe <PROJECT_ID>   # billingEnabled: true 인지
+gcloud services enable compute.googleapis.com        # 1~2분 걸린다
+```
+
+그다음 주소를 잡는다.
+
+```bash
+gcloud compute addresses create finshield-ip --region=us-west1
+gcloud compute addresses describe finshield-ip --region=us-west1 --format='value(address)'
 ```
 
 **2024년부터는 붙어 있어도 과금된다.** 실행 중인 인스턴스에 붙은 외부 IPv4 가 무료였던 것은 그 이전 이야기다. 지금은 시간당 $0.005 선이고, 아무 데도 안 붙어 있으면 요율이 더 높다. always-free 구성에서 실제로 청구되는 항목은 이것 하나뿐이니, 안 쓰게 되면 지운다.
@@ -323,7 +343,7 @@ gcloud compute addresses describe finshield-ip --region=us-central1 --format='va
 
 ```bash
 gcloud compute instances create finshield \
-  --zone=us-central1-a \
+  --zone=us-west1-b \
   --machine-type=e2-micro \
   --image-family=debian-12 --image-project=debian-cloud \
   --boot-disk-size=30GB --boot-disk-type=pd-standard \
@@ -342,23 +362,52 @@ gcloud compute firewall-rules create finshield-web \
 
 `udp:443` 을 빼먹기 쉽다. `compose.https.yaml` 이 `443:443/udp` 를 열고 Caddy 가 HTTP/3 리스너를 띄우는데, UDP 가 막혀 있으면 **브라우저가 HTTP/3 를 시도했다가 TCP 로 되돌아온다.** 겉으로는 동작해서 눈치채기 어렵고, 첫 접속마다 왕복이 한 번 더 붙는다.
 
-`gcloud compute ssh finshield --zone=us-central1-a` 로 붙는다. 별도 키 설정은 필요 없다 — gcloud 가 OS Login 으로 처리한다.
+`gcloud compute ssh finshield --zone=us-west1-b` 로 붙는다. 별도 키 설정은 필요 없다 — gcloud 가 OS Login 으로 처리한다.
 
 ### 11-4. VM 안에서
 
+**swap 을 가장 먼저 만든다.** 뒤이어 오는 apt 와 pip 가 메모리를 쓰는데, 1GB 에는 여유가 없다.
+
 ```bash
-# 1GB 에는 여유가 없다. swap 이 없으면 순간 피크에서 OOM killer 가 돈다.
 sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
 sudo mkswap /swapfile && sudo swapon /swapfile
 echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
 
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
+**Docker 는 배포판 저장소가 아니라 Docker 공식 저장소에서 받는다.** Debian 12(bookworm)에는 `docker-compose-v2` 패키지가 **없다** — compose v2 가 Debian 에 들어온 것은 13(trixie)부터다. `apt-get install docker.io docker-compose-v2` 는 `E: Unable to locate package` 로 실패한다. `docker.io` 만 깔면 엔진은 뜨지만 `docker compose` 가 없어서 이 스택은 한 줄도 못 올린다.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg git python3-venv
+
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/debian
+Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 sudo usermod -aG docker $USER && exec newgrp docker
+```
 
+`docker-buildx-plugin` 은 일부러 뺐다. 이 VM 은 빌드하지 않는다(11-1). 필요해지는 상황이 곧 "VM 에서 빌드하려 하고 있다" 는 신호이므로, 없는 편이 낫다.
+
+`python3-venv` 도 **별도 패키지다.** Debian 은 `venv` 모듈을 python3 본체에서 분리해 놓았고, 없으면 아래 `python3 -m venv` 가 `ensurepip is not available` 로 죽는다.
+
+```bash
 git clone https://github.com/mosejong/finshield-ai.git && cd finshield-ai
 python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.txt
 .venv/bin/python scripts/create_local_docker_secrets.py
 ```
+
+호스트 venv 가 필요한 이유는 앱이 아니라 **스크립트** 다. 앱은 컨테이너 안에서 돈다. 호스트에서 도는 것은 비밀 생성기와 인증서 갱신 감시(6절)뿐이고, 둘 다 `cryptography` 를 쓴다.
 
 이름은 `create_local_docker_secrets` 지만 생성값은 운영에 써도 되는 강도다(`token_urlsafe(32)`, `Fernet.generate_key()`). 이미 있는 파일은 절대 덮어쓰지 않는다.
 
@@ -376,3 +425,47 @@ python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.
 | 스냅샷 | 디스크 스냅샷 스케줄은 `pg_dump` 백업을 대체하지 않는다. 스냅샷은 실행 중인 PostgreSQL 의 순간 상태라 복구 시 복구 모드를 거치고, 무엇보다 **복호화되는지를 확인하지 않는다.** 둘 다 두되 합격 기준은 `docs/29` 를 따른다 |
 | Cloud DNS | 필수가 아니다. 등록기관 DNS 에 A 레코드만 걸면 된다. Cloud DNS 는 존당 월 요금이 붙는다 |
 | 요금 알림 | Billing 예산 알림을 걸어 둔다. 크레딧이 없으므로 처음부터 실비 청구다. 정상 상태에서는 고정 IP 월 $3~4 뿐이니, 예산을 그보다 조금 위에 잡아 두면 **의도치 않은 과금이 시작된 순간**을 바로 알 수 있다 |
+
+### 11-6. 실측 (2026-08-18)
+
+도메인 없이 `compose.yaml` + `compose.deploy.yaml` 만으로 한 번 올려 봤다. 포트가 전부 loopback 바인딩이라 외부 노출이 없어서, DNS 와 인증서가 정해지기 전에 해도 되는 검증이다. 여기서 답이 나오는 질문이 두 개다 — **1GB 에서 뜨는가**, 그리고 **재부팅하면 저절로 돌아오는가.**
+
+#### 메모리
+
+| 컨테이너 | 사용 |
+|---|---|
+| backend (uvicorn worker 2) | 155 MiB |
+| web (Next standalone) | 79.7 MiB |
+| retention | 50.3 MiB |
+| db | 40.1 MiB |
+| backup | 0.7 MiB |
+| **합계** | **326 MiB** |
+
+호스트 전체는 `used` 735 MiB / `available` 234 MiB 였다. 컨테이너 밖 약 409 MiB 는 `dockerd`(74MB) · `containerd`(31MB) · shim 5개 · GCE 게스트 에이전트 3종(49MB) · systemd 다. 특별히 큰 것은 없다.
+
+`vmstat 1 5` 의 `si`/`so` 가 전부 0 이라 **활성 스와핑은 없다.** `free` 에 잡힌 swap 은 앞선 `pip install` 이 밀어낸 잔재다 — 리눅스는 여유가 생겨도 swap 페이지를 자동으로 되돌리지 않는다. CPU 는 5개 샘플 중 4개가 idle 92~100% 였다.
+
+**Caddy 는 아직 얹지 않았다.** 30~50 MiB 를 더 쓸 것이므로 `available` 은 190 MiB 근처가 된다. 들어가지만 여유가 그만큼 준다. 그리고 위 숫자는 전부 **idle** 이다 — 부하 시 수치는 모른다.
+
+#### 재부팅
+
+`sudo reboot` 뒤 swap 이 `/etc/fstab` 으로 자동 복구됐고, 컨테이너 5개가 자동 기동해 **39초 만에** `/health/ready` 가 `ready` 를 냈다.
+
+**그런데 여기서 결함이 하나 나왔다.** 데이터도 도메인도 없을 때 재부팅해 본 이유가 이것이다.
+
+```
+pg_dump: error: connection to server at "db" (172.18.0.6), port 5432 failed: Connection refused
+{"event":"backup_run","status":"failed","timestamp":"2026-08-18T10:08:24Z","stage":"dump"}
+```
+
+`restart: unless-stopped` 로 데몬이 컨테이너를 되살릴 때는 compose 의 `depends_on` 이 **적용되지 않는다.** 그건 `docker compose up` 이 해석하는 조건이다. 그래서 backup 이 db 보다 먼저 떴다. 여기까지는 정상적인 경합이고, 문제는 그 다음이었다 — 루프가 실패에도 성공과 같은 `INTERVAL`(기본 24시간)을 자고 있어서 다음 시도가 하루 뒤였다. heartbeat 는 tmpfs 라 재시작으로 사라지므로, 그동안 healthcheck 도 unhealthy 다. **재부팅 한 번이 하루치 백업 공백을 만드는 구조였다.**
+
+`FINSHIELD_BACKUP_RETRY_SECONDS`(기본 60초)로 고쳤다. 상세는 `docs/29` 2절.
+
+기존 백업 테스트 32건이 이걸 놓친 이유도 분명하다. **전부 `--once` 로 돌아서 `while` 루프의 대기 정책을 한 번도 실행하지 않았다.** 진짜 루프를 띄우는 검사 2건을 추가했다.
+
+#### 그밖에 확인된 것
+
+- `docker compose pull` 로 backend 331MB / web 303MB 를 받았다. VM 에서 빌드하지 않는 경로가 실제로 성립한다.
+- 첫 dump 가 `backups/finshield-…Z.dump` (8093B, `root:root`) 로 떨어졌다. **`cap_add: DAC_OVERRIDE` 가 실기에서 처음 검증됐다** — 지금까지 리눅스 CI 에서만 확인한 수정이다.
+- dump 는 `0644`, `backups/` 는 `0755` 라 로컬 사용자면 읽을 수 있다. 지금은 문제가 아니다 — 프로필은 암호화 저장이고 복호화 키는 `secrets/`(`0700`) 안에 있어서 dump 하나로는 아무것도 열리지 않는다. 0절의 분리가 의도대로 작동하는 상태다.

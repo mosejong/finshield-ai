@@ -15,6 +15,14 @@ set -eu
 
 BACKUP_DIR="${FINSHIELD_BACKUP_DIR:-/backups}"
 INTERVAL="${FINSHIELD_BACKUP_INTERVAL_SECONDS:-86400}"
+# 실패한 뒤에는 한 주기를 통째로 기다리지 않는다. 2026-08-18 에 GCP VM 을
+# 재부팅해 보고 찾은 결함이다. `restart: unless-stopped` 로 데몬이 컨테이너를
+# 되살릴 때는 compose 의 `depends_on` 이 적용되지 않아서, 이 루프가 db 보다
+# 먼저 떠서 `pg_dump` 가 "connection refused" 로 죽었다. 그런데 실패와 성공이
+# 같은 대기를 쓰고 있었으므로 다음 시도가 24시간 뒤였다. heartbeat 는 tmpfs 라
+# 재시작으로 사라지니, 재부팅 한 번이 하루치 백업 공백과 하루치 unhealthy 를
+# 만드는 구조였다.
+RETRY="${FINSHIELD_BACKUP_RETRY_SECONDS:-60}"
 KEEP="${FINSHIELD_BACKUP_KEEP:-7}"
 HEARTBEAT="${FINSHIELD_BACKUP_HEARTBEAT_PATH:-/tmp/finshield-backup-heartbeat}"
 PASSWORD_FILE="${POSTGRES_PASSWORD_FILE:-/run/secrets/postgres_password}"
@@ -45,9 +53,15 @@ require_int() {
 }
 
 require_int "interval_not_an_integer" "$INTERVAL"
+require_int "retry_not_an_integer" "$RETRY"
 require_int "keep_not_an_integer" "$KEEP"
 if [ "$INTERVAL" -lt "$MIN_INTERVAL" ] || [ "$INTERVAL" -gt "$MAX_INTERVAL" ]; then
     fail_config "interval_out_of_range"
+fi
+# 재시도가 주기보다 길면 "실패했으니 빨리 다시" 라는 말이 뒤집힌다. 0 이면
+# 실패한 pg_dump 를 쉬지 않고 두드린다.
+if [ "$RETRY" -lt 1 ] || [ "$RETRY" -gt "$INTERVAL" ]; then
+    fail_config "retry_out_of_range"
 fi
 if [ "$KEEP" -lt 1 ] || [ "$KEEP" -gt "$MAX_KEEP" ]; then
     fail_config "keep_out_of_range"
@@ -156,8 +170,15 @@ fi
 # 첫 백업을 미루지 않는다. 배포 직후 한 주기를 통째로 기다리면 그동안은
 # 백업이 하나도 없는 상태로 서비스가 떠 있는 것이다.
 while true; do
-    # 실패해도 루프를 세우지 않는다. 다음 주기에 다시 시도하고, 그 사이
-    # heartbeat 가 낡으면 healthcheck 가 대신 소리를 낸다.
-    run_once || true
-    sleep "$INTERVAL"
+    # 실패해도 루프를 세우지 않는다. 다만 **성공과 같은 시간을 자지도 않는다.**
+    # 실패의 원인은 대부분 일시적이고(기동 경합, db 재시작, 순간 디스크 오류)
+    # 한 주기를 통째로 기다리는 것은 그 일시적 상태를 하루짜리 공백으로
+    # 확대하는 짓이다. 계속 실패하면 heartbeat 가 낡아 healthcheck 가 소리를
+    # 낸다 - 재시도는 그 판정을 흐리지 않는다. 성공한 실행만 heartbeat 를
+    # 갱신하기 때문이다.
+    if run_once; then
+        sleep "$INTERVAL"
+    else
+        sleep "$RETRY"
+    fi
 done

@@ -243,8 +243,15 @@ pytest -q                                   → 531 passed, 2 skipped in 18.42s
 
 ## 커밋 SHA
 
-- `18dea93` — feat: pin the LLM explanation contract before any key is plugged in
+- **main**: `1809997` — PR #58 squash 병합 (2026-08-18 03:51 UTC)
+- 작업 브랜치: `18dea93` — feat: pin the LLM explanation contract before any key
+  is plugged in / `26893ac` — feat: add the AI Studio provider, and correct the
+  free-tier premise
+
+두 SHA 모두 **main 에서 도달할 수 없다** — squash 병합이라 36개 커밋이 `1809997`
+하나로 접혔다. `feature/frontend-accessibility-e2e` 브랜치가 남아 있는 동안만
+원본 객체가 살아 있다.
 
 ## PR
 
-- PR #58 에 포함 예정. 병합 전략 미정(merge commit vs squash) — 대기 중.
+- #58 (`feature/frontend-accessibility-e2e`), squash 병합

@@ -11,6 +11,7 @@ from app.core.rate_limit import (
     RateLimitConfigurationError,
     build_rate_limit_service,
     rate_limit_enabled,
+    rate_limit_service,
     reset_rate_limit_service,
 )
 from app.db.session import build_engine, build_session_factory
@@ -184,6 +185,47 @@ def test_window_boundary_resets_the_counter() -> None:
     assert later.check(
         method="POST", path="/api/v1/analyze", client_ip="203.0.113.7"
     ).allowed
+
+
+def test_a_client_can_burst_twice_the_limit_across_a_boundary() -> None:
+    """고정 창의 대가를 명시해 둔다.
+
+    window 가 epoch 에 정렬돼 있으므로, 창이 끝나기 직전에 한도를 채우고 창이
+    바뀌자마자 다시 채우면 아주 짧은 순간에 한도의 **2배** 가 통과한다.
+    슬라이딩 창으로 바꾸기 전까지 이건 사실이다.
+
+    한도의 목적이 공정 분배가 아니라 "한 명이 서비스를 갈아버리는 것" 의 차단이라
+    이 정도 버스트는 받아들인다. 다만 받아들였다는 사실이 코드에 남아 있어야 하고,
+    나중에 누가 "한도가 30이면 어떤 1분에도 30을 넘지 않는다" 고 가정하는 것을
+    막아야 한다. 이 테스트가 실패하면 창 계산이 바뀐 것이므로 문서도 같이 고친다.
+    """
+    policy = RateLimitPolicy(
+        name="analyze",
+        limit=2,
+        window_seconds=60,
+        path_prefix="/api/v1/analyze",
+        exact_path=True,
+    )
+    repository = InMemoryRateLimitRepository()
+    boundary = datetime(2026, 8, 14, 12, 1, tzinfo=timezone.utc)
+
+    def allowed_at(moment: datetime) -> bool:
+        service = RateLimitService(
+            repository, secret=SECRET, policies=(policy,), clock=lambda: moment
+        )
+        return service.check(
+            method="POST", path="/api/v1/analyze", client_ip="203.0.113.7"
+        ).allowed
+
+    # 창이 닫히기 직전에 한도를 다 쓴다.
+    assert allowed_at(boundary - timedelta(milliseconds=200))
+    assert allowed_at(boundary - timedelta(milliseconds=100))
+    assert not allowed_at(boundary - timedelta(milliseconds=50))
+
+    # 창이 바뀌는 순간 카운터가 0 이 된다. 0.3초 안에 4건이 통과했다.
+    assert allowed_at(boundary)
+    assert allowed_at(boundary + timedelta(milliseconds=100))
+    assert not allowed_at(boundary + timedelta(milliseconds=150))
 
 
 def test_retry_after_points_at_the_end_of_the_window() -> None:
@@ -532,6 +574,16 @@ def limited_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("FINSHIELD_RATE_LIMIT_SECRET", SECRET)
     monkeypatch.setenv("FINSHIELD_RATE_LIMIT_ENABLED", "1")
     reset_rate_limit_service()
+
+    # 시계를 고정한다. window 는 epoch 에 정렬된 **고정 창** 이라, 아래 테스트들이
+    # 30여 번을 연속으로 쏘는 도중 분 경계를 넘으면 카운터가 리셋되고 429 가 아예
+    # 나오지 않는다. 전체 실행에서 간헐적으로 실패했고, 시계를 경계 0.5초 앞에
+    # 두는 방식으로 재현해 확인했다(32건 전부 200). 한도 로직의 결함이 아니라
+    # 테스트가 벽시계에 의존한 것이 문제이므로, 여기서 시간을 없앤다.
+    #
+    # 서비스는 여기서 한 번 만들어 캐시에 올려 두고 그 인스턴스의 시계만 바꾼다.
+    # `build_rate_limit_service` 의 저장소·비밀 선택 경로는 그대로 지난다.
+    monkeypatch.setattr(rate_limit_service(), "_clock", lambda: NOW)
 
     client = TestClient(main_app)
     try:

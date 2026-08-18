@@ -77,6 +77,7 @@ Mutation 감사에서 **위험 등급 임계값만 통과했다.** `score >= 70`
 | 본문 크기 (web) | `web/lib/api/request-body.ts` | Route Handler에는 본문 크기 기본 상한이 **없다.** 배포 경로가 Caddy → web → backend라 노출된 쪽은 web이고, `request.json()`을 그냥 부르면 100MB 본문도 다 담은 뒤에야 zod에서 거부한다 |
 | 카운터 저장 | `app/repositories/rate_limits.py` | InMemory(로컬) / SQLAlchemy(배포). 배포에서 SQLite면 기동 거부 — 워커 간 카운터가 안 공유돼 한도가 워커 수만큼 헐거워지는데 겉으로는 정상으로 보인다 |
 | 버킷 키 | `app/services/rate_limits.py` | `HMAC(secret, policy|ip)`. IPv4는 값이 2^32개뿐이라 단순 해시는 표로 되돌릴 수 있다. 저장된 행이 접속 기록이 되면 안 된다 |
+| 창 계산 | `app/services/rate_limits.py` | **epoch 정렬 고정 창.** 창이 닫히기 직전과 열린 직후에 몰아치면 짧은 순간 한도의 **2배** 가 통과한다. 목적이 공정 분배가 아니라 지속적 남용 차단이라 받아들였고, 가정이 굳지 않도록 `test_a_client_can_burst_twice_the_limit_across_a_boundary` 로 고정했다 |
 | 저장소 장애 | 같은 파일 | **통과시킨다.** DB 장애 때문에 위험한 문자를 확인 못 하게 만드는 쪽이 그동안 한도가 열리는 것보다 나쁘다. `app/domain/fraud/sources.py`와 같은 판단 |
 | 만료 행 정리 | `scripts/cleanup_expired_anonymous_data.py` | 닫힌 window 행은 다시 조회되지 않는다. 지우지 않으면 요청 수만큼 무한히 쌓인다. 개인정보 정리 **뒤에** 둔다 |
 
@@ -235,7 +236,7 @@ localhost 예행연습(Caddy 내부 CA, ACME 무관) 실측: 27개 검사 중 4�
 
 서버는 **GCP Compute Engine** 으로 간다(2026-08-17 결정). Cloud Run 은 파일시스템이 요청 단위로 사라지고 상시 실행 루프를 둘 수 없어 PostgreSQL·백업·retention 을 전부 다시 짜야 하는데, 공개를 그 재작업 뒤로 미룰 이유가 없다. 사양·방화벽·고정 IP 판단은 `31-public-deployment.md` 11절.
 
-머신은 **always-free `e2-micro`(us-central1)** 로 간다(2026-08-18 결정). $300 크레딧을 받지 못한 계정이라 상시 비용이 사실상 0 인 구성이 이것뿐이다. 대가가 둘 있다. 무료 리전이 미국 3곳뿐이라 한국에서 왕복 150ms 대이고, 1GB 로는 **Next 빌드가 반드시 죽는다.** 후자 때문에 이미지를 GitHub Actions 에서 빌드해 `ghcr.io` 로 올리고 VM 은 pull 만 해야 하는데, 그것이 아래 P1-3 이다. **즉 P1-3 이 P0-4 의 선행조건이 됐다.** 상세는 `31-public-deployment.md` 11-1.
+머신은 **always-free `e2-micro`(us-west1-b, 오리건)** 로 간다(2026-08-18 결정). $300 크레딧을 받지 못한 계정이라 상시 비용이 사실상 0 인 구성이 이것뿐이다. 대가가 둘 있다. 무료 리전이 미국 3곳뿐이라 한국에서 왕복 110ms 대이고, 1GB 로는 **Next 빌드가 반드시 죽는다.** 후자 때문에 이미지를 GitHub Actions 에서 빌드해 `ghcr.io` 로 올리고 VM 은 pull 만 해야 하는데, 그것이 아래 P1-3 이다. **즉 P1-3 이 P0-4 의 선행조건이 됐다.** 상세는 `31-public-deployment.md` 11-1.
 
 ### P0-5. 파이썬 의존성 잠금 — 완료 (2026-08-14)
 
@@ -281,7 +282,7 @@ CI `deps-lock` job이 `.in`과 lock의 어긋남을 막는다. `--upgrade` 없�
 
 계정 삭제, 프로필 변경처럼 되돌릴 수 없는 동작의 기록이 없다. `docs/10`에서 "identity와 보존 정책 필요"로 미뤄둔 항목이다. 익명 세션 모델 위에서 무엇을 남길 수 있는지부터 정해야 한다. 감사 로그가 개인정보 보존기간 정책과 충돌하지 않게 설계한다.
 
-### P1-3. 배포·롤백 절차 — 이미지 파이프라인 완료 (2026-08-18), 실배포 미검증
+### P1-3. 배포·롤백 절차 — 파이프라인과 VM 기동 확인 (2026-08-18), HTTPS·태그 경로 미검증
 
 수동 배포에는 되돌릴 대상 자체가 없었다. 태그 붙은 이미지가 없으니 "이전 버전"이라는 게 가리킬 곳이 없고, 되돌리려면 이전 커밋을 다시 빌드해야 하는데 그 빌드는 1GB VM 에서 죽는다. 그래서 이번 작업은 롤백 절차를 문서로 적는 대신 **되돌릴 수 있는 물건을 먼저 만드는** 쪽으로 갔다.
 
@@ -320,14 +321,33 @@ CI `deps-lock` job이 `.in`과 lock의 어긋남을 막는다. `--upgrade` 없�
 
 #### ghcr 패키지 공개 범위 (배포 전에 반드시 확인)
 
-워크플로가 처음 만든 패키지는 **저장소가 public 이어도 private 으로 생성된다.** 이걸 모르면 VM 에서 `docker compose pull` 이 인증 오류로 죽고, 원인이 코드에 없어서 한참 헤맨다. 둘 중 하나를 택한다.
+첫 실행에서 두 패키지 모두 **public 으로 생성됐다** (2026-08-18 실측). 저장소가 public 이라서로 보이지만 인과는 확인하지 못했으므로, 배포 전 확인 절차는 그대로 남긴다 — private 으로 생성되면 VM 에서 `docker compose pull` 이 인증 오류로 죽고, 원인이 코드에 없어서 한참 헤맨다. 확인 명령은 `docs/31` 3-2 절에 있다(익명 토큰으로 `tags/list`, `200` 이면 public). private 이면 둘 중 하나를 택한다.
 
 - 패키지 설정에서 공개로 바꾼다 (이미지에 비밀이 없다는 전제. 우리 이미지는 secrets 를 런타임 mount 로 받으므로 해당).
 - 또는 VM 에서 `read:packages` 만 가진 PAT 으로 `docker login ghcr.io` 한다.
 
+#### 여기까지 확인된 것 (2026-08-18)
+
+`release.yml` 을 `workflow_dispatch` 로 한 번 돌렸다 (run #1, main `1809997`, 2분 14초, backend/web 두 job 모두 성공). 이미지가 ghcr 에 올라갔고, 로컬에서 `FINSHIELD_IMAGE_TAG=sha-1809997… docker compose -f compose.yaml -f compose.deploy.yaml pull` 이 성공했다. digest 와 매니페스트 형태는 devlog 에 남겼다.
+
+**그리고 실제 e2-micro 에 올렸다 (2026-08-18).** 이것이 이 절의 가장 큰 미지수였다 — 1GB 에서 이 스택이 도는지는 문서로 답할 수 없는 질문이었다. 도는 것을 확인했다. 측정값은 `docs/31` 11-6.
+
+| 확인 | 결과 |
+|---|---|
+| `docker compose pull` (VM) | 성공. backend 331MB / web 303MB |
+| 컨테이너 5개 상태 | 전부 `healthy` (`migration` 은 `exited (0)`) |
+| `/health`, `/health/ready` | `ok`, `ready` |
+| `backup` 첫 dump | `backups/finshield-…Z.dump` 8093B, `root:root`. **`cap_add: DAC_OVERRIDE` 가 실기에서 처음 검증됐다** — 지금까지는 리눅스 CI 에서만 확인한 수정이다 |
+| 메모리 | 컨테이너 합계 326MiB, `available` 234MiB, 활성 스와핑 없음(`vmstat` si/so = 0) |
+| 재부팅 복구 | swap 이 `/etc/fstab` 으로 자동 복구, 컨테이너 5개 자동 기동, **39초 만에 `ready`**. 다만 `backup` 은 여기서 걸렸다 — 아래 참고 |
+
+**재부팅 테스트가 백업 루프의 결함을 하나 찾았다.** 데이터도 도메인도 없는 시점에 재부팅해 본 이유가 이것이다. 상세와 수정은 `docs/31` 11-6 및 해당 devlog.
+
 #### 아직 안 된 것
 
-- **실제로 배포해 본 적이 없다.** `release.yml` 은 아직 한 번도 돌지 않았다 (태그를 민 적 없음). 검증된 것은 YAML 파싱과 compose 해석까지다.
+- **태그 push 경로는 안 돌려 봤다.** run #1 은 수동 실행이라 `type=ref,event=tag` 가 아무 태그도 만들지 않았고, 붙은 태그는 `sha-…` 하나뿐이다. `v*` 태그를 미는 순간의 동작은 미검증이다.
+- **HTTPS 를 얹은 상태는 미검증이다.** 위 측정은 `compose.yaml` + `compose.deploy.yaml` 조합이고 포트는 전부 loopback 바인딩이었다. `compose.https.yaml` 의 Caddy 가 더해지면 30~50MiB 가 추가로 든다 — `available` 234MiB 안에 들어가지만 여유가 그만큼 줄어든다. 도메인이 정해져야 확인할 수 있다.
+- **부하를 준 적이 없다.** 위 숫자는 전부 idle 이다. 동시 요청이 들어왔을 때 uvicorn worker 2개와 Next 가 얼마나 더 먹는지는 모른다.
 - 롤백 리허설 없음. `docs/29` 의 복원 리허설처럼 실제로 되돌려 보는 절차가 필요하다.
 - expand/contract 를 강제하는 검사 없음. 지금은 규칙일 뿐이고, 어기면 리뷰에서만 걸린다.
 
@@ -477,7 +497,7 @@ Capacitor로 감싸는 선택지는 스토어 등록이 실제로 필요해질 �
 3. P0-2 만료 데이터 정리 자동화   ← 완료 (2026-08-15)
 4. P0-3 백업 자동화 + 복원 리허설   ← 완료 (2026-08-17)
 5. PWA (manifest + share_target)  ← 완료 (2026-08-17)
-6. P1-3 배포·롤백 (밖에서 빌드, VM 은 pull)  ← 파이프라인 완료 (2026-08-18), 실배포 미검증
+6. P1-3 배포·롤백 (밖에서 빌드, VM 은 pull)  ← e2-micro 실기동 확인 (2026-08-18), HTTPS·태그 경로 미검증
 7. P0-4 실도메인·DNS·TLS   ← 준비 완료 (2026-08-17), 도메인·서버 대기
 8. P1-1 알림 → P1-5 의존성 상승 관측 → P1-2 audit log → P1-4 CSP
 9. P2-1 평가 하네스 bootstrap ← 완료 (2026-08-13) → P2-2 LLM 어댑터 ← 경계·프로바이더 완료 (2026-08-18), 미측정 → held-out·LLM-only·Hybrid
