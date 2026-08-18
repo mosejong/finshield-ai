@@ -235,7 +235,7 @@ CI 와 같은 명령으로 두 lock 을 재생성했다. `requirements.txt` 무�
 
 ## 커밋 SHA
 
-- (커밋 후 기입)
+- `5780df1` — feat: build images outside the VM so a rollback has something to point at
 
 ## PR
 
