@@ -174,7 +174,7 @@ pytest -q                              → 496 passed, 2 skipped in 18.00s
 
 ## 커밋 SHA
 
-- (이 문서와 함께 커밋. SHA 는 커밋 후 추가)
+- `18dea93` — feat: pin the LLM explanation contract before any key is plugged in
 
 ## PR
 
