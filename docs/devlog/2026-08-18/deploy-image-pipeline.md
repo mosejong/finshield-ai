@@ -176,6 +176,56 @@ CI 와 같은 명령으로 두 lock 을 재생성했다. `requirements.txt` 무�
 
 (531 → 552, 신규 21건)
 
+**8. 첫 실제 실행 — `Release images` run #1 (병합 후 추가)**
+
+PR #58 병합 뒤 main(`1809997`)에서 `workflow_dispatch` 로 돌렸다. **총 2분 14초,
+`build (backend, ., Dockerfile)` 와 `build (web, ./web, ./web/Dockerfile)` 모두 성공.**
+
+붙은 태그는 `sha-180999715f6bf9aece4fbf678b2669048dd1daca` 하나뿐이다. 예상대로다 —
+수동 실행에는 태그 ref 가 없으므로 `type=ref,event=tag` 가 아무것도 만들지 않고
+`type=sha` 만 남는다. 즉 **이번 실행은 태그 push 경로를 검증하지 못했다.**
+
+digest (`docker-content-digest` 헤더):
+
+| 이미지 | digest | 크기 |
+|---|---|---|
+| `finshield-backend` | `sha256:7eeabb789e709eb59b0cc335a42d8640462661ef8057123ba87526b6ba8e4f15` | 331MB |
+| `finshield-web` | `sha256:4333d7750bcb4f6ce8b0e451263bb2f6be82fa41114bee5d9f8d637209f28f7f` | 303MB |
+
+두 매니페스트 모두 `application/vnd.oci.image.index.v1+json` 이고, 안에
+`linux/amd64` 와 `unknown/unknown` 이 하나씩 들어 있다. 뒤엣것은
+`build-push-action@v6` 이 기본으로 붙이는 provenance/SBOM attestation 이지 잘못
+빌드된 플랫폼이 아니다. 목표한 amd64 단일 플랫폼이 맞다.
+
+pull 검증:
+
+```
+FINSHIELD_IMAGE_TAG=sha-1809997… \
+  docker compose -f compose.yaml -f compose.deploy.yaml pull
+→ Image ghcr.io/mosejong/finshield-backend:sha-1809997…  Pulled
+```
+
+받은 backend 이미지가 331MB 인데 로컬 `docker compose build` 산출물이 332MB 다.
+**빌드 환경이 달라도 결과물이 사실상 같다** — Actions 가 다른 물건을 만들고 있지
+않다는 뜻이다.
+
+**9. 패키지 공개 범위 — 문서가 틀렸다**
+
+`gh api /user/packages` 는 토큰에 `read:packages` 가 없어 403 이었다. 그래서
+로그인 없이 레지스트리에 직접 물어봤다.
+
+```bash
+tok=$(curl -s "https://ghcr.io/token?scope=repository:mosejong/finshield-backend:pull" \
+  | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $tok" \
+  "https://ghcr.io/v2/mosejong/finshield-backend/tags/list"
+```
+
+**두 이미지 모두 200 — public 으로 생성됐다.** 저장소가 `PUBLIC` 이고
+`GITHUB_TOKEN` 으로 밀었기 때문으로 보이지만, 그 인과는 확인하지 않았다.
+`docs/28`/`docs/31` 에 "private 으로 생성된다" 고 단정해 뒀던 것을 관측한 사실로
+바꾸고, 확인 명령을 절차로 남겼다. 짐작을 문서에 적었다가 실측이 뒤집은 경우다.
+
 ## 보안·개인정보 영향
 
 - **새 외부 통신 없음.** 런타임 코드 변경이 없다. `release.yml` 은 CI 안에서만 돈다.
@@ -184,9 +234,9 @@ CI 와 같은 명령으로 두 lock 을 재생성했다. `requirements.txt` 무�
 - **이미지에 비밀이 들어가지 않는다.** `secrets/` 는 런타임 mount 이고
   (`compose.yaml` 의 `x-backend-secrets`), `Dockerfile` 은 이를 복사하지 않는다.
   그래서 ghcr 패키지를 공개로 둘 수 있다.
-- **ghcr 패키지 기본 공개 범위가 함정이다.** 워크플로가 처음 만든 패키지는 저장소가
-  public 이어도 private 으로 생성된다. VM 에서 pull 이 인증 오류로 죽고 원인이
-  코드에 없어서 헤매게 되므로 `docs/31` 3-2 에 명시했다.
+- **ghcr 패키지는 public 으로 생성됐다** (실측, 위 검증 9). 이미지에 비밀이 없으므로
+  공개 자체는 문제가 아니다. 다만 private 이면 VM 에서 pull 이 인증 오류로 죽고
+  원인이 코드에 없어 헤매게 되므로, 확인 절차를 `docs/31` 3-2 에 남겼다.
 - **로그 노출 없음.** digest 와 태그만 job summary 에 남는다.
 
 ## 실패, 수정, 리뷰 이력
@@ -215,8 +265,11 @@ CI 와 같은 명령으로 두 lock 을 재생성했다. `requirements.txt` 무�
 
 **위험**
 
-- **한 번도 배포해 본 적이 없다.** `release.yml` 은 아직 돌지 않았다. 검증된 것은
-  YAML 파싱과 compose 해석까지다. 첫 태그 push 가 곧 첫 검증이다.
+- **태그 push 경로가 미검증이다.** run #1 은 `workflow_dispatch` 라 `sha-` 태그만
+  만들었다. `v*` 를 밀었을 때 `type=ref,event=tag` 가 의도한 태그를 붙이는지는
+  아직 모른다. 첫 릴리스 태그가 그 검증이 된다.
+- **VM 에 올려 본 적이 없다.** pull 은 개발 머신(x86_64, 넉넉한 메모리)에서 확인했다.
+  e2-micro 1GB 에서 이 스택 전체가 뜨는지는 별개 문제로 남아 있다.
 - **expand/contract 는 규칙일 뿐 강제되지 않는다.** 어기면 리뷰에서만 걸린다.
   `downgrade()` 에 `drop_` 이 있는 마이그레이션을 감지하는 검사를 붙일 수 있지만,
   그건 정당한 경우까지 막으므로 판단이 더 필요하다.
@@ -227,8 +280,8 @@ CI 와 같은 명령으로 두 lock 을 재생성했다. `requirements.txt` 무�
 
 **다음**
 
-1. `workflow_dispatch` 로 이미지 빌드만 먼저 돌려 본다 (도메인과 무관하게 가능).
-2. ghcr 패키지 공개 범위를 확인한다.
+1. ~~`workflow_dispatch` 로 이미지 빌드만 먼저 돌려 본다~~ → 완료 (run #1).
+2. ~~ghcr 패키지 공개 범위를 확인한다~~ → 완료, 둘 다 public.
 3. P0-4 — 도메인·ACME 연락처·`secrets/profile_encryption_keys.txt` 의 오프호스트
    보관 위치. 셋 다 사용자 결정 대기.
 4. P2-2 — 프로바이더를 `evaluation/` 에 연결해 `llm_only` 를 `not_run` 에서 뺀다.

@@ -83,7 +83,17 @@ export FINSHIELD_IMAGE_TAG=v0.3.0
 docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml pull
 ```
 
-**여기서 인증 오류가 나면 패키지가 private 이다.** 워크플로가 처음 만든 ghcr 패키지는 저장소가 public 이어도 private 으로 생성된다. 패키지 설정에서 공개로 바꾸거나, `read:packages` 만 가진 PAT 으로 `docker login ghcr.io` 한다. 이미지에 비밀은 없으므로(11-1) 공개로 두는 쪽이 단순하다.
+**패키지 공개 범위는 짐작하지 말고 확인한다.** 첫 실행(2026-08-18, `Release images` #1)에서 만들어진 두 패키지는 **둘 다 public 으로 생성됐다.** 저장소가 public 이고 `GITHUB_TOKEN` 으로 밀었기 때문으로 보이지만 그 인과는 확인하지 못했다 — 확실한 건 관측 결과뿐이다. VM 에 붙기 전에 로그인 없이 확인할 수 있다.
+
+```bash
+img=finshield-backend   # finshield-web 도 같은 방법으로
+tok=$(curl -s "https://ghcr.io/token?scope=repository:mosejong/$img:pull" \
+  | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $tok" \
+  "https://ghcr.io/v2/mosejong/$img/tags/list"
+```
+
+`200` 이면 익명으로 받을 수 있다 = public 이고 VM 에서 `docker login` 이 필요 없다. `401`/`403` 이면 private 이라 위의 `pull` 이 인증 오류로 죽는다. 그때는 패키지 설정에서 공개로 바꾸거나(이미지에 비밀은 없다 — 11-1 참고), `read:packages` 만 가진 PAT 으로 `docker login ghcr.io` 한다.
 
 아래 3-3/3-4 명령에도 `-f compose.deploy.yaml` 을 그대로 붙인다. 빠뜨리면 VM 이 빌드를 시작하고 OOM 으로 조용히 죽는다.
 
@@ -303,7 +313,7 @@ always-free 목록([free-cloud-features](https://docs.cloud.google.com/free/docs
 - VM 은 `docker compose pull` 만 한다. `compose.yaml` 의 `build:` 를 `image:` 로 바꾸는 배포용 override 가 `compose.deploy.yaml` 이다 (2026-08-18 작성).
 - 이미지에 비밀은 들어가지 않는다. `secrets/` 는 지금도 런타임 마운트라 레지스트리가 공개여도 노출 경로가 생기지 않는다.
 
-**이 때문에 작업 순서가 바뀐다.** `docs/28` P1-3(배포/롤백)은 원래 공개 이후로 미뤄둔 항목인데, e2-micro 를 고른 이상 **P0-4 의 선행조건**이 된다. 손해만 있는 것은 아니다. 지금의 수동 배포에는 롤백 수단이 아예 없는데, 태그된 이미지를 pull 하는 방식에는 되돌릴 지점이 생긴다. → 2026-08-18 에 `release.yml` + `compose.deploy.yaml` 로 착지했다. **다만 아직 한 번도 태그를 밀어 보지 않았다.**
+**이 때문에 작업 순서가 바뀐다.** `docs/28` P1-3(배포/롤백)은 원래 공개 이후로 미뤄둔 항목인데, e2-micro 를 고른 이상 **P0-4 의 선행조건**이 된다. 손해만 있는 것은 아니다. 지금의 수동 배포에는 롤백 수단이 아예 없는데, 태그된 이미지를 pull 하는 방식에는 되돌릴 지점이 생긴다. → 2026-08-18 에 `release.yml` + `compose.deploy.yaml` 로 착지했고, 수동 실행(run #1)으로 두 이미지가 ghcr 에 올라가 pull 까지 되는 것을 확인했다. **다만 `v*` 태그를 밀어 본 적은 아직 없다** — 태그 경로만 미검증이다.
 
 > **결제 계정 확인 (2026-08-18).** 후불 Google Cloud 결제 계정이 활성 상태이고 미결제 잔액 ₩0, 청구 기준액 ₩100,000 이다. always-free `e2-micro` 가 요구하는 것은 활성 결제 계정 하나뿐이므로 **이 절의 선행조건은 충족됐다.** $300 무료 체험 크레딧은 없고, 필요하지도 않다 — always-free 는 체험과 별개 프로그램이다. AI Studio 선불 크레딧 ₩70,000 은 Gemini API 전용이라 Compute Engine 요금에는 쓰이지 않는다.
 
