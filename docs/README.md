@@ -1,7 +1,7 @@
 # FinShield Documentation Index
 
 ## Product / research
-01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog · 28 fraud evaluation benchmark · 29 competition evidence pack
+01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog · 32 fraud evaluation benchmark · 33 competition evidence pack
 
 ## Architecture / engineering
 

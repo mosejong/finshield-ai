@@ -32,8 +32,8 @@ Scenario Engine을 재현 가능하게 비교한다. bootstrap 개발셋 기준 
 precision 0.973684, recall 0.948718, F1 0.961039, FPR 0.045455이며 action-source
 근거 연결 coverage는 1.0이다. 같은 데이터로 규칙을 교정했으므로 독립 held-out
 성능이나 실서비스 정확도로 주장하지 않는다. LLM-only와 Hybrid 비교도 아직
-수행하지 않았다. 상세 결과와 주장 한계는 `docs/28-fraud-evaluation-benchmark.md`와
-`docs/29-competition-evidence-pack.md`를 따른다.
+수행하지 않았다. 상세 결과와 주장 한계는 `docs/32-fraud-evaluation-benchmark.md`와
+`docs/33-competition-evidence-pack.md`를 따른다.
 프론트 접근성 v0.1은 본문 건너뛰기, 공통 포커스 링, 로딩·비동기 상태 안내,
 움직임 축소 설정과 구조적 회귀 테스트를 포함한다. PM 브라우저 검수에서
 375·768·1280 다크 화면의 가로 overflow·nav 전환과 스킵 링크의 main 포커스를
