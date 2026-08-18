@@ -19,7 +19,7 @@
 - [x] 익명 계정 전체 삭제 + 만료 세션/profile dry-run 정리
 - [x] Docker·PostgreSQL runtime + migration + backup/restore CI
 - [x] HTTP security headers + same-origin state-change protection + HTTPS deployment config
-- [ ] public MVP deployment (real domain/DNS/certificate verification required) — 선행 P0는 전부 완료. 배포 절차·staging 예행연습·외부 검증기는 `31-public-deployment.md`에 준비돼 있고 `localhost` 예행연습까지 끝났다. 남은 것은 도메인과 서버뿐이다
+- [ ] public MVP deployment (real domain/DNS/certificate verification required) — 선행 P0는 전부 완료. 배포 절차·staging 예행연습·외부 검증기는 `31-public-deployment.md`에 준비돼 있고 `localhost` 예행연습까지 끝났다. 남은 것은 도메인·서버와, always-free `e2-micro`(1GB)를 고르면서 선행조건이 된 이미지 빌드·배포 파이프라인이다 (`28` P1-3)
 - [x] rate limiting + 요청 본문 크기 제한 (인증 없는 `/api/v1/analyze`·세션 발급 보호)
 - [x] 만료 데이터 정리 자동 스케줄 (`adr/0004` 이행)
 - [x] 운영 backup 스케줄 + 복원 리허설 (합격 기준은 "복원됐다"가 아니라 "복호화됐다")

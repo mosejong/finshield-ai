@@ -235,6 +235,8 @@ localhost 예행연습(Caddy 내부 CA, ACME 무관) 실측: 27개 검사 중 4�
 
 서버는 **GCP Compute Engine** 으로 간다(2026-08-17 결정). Cloud Run 은 파일시스템이 요청 단위로 사라지고 상시 실행 루프를 둘 수 없어 PostgreSQL·백업·retention 을 전부 다시 짜야 하는데, 공개를 그 재작업 뒤로 미룰 이유가 없다. 사양·방화벽·고정 IP 판단은 `31-public-deployment.md` 11절.
 
+머신은 **always-free `e2-micro`(us-central1)** 로 간다(2026-08-18 결정). $300 크레딧을 받지 못한 계정이라 상시 비용이 사실상 0 인 구성이 이것뿐이다. 대가가 둘 있다. 무료 리전이 미국 3곳뿐이라 한국에서 왕복 150ms 대이고, 1GB 로는 **Next 빌드가 반드시 죽는다.** 후자 때문에 이미지를 GitHub Actions 에서 빌드해 `ghcr.io` 로 올리고 VM 은 pull 만 해야 하는데, 그것이 아래 P1-3 이다. **즉 P1-3 이 P0-4 의 선행조건이 됐다.** 상세는 `31-public-deployment.md` 11-1.
+
 ### P0-5. 파이썬 의존성 잠금 — 완료 (2026-08-14)
 
 문제였던 것: base 이미지는 digest로 고정했는데 `requirements.txt`는 `fastapi>=0.116,<1.0` 같은 범위 지정이었다. 같은 커밋을 다시 빌드해도 다른 버전이 설치돼, 장애 시 "어제와 무엇이 달라졌는가"에 답할 수 없었다. 부수적으로 `pytest`가 런타임 목록에 있어 프로덕션 이미지에 테스트 프레임워크가 실려 나갔다.
@@ -295,16 +297,20 @@ P0-5로 버전은 고정했지만, 고정은 그 자체로 위험을 만든다. 
 
 배포와 무관하지만 이 프로젝트의 주장을 증명하는 부분이다.
 
-### P2-1. 평가 하네스
+### P2-1. 평가 하네스 — bootstrap 완료 (2026-08-13)
 
-**현재 저장소에 평가 코드가 전혀 없다.** `eval/`도 `benchmarks/`도 없고 precision/recall/F1을 계산하는 코드도 없다. `CLAUDE.md`의 Evaluation 조항과 `docs/05`가 요구하는 Rule-only / LLM-only / Hybrid 비교가 문서로만 존재한다.
+이 항목이 처음 쓰일 때는 저장소에 평가 코드가 한 줄도 없었고, "hybrid 가 더 안전하고 정확하다"는 이 프로젝트의 논지를 뒷받침하는 숫자가 하나도 없었다. 지금은 `evaluation/` 이 있다.
 
-이건 단순 누락이 아니다. 이 프로젝트의 논지는 "hybrid가 더 안전하고 정확하다"인데, 그걸 뒷받침하는 숫자가 하나도 없다. 지금 상태로는 아키텍처 주장이 근거 없는 선언이다.
+- `evaluation/fraud_golden.py` — 합성 61건 골든셋. 7개 UserState 를 상태당 최소 3건 덮는다. **비합성 케이스는 `ValueError` 로 거부한다**
+- `evaluation/fraud_benchmark.py` — precision/recall/F1, class별 recall, 신호 coverage, scenario 일치율, evidence coverage. 최저 품질 gate 포함
+- `scripts/evaluate_fraud_engine.py` — 재현 가능한 진입점, p50/p95 실측
+- `tests/test_fraud_evaluation.py` — gate 와 **알려진 오답 3건(fg-046/047/049)이 보고서에서 사라지지 않는지**를 고정한다
 
-- golden set 먼저 (`docs/05`의 scenario engine 항목 형식: 입력 상황, 이미 한 행동, 예상 scenario, 허용/금지 행동)
-- 재현 가능한 실행 진입점, 결과 산출물 포맷 고정
-- 지표: fraud 분류 precision/recall/F1과 class별 recall, 신호 추출 precision/recall, scenario 일치율, FPR
-- **먼저 Rule-only 베이스라인을 측정한다.** LLM 없이도 지금 당장 낼 수 있는 숫자이고, 이후 모든 비교의 기준선이 된다
+Rule-only 베이스라인은 이것으로 확보됐다. 남은 것 셋이다.
+
+- **held-out v0.2** — 현재 데이터는 non-held-out 이라 보고서가 `dataset.held_out = False` 를 그대로 싣는다. 독립 작성·동결이 필요하다
+- **LLM-only 측정** — 보고서가 `llm_only.status = "not_run"` 이고 사유가 "고정된 model·prompt·provider 계약이 없다" 이다. 즉 P2-2 의 어댑터가 선행이다
+- **Hybrid 비교** — `proposed_hybrid.status = "not_implemented"`
 
 ### P2-2. LLM 설명 계층
 
@@ -313,6 +319,16 @@ P0-5로 버전은 고정했지만, 고정은 그 자체로 위험을 만든다. 
 도입 시 함께 필요한 것: 출력 스키마 검증(`docs/04`의 model output schema validation), prompt injection golden set, 근거 이탈 검출. 규칙 판정을 LLM이 덮어쓰지 못하게 하는 경계가 코드로 강제되어야 한다 — `CLAUDE.md`의 첫 번째 non-negotiable이다.
 
 **P2-1을 먼저 한다.** 베이스라인 없이 LLM을 넣으면 개선됐는지 나빠졌는지 알 수 없다.
+
+#### 프로바이더 (2026-08-18 결정)
+
+**벤치마크는 Google AI Studio 무료 등급으로 시작하고, 실사용자 텍스트가 흐르기 전에 유료 경로로 옮긴다.**
+
+무료 등급은 제출한 내용이 Google 제품 개선에 쓰일 수 있는 조건이다. 그럼에도 벤치마크에 쓸 수 있는 이유는 골든셋에 실사용자 데이터가 한 건도 없기 때문이다 — `evaluation/fraud_golden.py` 가 비합성 케이스를 거부하고 `fraud_benchmark.py` 의 `source_kind` 도 `locally_authored_synthetic_reviewed` 다. 나가는 것은 팀이 직접 지어낸 61건뿐이다.
+
+이 조건이 무너지는 순간은 **사용자가 붙여넣은 문자 원문을 보내기 시작할 때**다. 그때 Vertex AI 로 옮긴다. GCE 인스턴스에 서비스 계정을 붙이면 메타데이터 서버가 단기 토큰을 주므로 **만료 없는 JSON 키 파일을 서버에 두지 않아도 된다.** 키 파일을 두는 순간 `docs/29` 0절이 막으려던 형태 — 백업 하나가 새면 전부 열리는 비밀 — 가 다시 생긴다.
+
+그래서 첫 결과물은 챗봇이 아니라 **고정된 model·prompt·provider 계약을 가진 어댑터**다. 프로바이더가 어댑터 뒤에 있어야 위 전환이 설정 변경으로 끝난다. 이는 새로운 외부 업로드 경로이므로 `CLAUDE.md` 의 검토 조항 대상이고, PII 최소화 계층과 **요청·응답 비로깅**이 어댑터의 일부여야 한다(`adr/0004`).
 
 ### P2-3. 접근성 실기기 검수
 
@@ -376,12 +392,13 @@ Capacitor로 감싸는 선택지는 스토어 등록이 실제로 필요해질 �
 3. P0-2 만료 데이터 정리 자동화   ← 완료 (2026-08-15)
 4. P0-3 백업 자동화 + 복원 리허설   ← 완료 (2026-08-17)
 5. PWA (manifest + share_target)  ← 완료 (2026-08-17)
-6. P0-4 실도메인·DNS·TLS   ← 준비 완료 (2026-08-17), 도메인·서버 대기
-7. P1-1 알림 → P1-5 의존성 상승 관측 → P1-3 배포·롤백 → P1-2 audit log → P1-4 CSP
-8. P2-1 평가 하네스 → P2-2 LLM 계층
+6. P1-3 배포·롤백 (밖에서 빌드, VM 은 pull)  ← e2-micro 선택으로 P0-4 선행조건이 됨 (2026-08-18)
+7. P0-4 실도메인·DNS·TLS   ← 준비 완료 (2026-08-17), 도메인·서버 대기
+8. P1-1 알림 → P1-5 의존성 상승 관측 → P1-2 audit log → P1-4 CSP
+9. P2-1 평가 하네스 bootstrap ← 완료 (2026-08-13) → P2-2 LLM 어댑터 → held-out·LLM-only·Hybrid
 ```
 
-P0-5를 맨 앞에 둔 이유는 의존성이 고정돼야 이후 rate limit·백업 검증 결과가 재현되기 때문이다. P0-4를 마지막에 두는 이유는 공개 노출이 되돌리기 가장 어려운 단계라서다.
+P0-5를 맨 앞에 둔 이유는 의존성이 고정돼야 이후 rate limit·백업 검증 결과가 재현되기 때문이다. P0-4를 마지막에 두는 이유는 공개 노출이 되돌리기 가장 어려운 단계라서다. P1-3 이 P0-4 앞으로 올라온 것은 우선순위가 바뀌어서가 아니라, 1GB 머신에서는 배포 파이프라인 없이 배포 자체가 불가능하기 때문이다.
 
 6번은 코드·구성·검증기가 모두 준비됐고 `localhost` 예행연습까지 끝났다(`31-public-deployment.md`). **막힌 것은 도메인과 서버 하나뿐이다.** 정해지는 대로 31 문서 3절을 그대로 따라가면 되고, 그 사이에는 7번을 먼저 진행해도 순서가 어긋나지 않는다 — P1-1 알림이 먼저 붙으면 인증서 갱신 감시를 cron 대신 알림으로 시작할 수 있다.
 

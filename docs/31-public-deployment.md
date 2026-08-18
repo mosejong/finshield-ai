@@ -219,19 +219,32 @@ HTTPS 를 통째로 내리려면 `compose.https.yaml` 없이 올린다. 그러�
 
 Cloud Run 으로 옮기는 것 자체는 나중에 검토할 수 있지만, **공개를 그 재작업 뒤로 미룰 이유는 없다.**
 
-### 11-1. 사양
+### 11-1. 사양 — always-free `e2-micro` (2026-08-18 결정)
+
+이 계정은 **$300 무료 크레딧을 받지 못했다.** 체험판 대상이 아니어서 되돌릴 방법이 없다. 그래서 상시 비용이 사실상 0 에 가까운 구성을 고른다. 아래 값은 그 제약에서 나온 것이지 성능상 최선이 아니다.
 
 | 항목 | 값 | 이유 |
 |---|---|---|
-| 리전 | `asia-northeast3` (서울) | 사용자가 한국에 있다. us-central1 은 왕복이 150ms 대다 |
-| 머신 | `e2-medium` (2 vCPU, 4GB) | 상시 사용량은 800MB 남짓인데 **`docker compose build` 의 Next 빌드가 2GB 이상 쓴다.** 여기서 OOM 나면 빌드가 조용히 죽는다 |
-| 디스크 | `pd-balanced` 30GB | 기본 10GB 는 PostgreSQL + 이미지 4개 + 백업 7세대를 담기에 빠듯하다 |
+| 리전 | `us-central1` (아이오와) | **always-free 대상 리전은 `us-west1` / `us-central1` / `us-east1` 뿐이다.** 서울(`asia-northeast3`)에는 무료 등급이 없다. 한국에서 왕복 150ms 대를 감수한다 |
+| 머신 | `e2-micro` (공유 vCPU, 1GB) | 월 1대 always-free. 상시 사용량 800MB 남짓이 1GB 안에 아슬아슬하게 들어간다. **빌드는 여기서 하지 않는다**(아래) |
+| 디스크 | `pd-standard` 30GB | always-free 는 **standard** 30GB 까지다. `pd-balanced` 는 무료 대상이 아니다 |
+| swap | 2GB 파일 | 1GB 에는 여유가 없다. 순간 피크에서 OOM killer 가 고르는 것은 대개 가장 큰 프로세스, 즉 PostgreSQL 이다 |
 | OS | Debian 12 (bookworm) | Container-Optimized OS 는 루트가 읽기 전용이고 compose plugin 이 기본으로 없다. 이 스택은 `deploy/*.sh` 와 `./backups` 를 bind mount 한다 |
-| 외부 IP | **고정(static)** | 아래 참조 |
+| 외부 IP | **고정(static)** | 아래 참조. **이것만은 무료가 아니다** |
 
-**always-free 등급인 `e2-micro`(1GB)로는 안 된다.** 상시 실행은 아슬아슬하게 되더라도 Next 빌드에서 반드시 죽는다. 굳이 작은 머신을 쓰려면 이미지를 GitHub Actions 에서 빌드해 Artifact Registry 에 올리고 VM 은 pull 만 하게 해야 하는데, 그건 `docs/28` P1-3(배포·롤백) 작업이다.
+실제 청구액은 고정 IP 월 $3~4 가 사실상 전부다. e2-medium 구성이 월 3~4만원인 것과의 차이가 이 선택의 이유다. 요금은 바뀌므로 Pricing Calculator 로 확인한다.
 
-비용은 e2-medium + 30GB 기준 **월 3~4만원 선**이다. 신규 계정 $300 크레딧(90일)으로 충분히 덮인다. 정확한 값은 요금이 바뀌므로 Pricing Calculator 로 확인한다.
+무료 이그레스는 **북미발 월 1GB** 다(중국·호주 제외). Next 첫 로드가 수백 KB 이므로 월 수천 페이지뷰 근처에서 넘어가는데, 초과분이 GB 당 $0.12 선이라 금액 자체는 문제가 안 된다. 트래픽이 늘면 비용보다 **1GB RAM 이 먼저 한계에 닿는다.**
+
+#### 이미지를 VM 안에서 만들지 않는다
+
+`docker compose build` 의 Next 빌드는 2GB 이상을 쓴다. e2-micro 에서는 반드시 죽고, OOM 은 조용히 죽기 때문에 원인도 잘 안 보인다. 그래서 배포 형태가 하나 바뀐다.
+
+- 이미지는 **GitHub Actions 에서 빌드**해 `ghcr.io/mosejong/finshield-*` 로 올린다. 저장소가 public 이라 공개 패키지는 용량 제한 없이 무료다. Artifact Registry 는 무료가 0.5GB 뿐이라 이 스택에는 모자란다.
+- VM 은 `docker compose pull` 만 한다. `compose.yaml` 의 `build:` 를 `image:` 로 바꾸는 배포용 override 파일이 필요하다.
+- 이미지에 비밀은 들어가지 않는다. `secrets/` 는 지금도 런타임 마운트라 레지스트리가 공개여도 노출 경로가 생기지 않는다.
+
+**이 때문에 작업 순서가 바뀐다.** `docs/28` P1-3(배포/롤백)은 원래 공개 이후로 미뤄둔 항목인데, e2-micro 를 고른 이상 **P0-4 의 선행조건**이 된다. 손해만 있는 것은 아니다. 지금의 수동 배포에는 롤백 수단이 아예 없는데, 태그된 이미지를 pull 하는 방식에는 되돌릴 지점이 생긴다.
 
 ### 11-2. 고정 IP를 먼저 잡는다
 
@@ -239,20 +252,20 @@ Cloud Run 으로 옮기는 것 자체는 나중에 검토할 수 있지만, **�
 
 ```bash
 gcloud config set project <PROJECT_ID>
-gcloud compute addresses create finshield-ip --region=asia-northeast3
-gcloud compute addresses describe finshield-ip --region=asia-northeast3 --format='value(address)'
+gcloud compute addresses create finshield-ip --region=us-central1
+gcloud compute addresses describe finshield-ip --region=us-central1 --format='value(address)'
 ```
 
-인스턴스에 붙어 있고 실행 중이면 요금이 없다. 정지된 인스턴스에 붙어 있거나 아무 데도 안 붙어 있으면 과금되므로, 안 쓰게 되면 지운다.
+**2024년부터는 붙어 있어도 과금된다.** 실행 중인 인스턴스에 붙은 외부 IPv4 가 무료였던 것은 그 이전 이야기다. 지금은 시간당 $0.005 선이고, 아무 데도 안 붙어 있으면 요율이 더 높다. always-free 구성에서 실제로 청구되는 항목은 이것 하나뿐이니, 안 쓰게 되면 지운다.
 
 ### 11-3. 인스턴스와 방화벽
 
 ```bash
 gcloud compute instances create finshield \
-  --zone=asia-northeast3-a \
-  --machine-type=e2-medium \
+  --zone=us-central1-a \
+  --machine-type=e2-micro \
   --image-family=debian-12 --image-project=debian-cloud \
-  --boot-disk-size=30GB --boot-disk-type=pd-balanced \
+  --boot-disk-size=30GB --boot-disk-type=pd-standard \
   --address=finshield-ip \
   --tags=finshield-web
 ```
@@ -268,11 +281,16 @@ gcloud compute firewall-rules create finshield-web \
 
 `udp:443` 을 빼먹기 쉽다. `compose.https.yaml` 이 `443:443/udp` 를 열고 Caddy 가 HTTP/3 리스너를 띄우는데, UDP 가 막혀 있으면 **브라우저가 HTTP/3 를 시도했다가 TCP 로 되돌아온다.** 겉으로는 동작해서 눈치채기 어렵고, 첫 접속마다 왕복이 한 번 더 붙는다.
 
-`gcloud compute ssh finshield --zone=asia-northeast3-a` 로 붙는다. 별도 키 설정은 필요 없다 — gcloud 가 OS Login 으로 처리한다.
+`gcloud compute ssh finshield --zone=us-central1-a` 로 붙는다. 별도 키 설정은 필요 없다 — gcloud 가 OS Login 으로 처리한다.
 
 ### 11-4. VM 안에서
 
 ```bash
+# 1GB 에는 여유가 없다. swap 이 없으면 순간 피크에서 OOM killer 가 돈다.
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
 sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
 sudo usermod -aG docker $USER && exec newgrp docker
 
@@ -296,4 +314,4 @@ python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.
 | 백업이 같은 디스크 | `./backups` 는 부트 디스크 위에 있다. 디스크가 날아가면 DB 와 백업이 같이 날아간다. GCS 버킷 + VM 서비스 계정으로 반출하는 것이 자연스러운 다음 단계다 (`docs/28` P0-3 의 남은 항목). **암호화 키는 그 버킷에 넣지 않는다** |
 | 스냅샷 | 디스크 스냅샷 스케줄은 `pg_dump` 백업을 대체하지 않는다. 스냅샷은 실행 중인 PostgreSQL 의 순간 상태라 복구 시 복구 모드를 거치고, 무엇보다 **복호화되는지를 확인하지 않는다.** 둘 다 두되 합격 기준은 `docs/29` 를 따른다 |
 | Cloud DNS | 필수가 아니다. 등록기관 DNS 에 A 레코드만 걸면 된다. Cloud DNS 는 존당 월 요금이 붙는다 |
-| 요금 알림 | Billing 예산 알림을 걸어 둔다. 크레딧이 끝나는 시점을 모르고 지나가면 인스턴스가 정지되고, 그러면 고정 IP 에 과금이 시작된다 |
+| 요금 알림 | Billing 예산 알림을 걸어 둔다. 크레딧이 없으므로 처음부터 실비 청구다. 정상 상태에서는 고정 IP 월 $3~4 뿐이니, 예산을 그보다 조금 위에 잡아 두면 **의도치 않은 과금이 시작된 순간**을 바로 알 수 있다 |
