@@ -288,7 +288,7 @@ Cloud Run 으로 옮기는 것 자체는 나중에 검토할 수 있지만, **�
 
 | 항목 | 값 | 이유 |
 |---|---|---|
-| 리전 | `us-central1` (아이오와) | **always-free 대상 리전은 `us-west1` / `us-central1` / `us-east1` 뿐이다.** 서울(`asia-northeast3`)에는 무료 등급이 없다. 한국에서 왕복 150ms 대를 감수한다 |
+| 리전 | `us-west1-b` (오리건) | **always-free 대상 리전은 `us-west1` / `us-central1` / `us-east1` 뿐이다.** 서울(`asia-northeast3`)에는 무료 등급이 없다. 셋 중 한국에서 가장 가까운 것을 고른다 — 오리건 왕복 110~130ms 대, 아이오와 150~170ms 대. 무료 조건은 셋이 동일하므로 더 먼 쪽을 고를 이유가 없다 |
 | 머신 | `e2-micro` (공유 vCPU, 1GB) | 월 1대 always-free. 상시 사용량 800MB 남짓이 1GB 안에 아슬아슬하게 들어간다. **빌드는 여기서 하지 않는다**(아래) |
 | 디스크 | `pd-standard` 30GB | always-free 는 **standard** 30GB 까지다. `pd-balanced` 는 무료 대상이 아니다 |
 | swap | 2GB 파일 | 1GB 에는 여유가 없다. 순간 피크에서 OOM killer 가 고르는 것은 대개 가장 큰 프로세스, 즉 PostgreSQL 이다 |
@@ -321,10 +321,20 @@ always-free 목록([free-cloud-features](https://docs.cloud.google.com/free/docs
 
 기본값인 ephemeral IP 는 인스턴스를 정지했다 켜면 **바뀐다.** 그러면 DNS 가 죽은 주소를 가리키고, Caddy 는 계속 재시도하며, ACME 검증 실패가 0절의 시간당 5회 한도를 태운다. 도메인을 붙이기 전에 잡아 둔다.
 
+먼저 프로젝트를 고르고 **Compute Engine API 를 켠다.** 새 프로젝트에서는 꺼져 있고, 켜지 않으면 아래 첫 명령이 `Compute Engine API has not been used in project ... before or it is disabled` 로 그냥 실패한다. 결제 계정이 프로젝트에 연결돼 있어야 켜진다 — always-free 등급도 활성 결제 계정을 요구한다(11-1).
+
 ```bash
+gcloud projects list                       # PROJECT_ID 확인
 gcloud config set project <PROJECT_ID>
-gcloud compute addresses create finshield-ip --region=us-central1
-gcloud compute addresses describe finshield-ip --region=us-central1 --format='value(address)'
+gcloud beta billing projects describe <PROJECT_ID>   # billingEnabled: true 인지
+gcloud services enable compute.googleapis.com        # 1~2분 걸린다
+```
+
+그다음 주소를 잡는다.
+
+```bash
+gcloud compute addresses create finshield-ip --region=us-west1
+gcloud compute addresses describe finshield-ip --region=us-west1 --format='value(address)'
 ```
 
 **2024년부터는 붙어 있어도 과금된다.** 실행 중인 인스턴스에 붙은 외부 IPv4 가 무료였던 것은 그 이전 이야기다. 지금은 시간당 $0.005 선이고, 아무 데도 안 붙어 있으면 요율이 더 높다. always-free 구성에서 실제로 청구되는 항목은 이것 하나뿐이니, 안 쓰게 되면 지운다.
@@ -333,7 +343,7 @@ gcloud compute addresses describe finshield-ip --region=us-central1 --format='va
 
 ```bash
 gcloud compute instances create finshield \
-  --zone=us-central1-a \
+  --zone=us-west1-b \
   --machine-type=e2-micro \
   --image-family=debian-12 --image-project=debian-cloud \
   --boot-disk-size=30GB --boot-disk-type=pd-standard \
@@ -352,7 +362,7 @@ gcloud compute firewall-rules create finshield-web \
 
 `udp:443` 을 빼먹기 쉽다. `compose.https.yaml` 이 `443:443/udp` 를 열고 Caddy 가 HTTP/3 리스너를 띄우는데, UDP 가 막혀 있으면 **브라우저가 HTTP/3 를 시도했다가 TCP 로 되돌아온다.** 겉으로는 동작해서 눈치채기 어렵고, 첫 접속마다 왕복이 한 번 더 붙는다.
 
-`gcloud compute ssh finshield --zone=us-central1-a` 로 붙는다. 별도 키 설정은 필요 없다 — gcloud 가 OS Login 으로 처리한다.
+`gcloud compute ssh finshield --zone=us-west1-b` 로 붙는다. 별도 키 설정은 필요 없다 — gcloud 가 OS Login 으로 처리한다.
 
 ### 11-4. VM 안에서
 
