@@ -7,6 +7,11 @@
 
 pytest>=8.4,<9.0
 
+# `tests/test_deploy_images.py` 가 compose 파일을 읽는다. 지금까지는
+# `uvicorn[standard]` 를 통해 우연히 들어와 있었는데, 그 extra 가 빠지는 날
+# 테스트가 collect 단계에서 깨진다. 쓰는 쪽에서 직접 적는다.
+pyyaml>=6.0,<7.0
+
 # lock 파일 자체를 만드는 도구. lock 안에 고정해 두어야
 # 재생성하는 사람마다 다른 resolver 를 쓰는 일이 없다.
 uv>=0.12,<0.13

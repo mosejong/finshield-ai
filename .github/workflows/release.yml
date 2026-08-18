@@ -1,0 +1,87 @@
+# 배포 이미지를 만들어 ghcr.io 로 올린다.
+#
+# VM 이 e2-micro(1GB) 라 거기서 빌드할 수 없다는 것이 직접적인 이유다
+# (`docs/31` 11-1). 결과적으로 되돌릴 지점이 생기는 쪽이 더 중요하다 —
+# 태그된 이미지가 있으면 롤백이 "이전 태그로 다시 올린다" 가 된다.
+#
+# 태그를 밀면 돈다. 수동 실행(workflow_dispatch)은 태그 없이 커밋 SHA 로만
+# 올린다 — 배포 전에 이미지가 실제로 만들어지는지 확인하는 용도다.
+name: Release images
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  # 같은 태그를 두 번 밀었을 때 두 빌드가 같은 태그를 두고 경쟁하지 않게 한다.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      # 하나가 실패해도 나머지를 마저 만든다. 어느 쪽이 깨졌는지 한 번에 본다.
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: .
+            dockerfile: Dockerfile
+          - name: web
+            context: ./web
+            dockerfile: ./web/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/finshield-${{ matrix.name }}
+          # `latest` 를 붙이지 않는다. 배포는 항상 명시적인 태그를 지정한다
+          # (`compose.deploy.yaml` 이 FINSHIELD_IMAGE_TAG 를 필수로 받는 것과
+          # 같은 이유다). 무엇이 돌고 있는지 모르면 되돌릴 수도 없다.
+          tags: |
+            type=ref,event=tag
+            type=sha,format=long,prefix=sha-
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          # e2-micro 는 x86_64 다. arm64 를 같이 만들면 빌드 시간만 두 배가 된다.
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
+
+      # 태그는 옮겨 붙을 수 있고 digest 는 그렇지 않다. 사고 조사 때
+      # "그때 무엇이 돌고 있었나" 에 답하려면 이 값이 남아 있어야 한다.
+      - name: digest 를 요약에 남긴다
+        run: |
+          {
+            echo "### finshield-${{ matrix.name }}"
+            echo ""
+            echo '```'
+            echo "digest: ${{ steps.build.outputs.digest }}"
+            echo "tags:"
+            echo "${{ steps.meta.outputs.tags }}" | sed 's/^/  /'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

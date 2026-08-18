@@ -82,6 +82,22 @@ jobs:
           FINSHIELD_DOMAIN=finshield.example.com
           FINSHIELD_ACME_EMAIL=ci@finshield.example.com
           docker compose -f compose.yaml -f compose.https.yaml -f compose.acme-staging.yaml config --quiet
+      # 실제 배포가 쓰는 조합이다. 여기서만 `build:` 가 사라지고 ghcr.io 이미지가
+      # 들어가므로, 이 검사가 없으면 override 가 조용히 낡는다. 태그는 아무 값이나
+      # 넣는다 - 이 단계는 pull 하지 않고 문법과 치환만 본다.
+      - run: >-
+          FINSHIELD_DOMAIN=finshield.example.com
+          FINSHIELD_ACME_EMAIL=ci@finshield.example.com
+          FINSHIELD_IMAGE_TAG=v0.0.0-ci
+          docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml config --quiet
+      # 태그를 빼면 거부해야 한다. `latest` 로 흘러가면 무엇이 돌고 있는지 모르게
+      # 되고, 모르는 것은 되돌릴 수도 없다.
+      - name: 태그 없는 배포 조합은 거부되어야 한다
+        run: >-
+          if FINSHIELD_DOMAIN=finshield.example.com
+          FINSHIELD_ACME_EMAIL=ci@finshield.example.com
+          docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml config --quiet 2>/dev/null;
+          then echo "FINSHIELD_IMAGE_TAG 없이 config 가 통과했다" >&2; exit 1; fi
       - run: >-
           docker run --rm
           -e FINSHIELD_DOMAIN=finshield.example.com

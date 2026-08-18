@@ -27,14 +27,17 @@
 
 판정과 실측을 나눈 이유는 P0-3 에서 겪은 것 때문이다. 검사가 돌고 있었지만 실패할 수 없는 검사였고, 초록불이 아무것도 증명하지 않았다. 판정을 순수 함수로 빼면 네트워크 없이 **기준 자체**를 테스트할 수 있다.
 
-## 2. 환경변수 두 개
+## 2. 환경변수 세 개
 
 ```
 FINSHIELD_DOMAIN=finshield.example.com
 FINSHIELD_ACME_EMAIL=ops@finshield.example.com
+FINSHIELD_IMAGE_TAG=v0.3.0
 ```
 
-둘 다 `compose.https.yaml` 에서 필수다(`:?`). 없으면 compose 가 거부하고, 이메일이 빈 문자열이면 Caddy 가 기동 자체를 거부한다.
+셋 다 필수다(`:?`) — 앞의 둘은 `compose.https.yaml`, 마지막은 `compose.deploy.yaml`. 없으면 compose 가 거부하고, 이메일이 빈 문자열이면 Caddy 가 기동 자체를 거부한다.
+
+`FINSHIELD_IMAGE_OWNER` 는 선택값이고 기본이 `mosejong` 이다. fork 에서 배포할 때만 바꾼다.
 
 ```
 Error: adapting config using caddyfile: parsing caddyfile tokens for 'email':
@@ -60,12 +63,36 @@ dig +short finshield.example.com AAAA
 
 서버 밖에서 80 이 실제로 열렸는지도 본다. 방화벽/보안그룹이 닫혀 있으면 검증이 실패하고 그 실패가 한도에 잡힌다.
 
-### 3-2. staging 예행연습
+### 3-2. 이미지를 받는다
+
+VM 은 빌드하지 않는다(11-1). `compose.deploy.yaml` 을 끼우면 네 서비스의 `build:` 가 사라지고 `ghcr.io` 이미지가 들어간다.
+
+먼저 릴리스 태그를 밀어 이미지를 만든다. 로컬에서:
+
+```bash
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+`.github/workflows/release.yml` 이 `finshield-backend` / `finshield-web` 을 `linux/amd64` 로 빌드해 올린다. Actions 요약에 digest 가 남으므로, 나중에 "그때 무엇이 돌고 있었나" 를 여기서 확인한다.
+
+그다음 VM 에서:
+
+```bash
+export FINSHIELD_IMAGE_TAG=v0.3.0
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml pull
+```
+
+**여기서 인증 오류가 나면 패키지가 private 이다.** 워크플로가 처음 만든 ghcr 패키지는 저장소가 public 이어도 private 으로 생성된다. 패키지 설정에서 공개로 바꾸거나, `read:packages` 만 가진 PAT 으로 `docker login ghcr.io` 한다. 이미지에 비밀은 없으므로(11-1) 공개로 두는 쪽이 단순하다.
+
+아래 3-3/3-4 명령에도 `-f compose.deploy.yaml` 을 그대로 붙인다. 빠뜨리면 VM 이 빌드를 시작하고 OOM 으로 조용히 죽는다.
+
+### 3-3. staging 예행연습
 
 ```bash
 FINSHIELD_DOMAIN=finshield.example.com \
 FINSHIELD_ACME_EMAIL=ops@finshield.example.com \
-docker compose -f compose.yaml -f compose.https.yaml -f compose.acme-staging.yaml up -d
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml -f compose.acme-staging.yaml up -d
 docker compose logs proxy | grep -i "certificate obtained"
 ```
 
@@ -73,12 +100,12 @@ docker compose logs proxy | grep -i "certificate obtained"
 
 override 를 **별도 파일**로 둔 이유: 환경변수 하나로 켜고 끄면 "연습 중"인지 "운영 중"인지가 눈에 안 보인다. 브라우저가 믿지 않는 인증서로 공개돼 있는 상태는 `-f` 하나의 존재로 드러나야 한다.
 
-### 3-3. 운영 발급
+### 3-4. 운영 발급
 
-override 를 빼고 다시 올린다.
+staging override 만 빼고 다시 올린다. `compose.deploy.yaml` 은 남는다.
 
 ```bash
-docker compose -f compose.yaml -f compose.https.yaml up -d
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml up -d
 ```
 
 Caddy 는 staging 인증서를 버리고 운영 발급자로 새로 받는다. 기본 발급자는 Let's Encrypt 이고 실패하면 ZeroSSL 로 넘어간다. adapt 결과로 확인한 값:
@@ -92,7 +119,7 @@ Caddy 는 staging 인증서를 버리고 운영 발급자로 새로 받는다. �
 
 `acme_ca` 를 기본값으로 박지 않은 이유가 여기 있다. 명시하면 **두 발급자가 모두 그 하나로 대체된다.** staging 을 환경변수 기본값으로 뒀다면 대체 발급자가 영구히 사라졌을 것이다.
 
-### 3-4. 밖에서 확인
+### 3-5. 밖에서 확인
 
 **서버 안에서 돌리면 의미가 없다.** loopback 에만 bind 된 내부 포트가 열려 보이고, 방화벽도 이미 통과한 뒤다. 다른 네트워크(집 회선, 휴대폰 테더링)에서 돌린다.
 
@@ -189,7 +216,27 @@ is to pass headers to the upstream
 
 ## 9. 되돌리기
 
-발급이 꼬였을 때:
+### 9-1. 배포한 버전을 되돌린다
+
+이전 태그로 다시 올린다. 그게 전부다.
+
+```bash
+export FINSHIELD_IMAGE_TAG=v0.2.0        # 직전에 돌던 태그
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml pull
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml up -d
+```
+
+**`alembic downgrade` 를 부르지 않는다.** `migrations/versions/` 의 `downgrade()` 들은 `drop_table` / `drop_index` / `drop_constraint` 라서, 실행하면 되돌리기가 아니라 데이터 삭제가 된다. 사고 대응 중에 칠 명령이 아니다.
+
+대신 스키마는 새 버전 그대로 두고 코드만 되돌린다. 이게 성립하려면 마이그레이션이 이전 이미지에서도 안전해야 하고, 그래서 `docs/28` P1-3 의 expand/contract 규칙이 있다 — 컬럼 추가는 nullable, 삭제·이름 변경은 한 릴리스 뒤로 미룬다. **그 규칙을 어긴 릴리스는 이 절차로 되돌아가지 않는다.** 그런 릴리스를 되돌려야 한다면 백업 복원(`docs/29`)이 경로이고, 다운타임을 각오해야 한다.
+
+되돌린 뒤 무엇이 돌고 있는지 확인한다. 태그는 옮겨 붙을 수 있으므로 digest 를 본다.
+
+```bash
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml images
+```
+
+### 9-2. 인증서 발급이 꼬였을 때
 
 ```bash
 docker compose -f compose.yaml -f compose.https.yaml down
@@ -198,7 +245,11 @@ docker volume rm finshield_caddy-data   # 인증서·ACME 계정 전부 삭제
 
 `caddy-data` 를 지우면 **ACME 계정도 사라지고 다음 발급이 처음부터 시작한다.** 운영 한도가 이미 빠듯하다면 지우기 전에 staging 으로 먼저 확인한다.
 
-HTTPS 를 통째로 내리려면 `compose.https.yaml` 없이 올린다. 그러면 80/443 이 닫히고 `127.0.0.1` bind 만 남는다 — 공개는 중단되지만 데이터는 그대로다.
+HTTPS 를 통째로 내리려면 `compose.https.yaml` 없이 올린다(`compose.deploy.yaml` 은 남긴다 — 빼면 VM 이 빌드를 시작한다). 그러면 80/443 이 닫히고 `127.0.0.1` bind 만 남는다 — 공개는 중단되지만 데이터는 그대로다.
+
+```bash
+docker compose -f compose.yaml -f compose.deploy.yaml up -d
+```
 
 ## 10. 남은 것
 
@@ -206,6 +257,8 @@ HTTPS 를 통째로 내리려면 `compose.https.yaml` 없이 올린다. 그러�
 - 외부 TLS 등급 측정(SSL Labs 등)은 공개된 도메인이 있어야 돌릴 수 있다.
 - 갱신 감시를 cron 이 아니라 알림으로 옮기는 것은 `docs/28` P1-1.
 - CAA 레코드는 발급자가 확정된 뒤에 건다. 지금 걸면 ZeroSSL 대체 발급 경로를 스스로 막는다.
+- **릴리스 파이프라인이 한 번도 돈 적 없다.** 3-2 절은 YAML 파싱과 compose 해석까지만 검증됐다. 도메인을 기다리는 동안 `workflow_dispatch` 로 이미지 빌드만 먼저 돌려 두면, 첫 실패가 도메인 작업과 섞이지 않는다.
+- 롤백(9-1) 리허설 없음. `docs/29` 의 복원 리허설처럼 실제로 이전 태그로 되돌려 보는 절차가 필요하다.
 
 ## 11. 부록 — GCP Compute Engine
 
@@ -241,10 +294,10 @@ Cloud Run 으로 옮기는 것 자체는 나중에 검토할 수 있지만, **�
 `docker compose build` 의 Next 빌드는 2GB 이상을 쓴다. e2-micro 에서는 반드시 죽고, OOM 은 조용히 죽기 때문에 원인도 잘 안 보인다. 그래서 배포 형태가 하나 바뀐다.
 
 - 이미지는 **GitHub Actions 에서 빌드**해 `ghcr.io/mosejong/finshield-*` 로 올린다. 저장소가 public 이라 공개 패키지는 용량 제한 없이 무료다. Artifact Registry 는 무료가 0.5GB 뿐이라 이 스택에는 모자란다.
-- VM 은 `docker compose pull` 만 한다. `compose.yaml` 의 `build:` 를 `image:` 로 바꾸는 배포용 override 파일이 필요하다.
+- VM 은 `docker compose pull` 만 한다. `compose.yaml` 의 `build:` 를 `image:` 로 바꾸는 배포용 override 가 `compose.deploy.yaml` 이다 (2026-08-18 작성).
 - 이미지에 비밀은 들어가지 않는다. `secrets/` 는 지금도 런타임 마운트라 레지스트리가 공개여도 노출 경로가 생기지 않는다.
 
-**이 때문에 작업 순서가 바뀐다.** `docs/28` P1-3(배포/롤백)은 원래 공개 이후로 미뤄둔 항목인데, e2-micro 를 고른 이상 **P0-4 의 선행조건**이 된다. 손해만 있는 것은 아니다. 지금의 수동 배포에는 롤백 수단이 아예 없는데, 태그된 이미지를 pull 하는 방식에는 되돌릴 지점이 생긴다.
+**이 때문에 작업 순서가 바뀐다.** `docs/28` P1-3(배포/롤백)은 원래 공개 이후로 미뤄둔 항목인데, e2-micro 를 고른 이상 **P0-4 의 선행조건**이 된다. 손해만 있는 것은 아니다. 지금의 수동 배포에는 롤백 수단이 아예 없는데, 태그된 이미지를 pull 하는 방식에는 되돌릴 지점이 생긴다. → 2026-08-18 에 `release.yml` + `compose.deploy.yaml` 로 착지했다. **다만 아직 한 번도 태그를 밀어 보지 않았다.**
 
 > **결제 계정 확인 (2026-08-18).** 후불 Google Cloud 결제 계정이 활성 상태이고 미결제 잔액 ₩0, 청구 기준액 ₩100,000 이다. always-free `e2-micro` 가 요구하는 것은 활성 결제 계정 하나뿐이므로 **이 절의 선행조건은 충족됐다.** $300 무료 체험 크레딧은 없고, 필요하지도 않다 — always-free 는 체험과 별개 프로그램이다. AI Studio 선불 크레딧 ₩70,000 은 Gemini API 전용이라 Compute Engine 요금에는 쓰이지 않는다.
 
@@ -312,7 +365,7 @@ python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.
 
 | 항목 | 내용 |
 |---|---|
-| 검증기 실행 위치 | VM 안에서 돌리면 안 된다(3-4절). 로컬 PC 에서 `--domain` 만 주고 돌린다. VM 안에서는 내부 포트가 열려 보이고 방화벽도 이미 통과한 뒤다 |
+| 검증기 실행 위치 | VM 안에서 돌리면 안 된다(3-5절). 로컬 PC 에서 `--domain` 만 주고 돌린다. VM 안에서는 내부 포트가 열려 보이고 방화벽도 이미 통과한 뒤다 |
 | 백업이 같은 디스크 | `./backups` 는 부트 디스크 위에 있다. 디스크가 날아가면 DB 와 백업이 같이 날아간다. GCS 버킷 + VM 서비스 계정으로 반출하는 것이 자연스러운 다음 단계다 (`docs/28` P0-3 의 남은 항목). **암호화 키는 그 버킷에 넣지 않는다** |
 | 스냅샷 | 디스크 스냅샷 스케줄은 `pg_dump` 백업을 대체하지 않는다. 스냅샷은 실행 중인 PostgreSQL 의 순간 상태라 복구 시 복구 모드를 거치고, 무엇보다 **복호화되는지를 확인하지 않는다.** 둘 다 두되 합격 기준은 `docs/29` 를 따른다 |
 | Cloud DNS | 필수가 아니다. 등록기관 DNS 에 A 레코드만 걸면 된다. Cloud DNS 는 존당 월 요금이 붙는다 |
