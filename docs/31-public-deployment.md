@@ -263,12 +263,14 @@ docker compose -f compose.yaml -f compose.deploy.yaml up -d
 
 ## 10. 남은 것
 
-- **도메인과 서버가 아직 없다.** 3절 전체와 `certificate_trusted` 실측이 여기 묶여 있다. P0-4 는 이것이 정해져야 닫힌다.
-- 외부 TLS 등급 측정(SSL Labs 등)은 공개된 도메인이 있어야 돌릴 수 있다.
-- 갱신 감시를 cron 이 아니라 알림으로 옮기는 것은 `docs/28` P1-1.
+3절 전체가 2026-08-18 에 `finshield-ai.duckdns.org` 로 실행됐다. 검증기 **27개 전부 통과, 종료코드 0** — `certificate_trusted` 를 포함해서다. 릴리스 파이프라인도 `workflow_dispatch` 로 두 번 돌아 이미지가 실제로 만들어졌다. 남은 것은 아래다.
+
+- 외부 TLS 등급 측정(SSL Labs 등). 검증기는 프로토콜 버전과 체인까지 보고 암호 스위트 등급은 매기지 않는다.
+- 갱신 감시를 cron 이 아니라 알림으로 옮기는 것은 `docs/28` P1-1. **첫 갱신은 2026-10-17 무렵**(만료 30일 전)이므로 그 전에 정리한다.
 - CAA 레코드는 발급자가 확정된 뒤에 건다. 지금 걸면 ZeroSSL 대체 발급 경로를 스스로 막는다.
-- **릴리스 파이프라인이 한 번도 돈 적 없다.** 3-2 절은 YAML 파싱과 compose 해석까지만 검증됐다. 도메인을 기다리는 동안 `workflow_dispatch` 로 이미지 빌드만 먼저 돌려 두면, 첫 실패가 도메인 작업과 섞이지 않는다.
+- **태그 push 경로(`type=ref,event=tag`)는 아직 안 돌았다.** 지금까지 전부 `workflow_dispatch` 였고, 그쪽은 `sha-` 태그만 붙인다. 즉 9-1 의 "이전 버전 태그" 가 아직 사람이 읽을 수 있는 이름으로 존재하지 않는다.
 - 롤백(9-1) 리허설 없음. `docs/29` 의 복원 리허설처럼 실제로 이전 태그로 되돌려 보는 절차가 필요하다.
+- **부하 시 수치를 모른다.** 11-6 의 메모리·지연은 전부 idle 실측이다.
 
 ## 11. 부록 — GCP Compute Engine
 
@@ -502,7 +504,7 @@ finshield-backend-1  | Child process [9] died
 
 검사는 `tests/test_backend_workers.py` 8건이다. `--workers` 가 CMD 로 돌아오면(그러면 uvicorn 이 `WEB_CONCURRENCY` 를 무시한다) 실패하고, 타임아웃을 기본값으로 되돌려도, 컨테이너 예산 밖으로 늘려도, 이미지 기본값과 compose 기본값이 갈라져도 실패한다.
 
-**한 가지 남는다.** VM 에서 급히 고칠 때 추적되지 않는 `compose.host-small.yaml` 을 직접 만들어 썼다. 위 수정이 배포되면 그 파일을 지우고 `COMPOSE_FILE` 에서 빼야 한다. 안 지우면 저장소 설정과 실제로 도는 설정이 조용히 갈라진다.
+VM 에서 급히 고칠 때는 추적되지 않는 `compose.host-small.yaml` 을 직접 만들어 썼다. 위 수정이 배포된 뒤 그 파일을 지우고 `COMPOSE_FILE` 에서 뺐다 — 안 지우면 저장소 설정과 실제로 도는 설정이 조용히 갈라진다. **지우는 순서가 중요하다.** 이전 이미지는 CMD 에 `--workers 2` 가 박혀 있어서 `WEB_CONCURRENCY` 를 무시한다. 새 이미지를 `pull` 하기 **전에** override 를 빼면 그대로 다시 굳는다. 지금 `COMPOSE_FILE` 은 추적되는 세 파일뿐이고, `docker compose top backend` 에 uvicorn 프로세스가 **하나만** 보인다(로그도 `Started parent process` 가 아니라 `Started server process`).
 
 #### HTTPS 발급
 
@@ -524,4 +526,5 @@ staging→운영 전환은 볼륨을 지우지 않아도 된다. Caddy 가 CA �
 
 - `docker compose pull` 로 backend 331MB / web 303MB 를 받았다. VM 에서 빌드하지 않는 경로가 실제로 성립한다.
 - 첫 dump 가 `backups/finshield-…Z.dump` (8093B, `root:root`) 로 떨어졌다. **`cap_add: DAC_OVERRIDE` 가 실기에서 처음 검증됐다** — 지금까지 리눅스 CI 에서만 확인한 수정이다.
+- `scripts/verify_public_deployment.py` 를 **VM 밖의 개발 PC**(다른 네트워크)에서 돌려 27/27 통과했다. 이 중 `internal_port` 세 건(18000·13000·5432)이 처음으로 밖에서 실증됐다 — 지금까지 loopback 바인딩과 방화벽은 설정으로만 참이었고 실제로 두드려 본 적이 없었다.
 - dump 는 `0644`, `backups/` 는 `0755` 라 로컬 사용자면 읽을 수 있다. 지금은 문제가 아니다 — 프로필은 암호화 저장이고 복호화 키는 `secrets/`(`0700`) 안에 있어서 dump 하나로는 아무것도 열리지 않는다. 0절의 분리가 의도대로 작동하는 상태다.
