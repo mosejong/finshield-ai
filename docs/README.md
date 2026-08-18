@@ -1,10 +1,11 @@
 # FinShield Documentation Index
 
 ## Product / research
-01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog
+01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog · 28 fraud evaluation benchmark · 29 competition evidence pack
 
 ## Architecture / engineering
 
+Fraud evaluation bootstrap policy · `adr/0007-bootstrap-fraud-evaluation.md`
 27 observability/PII masking · `adr/0006-privacy-safe-observability.md`
 26 HTTP security/HTTPS boundary · `adr/0005-http-security-and-https-boundary.md`
 04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · 28 production readiness · 29 backup and recovery · 30 PWA and share target · 31 public deployment (domain/DNS/TLS) · ADR 색인 `adr/README.md`
@@ -29,7 +30,9 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 - `devlog/2026-08-15/rate-limiting-request-limits.md` — IP 기준 요청 한도·본문 크기 상한·홉 신뢰 경계·429 문구
 - `devlog/2026-08-14/dependency-hash-locking.md` — 해시 고정 universal lock·런타임/개발 분리·CI drift 차단
 - `devlog/2026-08-14/code-verification-and-fixes.md` — mutation·독립 재계산 검증과 위험 판정·링크·출처 수정
-- `devlog/2026-08-13/frontend-accessibility-e2e.md` — 접근성 패스와 구조적 a11y 회귀 검사
+- `devlog/2026-08-13/frontend-accessibility-e2e.md` — Claude 구현·PM 교정·실브라우저 반응형 검수
+- `devlog/2026-08-13/fraud-evaluation-integration.md` — PR #54 Linux CI·PM 승인·main 통합 기록
+- `devlog/2026-08-13/fraud-evaluation-benchmark-v0.1.md` — 합성 golden set·품질 gate·대회 증거 묶음
 - `devlog/2026-08-13/observability-pii-masking.md` — 요청 추적·latency·readiness·PII 비노출 구현
 - `devlog/2026-08-13/observability-integration.md` — PR #52 Linux CI·PII 비노출·main 통합 기록
 - `devlog/2026-08-13/security-https-boundary.md` — 보안 헤더·CSRF·Host·HTTPS 경계 구현 및 검증

@@ -4,7 +4,7 @@
 
 ## Status
 
-**MVP implementation — 2026-08-12**
+**MVP implementation — 2026-08-13**
 
 목표 대회: **2026 금융 AI Challenge**  
 Fraud Scenario Engine v0.1 백엔드가 `main`에 병합됐다. 현재 분석은 LLM이나
@@ -27,6 +27,17 @@ Next same-origin 프록시로 세션을 자동 준비하며 브라우저에는 p
 남기지 않는다.
 월 현금흐름·월소득 대비 상환액·비상자금
 기간도 backend에서 결정론적으로 계산해 profile과 Home에 같은 값으로 표시한다.
+Fraud evaluation v0.1은 팀이 직접 작성한 합성 61건으로 legacy 5-keyword baseline과
+Scenario Engine을 재현 가능하게 비교한다. bootstrap 개발셋 기준 Scenario Engine은
+precision 0.973684, recall 0.948718, F1 0.961039, FPR 0.045455이며 action-source
+근거 연결 coverage는 1.0이다. 같은 데이터로 규칙을 교정했으므로 독립 held-out
+성능이나 실서비스 정확도로 주장하지 않는다. LLM-only와 Hybrid 비교도 아직
+수행하지 않았다. 상세 결과와 주장 한계는 `docs/28-fraud-evaluation-benchmark.md`와
+`docs/29-competition-evidence-pack.md`를 따른다.
+프론트 접근성 v0.1은 본문 건너뛰기, 공통 포커스 링, 로딩·비동기 상태 안내,
+움직임 축소 설정과 구조적 회귀 테스트를 포함한다. PM 브라우저 검수에서
+375·768·1280 다크 화면의 가로 overflow·nav 전환과 스킵 링크의 main 포커스를
+확인했다. 실제 스크린리더·정량 AA 대비·라이트 모드·iOS Safari는 후속 검수다.
 
 ## Problem
 
@@ -213,6 +224,7 @@ host에 공개하지 않는다. 로컬 HTTP와 공개 HTTPS 환경의 차이, ba
 
 ```bash
 pytest -q
+python -m scripts.evaluate_fraud_engine --check
 cd web
 npm run build
 npx tsc --noEmit
@@ -220,10 +232,9 @@ npm run lint
 npm test
 ```
 
-현재 `main` 기준: Python **192 passed + POSIX 권한 테스트 1건 Windows skip**, frontend
-**32 passed**, Next production build,
-TypeScript와 lint 통과. Starlette `TestClient` 사용 중단 예정 경고 1건은 별도
-유지보수 항목으로 관리한다.
+현재 검증 수치는 각 PR의 개발일지와 CI를 기준으로 갱신한다. Python 전체 테스트,
+fraud quality gate, frontend test·production build·typecheck·lint를 각각 실행한다.
+Starlette `TestClient` 사용 중단 예정 경고 1건은 별도 유지보수 항목으로 관리한다.
 
 ## Backend v0.1 API
 
@@ -341,7 +352,8 @@ PWA로 설치되고 문자 앱 공유 시트에서 바로 들어온다. manifest
 
 공개 배포는 도메인만 남았다. ACME 계정 연락처를 필수로 두어(비면 Caddy가 기동을 거부한다) 인증서 갱신이 조용히 실패해도 발급기관이 알릴 통로가 있게 했고, 첫 발급은 Let's Encrypt staging으로 예행연습한다 — 운영 디렉터리는 검증 실패 5회/시간·중복 인증서 5장/주로 막히는데 **한도를 태운 사실은 준비가 끝난 뒤에 알게 된다.** staging을 환경변수가 아니라 mount되는 파일로 둔 이유는 `acme_ca`를 명시하면 기본 발급자 두 개(Let's Encrypt + ZeroSSL 대체)가 모두 하나로 대체되기 때문이다. `scripts/verify_public_deployment.py`가 외부에서 리다이렉트·HSTS·보안 헤더·인증서 만료·주요 화면·공유 시트·내부 포트를 확인하고, 판정 기준 자체는 `tests/test_public_deployment.py`가 네트워크 없이 고정한다. `localhost` 예행연습으로 경로 전체를 확인했다. 절차와 완료 기준은 `docs/31-public-deployment.md`를 따른다.
 
-- 실제 데이터셋 기반 precision, recall, F1, class별 recall, FPR 측정
+- 독립 작성·동결한 held-out fraud golden v0.2 평가
+- 고정 model·prompt·provider 계약 후 LLM-only와 Hybrid 비교
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현

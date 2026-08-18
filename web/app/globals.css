@@ -217,10 +217,6 @@
     outline-offset: 2px;
   }
 
-  /* 본문 건너뛰기 대상이 프로그램적으로 포커스될 때 큰 아웃라인을 만들지 않는다 */
-  main:focus {
-    outline: none;
-  }
 }
 
 /*

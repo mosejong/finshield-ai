@@ -26,8 +26,9 @@
 - [x] 파이썬 의존성 해시 잠금 + 런타임·개발 의존성 분리
 
 ## P1 — 경쟁력
-- [ ] Rule-only vs LLM-only vs Hybrid benchmark
-- [ ] persona별 scenario golden set
+- [x] Legacy rule vs Scenario Engine bootstrap benchmark (합성 61건, non-held-out)
+- [x] persona·전체 UserState scenario golden set v0.1 (합성 bootstrap)
+- [ ] 고정 LLM-only vs proposed Hybrid held-out benchmark
 - [x] URL lexical feature analysis (offline safe implementation)
 - [ ] URL domain/reputation feature analysis (outbound-fetch policy required)
 - [x] financial profile dashboard shell
@@ -39,6 +40,9 @@
 - [x] 재테크 기초 가이드 v0.1 (공식 금융교육 근거, 입력·종목·매매 추천 없음)
 - [x] API latency instrumentation (exact JSON duration + process histogram; dashboard pending)
 - [x] privacy-safe request logging / PII non-disclosure regression
+- [x] frontend accessibility v0.1 (skip link, focus ring, live status, reduced motion, structural regression)
+- [x] responsive dark-browser check (375/768/1280, nav transition, horizontal overflow)
+- [ ] screen reader + quantitative AA contrast + light mode + iOS Safari device audit
 - [x] PWA 설치 + 문자 앱 공유 시트 진입 (`share_target`은 원문을 주소에 싣지 않도록 POST, 오프라인 셸, 설치 유도) — 실기기 공유 확인은 실도메인 이후
 - [ ] account-level audit log (requires identity and retention policy)
 

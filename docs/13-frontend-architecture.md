@@ -154,7 +154,7 @@ lib/store/*.ts         sessionStorage의 분석 결과·profile identity 보관
 | 대응 액션 | 있음 | live |
 | 공식 근거 | 있음 | live + 검토일 표시 |
 | 금융 프로필 CRUD | `/api/v1/profiles` | live, session에는 ID+persona만 보관 |
-| 파생지표 | 없음 | mock 이 계산 완료값 제공 |
+| 파생지표 | `/api/v1/profiles/{id}/metrics` | live 계산 완료값 표시 |
 | 상품 후보 | `/api/v1/recommendations` | live, backend 상태·reason 그대로 표시 |
 | 대출 What-if 시뮬레이션 | `/api/v1/loans/simulate` | live, 현재·변경 조건을 각각 계산 |
 | 재테크 기초 가이드 | `/api/v1/guidance/wealth` | live, 입력 없는 고정 교육 계약 |
@@ -163,8 +163,9 @@ lib/store/*.ts         sessionStorage의 분석 결과·profile identity 보관
 ### 금융 로직 금지선
 
 - `web/` 어디에도 이자 계산, 상환액 계산, 적격성 판정이 없다.
-- 파생지표는 프론트가 계산하지 않는다. mock service 가 이미 포맷된 `display` 문자열로 내려주고, 화면은 그대로 출력한다. 백엔드 `/profiles/{id}/metrics` 가 생기면 그 자리에 꽂는다.
-- 그 결과로 **사용자가 직접 입력한 프로필에는 지표가 표시되지 않는다.** `/profile` 은 입력값만 보여주고 "계산은 백엔드 연동 후"라고 명시한다. 프론트에서 몰래 계산하는 것보다 비어 있는 편이 낫다.
+- 파생지표는 프론트가 계산하지 않는다. live 모드는 백엔드
+  `/api/v1/profiles/{id}/metrics`의 포맷된 `display` 값을 그대로 표시하고,
+  mock 모드는 계산식 없는 고정 fixture를 표시한다.
 - `lib/format/` 의 `risk_level → 색` 매핑은 표현이지 판정이 아니다.
 - mock 은 백엔드 `risk_engine.py` 의 키워드 규칙을 복제하지 않는다. mock 모드는 입력과 무관한 고정 예시를 돌려주고 화면에 "예시"라고 적는다.
 
@@ -178,9 +179,11 @@ live 모드는 백엔드 `official_sources`를 `verified: true`로 변환하고
 
 ## 6. 백엔드 연동
 
-현재 백엔드: `GET /health`, `POST /api/v1/analyze`, `GET /api/v1/products`,
-`POST /api/v1/recommendations`, `POST /api/v1/loans/simulate`,
-`POST/GET/PUT/DELETE /api/v1/profiles`
+현재 백엔드: `GET /health`, `POST /api/v1/analyze`,
+`POST/GET/DELETE /api/v1/auth/session`, `DELETE /api/v1/auth/account`,
+`GET /api/v1/products`, `POST /api/v1/recommendations`,
+`POST /api/v1/loans/simulate`, `POST/GET/PUT/DELETE /api/v1/profiles`,
+`GET /api/v1/profiles/{id}/metrics`, `GET /api/v1/guidance/wealth`
 
 `analyze`는 기존 필드에 더해 `fraud_types`, `summary`, `actions`,
 `official_sources`를 반환한다. 프론트는 이 값을 mock으로 대체하지 않는다.
@@ -257,14 +260,19 @@ uvicorn app.main:app --reload
 - **라이브 영역**: 로딩은 `role="status"`(polite), 오류는 `role="alert"`(assertive). 비동기 결과(대출 계산 등)는 별도 `role="status"`로 한 번 알린다.
 - **폼 라벨**: 의심 메시지 textarea는 `aria-describedby`로 설명·글자수·개인정보 주의를 연결하고, 제출 버튼은 `aria-busy`로 진행 상태를 노출한다.
 
+PM 검수에서 375·768·1280 viewport의 가로 overflow와 nav 전환, 다크 화면,
+스킵 링크 활성화 후 main 포커스·2px outline을 실제 인앱 브라우저로 확인했다.
+검수 범위와 브라우저 클라이언트 이벤트 제한은 개발일지에 구분해 기록한다.
+
 ### 자동 검사
 
 `web/components/a11y.test.tsx`가 `react-dom/server` 정적 렌더링으로 랜드마크·폼 라벨·라이브 영역·장식 아이콘 숨김·근거 표시 계약을 CI에서 검증한다. 브라우저 DOM은 필요 없다. 검증 순서는 기존과 같다: `npm test` → `npm run build` → `npx tsc --noEmit` → `npm run lint`.
 
 ## 9. 남은 작업
 
-- 익명 계정 전환·복구와 세션/profile 보존기간·정리 정책
-- 접근성 육안·상호작용 검수 (스크린리더 낭독, 명도대비 AA 측정, 키보드 탭 순서 실동작, 다크모드·375/768/1280 뷰포트) — 4절의 헤드리스 Chrome iframe 하네스로 후속 확인. 구조적 자동 회귀만 상시 실행 중이다.
+- 로그인 기반 계정 전환·기기 간 복구는 익명 MVP 범위 밖이며 현재 지원하지 않음
+- 접근성 후속 검수: 실제 스크린리더 낭독, 명도대비 AA 정량 측정, 전체 키보드
+  탭 순서, 라이트 색상 모드. 다크 화면·375/768/1280·스킵 링크 포커스는 PM 확인 완료.
 - 실기기 확인 (지금까지는 헤드리스 Chrome 캡처와 실서버 SSR HTML 확인만). iOS Safari 의 `env(safe-area-inset-bottom)` 과 `100dvh` 동작은 시뮬레이터로 재확인 필요
 - 폼 필드별 `aria-invalid`/오류 개별 연결 (현재는 폼 단위 `role="alert"` 요약)
 - 실기기 PWA 확인 — 홈 화면 설치, 안드로이드 공유 시트에 실제로 뜨는지, 서비스 워커 오프라인 폴백. HTTPS 요건 때문에 실도메인(`docs/28` P0-4) 이후에야 가능하다

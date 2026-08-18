@@ -162,7 +162,9 @@ describe("StateSelector", () => {
 describe("MockBadge 출처 정직성", () => {
   it("live 출처는 배지를 만들지 않고 mock 출처만 표시한다", () => {
     expect(render(<MockBadge source="live" />)).toBe("");
-    expect(render(<MockBadge source="mock" label="예시" />)).toContain("예시");
+    const html = render(<MockBadge source="mock" label="예시" />);
+    expect(html).toContain("예시");
+    expect(html).toContain("실제 사용자 데이터가 아닌 고정 예시입니다.");
   });
 });
 

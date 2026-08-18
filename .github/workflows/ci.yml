@@ -15,6 +15,7 @@ jobs:
           cache: pip
       - run: pip install --require-hashes -r requirements-dev.txt
       - run: pytest -q
+      - run: python -m scripts.evaluate_fraud_engine --check
 
   # lock 이 원본(.in)과 어긋난 채 병합되는 것을 막는다.
   # --upgrade 없이 재컴파일하면 기존 pin 을 유지하므로, 상류에 새 버전이

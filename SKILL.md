@@ -26,12 +26,17 @@ Allowed: grounded explanation, safe clarification, evidence summary, plain-langu
 Forbidden: invented eligibility, repayment calculation, overriding safety blocks, unsupported legal conclusions, arbitrary URL browsing.
 
 ## API direction
+/api/v1/auth/session
+/api/v1/auth/account
 /api/v1/profiles
+/api/v1/profiles/{profile_id}/metrics
 /api/v1/products
 /api/v1/loans/simulate
 /api/v1/analyze
 /api/v1/recommendations
-/api/v1/evidence
+/api/v1/guidance/wealth
+
+Fraud evidence is returned as `official_sources` in the analyze response.
 
 ## Review
 Correctness: deterministic math, assumptions, mappings, missing values.
