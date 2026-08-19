@@ -18,6 +18,7 @@ from app.core.request_limits import (
     verify_request_limit_configuration,
 )
 from app.domain.fraud.sources import verify_official_sources
+from app.domain.housing.sources import verify_housing_sources
 from app.services.llm.runtime import verify_llm_runtime_configuration
 from app.api.routes.account import router as account_router
 from app.api.routes.auth import (
@@ -25,6 +26,7 @@ from app.api.routes.auth import (
     verify_auth_session_storage,
 )
 from app.api.routes.health import router as health_router
+from app.api.routes.housing import router as housing_router
 from app.api.routes.guidance import router as guidance_router
 from app.api.routes.analysis import router as analysis_router
 from app.api.routes.loans import router as loans_router
@@ -46,6 +48,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     verify_auth_session_storage()
     verify_financial_profile_storage()
     verify_official_sources()
+    verify_housing_sources()
     verify_llm_runtime_configuration()
     yield
 
@@ -75,6 +78,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(account_router, prefix="/api/v1")
 app.include_router(guidance_router, prefix="/api/v1")
 app.include_router(analysis_router, prefix="/api/v1")
+app.include_router(housing_router, prefix="/api/v1")
 app.include_router(loans_router, prefix="/api/v1")
 app.include_router(products_router, prefix="/api/v1")
 app.include_router(recommendations_router, prefix="/api/v1")
