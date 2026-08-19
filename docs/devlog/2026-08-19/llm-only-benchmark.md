@@ -212,3 +212,13 @@ exit 0
   차단율, prompt injection 골든셋 — 위 숫자는 전부 탐지·행동에 대한 것이다.
 - **비용 상한이 없다.** 유료 등급에 자동 정지가 없어 선불 크레딧 ₩70,000 이 유일한
   천장이다. 예산 알림 설정은 `docs/31` 11-5, `docs/34` 9절과 같은 항목이다.
+
+## 커밋 SHA
+
+- `01ab667` — feat: measure the model alone and publish the three-way comparison
+  (squash 병합 후 SHA 다. 작업 브랜치의 `25e7cc5` 는 병합과 함께 사라졌다)
+
+## PR
+
+- [#68](https://github.com/mosejong/finshield-ai/pull/68) — CI 8검사 전부 통과
+  (test / web / deps-lock / container-runtime × 2 run), 2026-08-19 squash 병합
