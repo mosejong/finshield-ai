@@ -140,8 +140,9 @@ tests/test_housing_sources.py                9
 
 ## 커밋 SHA
 
-병합 후 이 자리에 squash 결과 SHA 를 적는다.
+`99531ec0de1428369ee8344e60a1842f3f5487de`
 
 ## PR
 
-병합 후 이 자리에 PR 번호를 적는다.
+[#76 feat: add deterministic jeonse deposit risk check](https://github.com/mosejong/finshield-ai/pull/76)
+— CI 8건 통과 후 squash 병합.
