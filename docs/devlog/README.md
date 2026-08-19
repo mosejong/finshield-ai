@@ -79,6 +79,7 @@
 ## 2026-08-19
 
 - `llm-only-benchmark.md` — LLM 단독 판정 유료 측정, Rule / LLM / Hybrid 3자 비교, 채택하지 않은 조합
+- `rule-vocabulary-v0.2.md` — 모델이 찾아 준 오답 3건을 규칙 어휘로 메움, 골든셋 밖 검증, 개발셋 변별력 소진
 
 ## 작성 규칙
 

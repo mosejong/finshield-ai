@@ -1,8 +1,8 @@
 {
   "api_latency": {
-    "max_ms": 29.061,
-    "p50_ms": 2.47,
-    "p95_ms": 4.024,
+    "max_ms": 26.546,
+    "p50_ms": 2.222,
+    "p95_ms": 3.565,
     "sample_count": 1220,
     "scope": "in_process_asgi_without_network_or_tls"
   },
@@ -38,41 +38,37 @@
       "note": "제품에 넣지 않은 조합이다. 규칙에 판정 권한을 둔 선택을 숫자로 남기기 위해 같은 예측 벡터로 계산했다. 두 조합 모두 모델이 위험 수준을 움직이게 하므로 CLAUDE.md 의 non-negotiable 과 충돌한다.",
       "rule_and_llm": {
         "binary": {
-          "accuracy": 0.967213,
-          "f1": 0.973684,
-          "false_negative": 2,
+          "accuracy": 1.0,
+          "f1": 1.0,
+          "false_negative": 0,
           "false_positive": 0,
           "false_positive_rate": 0.0,
           "precision": 1.0,
-          "recall": 0.948718,
+          "recall": 1.0,
           "true_negative": 22,
-          "true_positive": 37
+          "true_positive": 39
         },
         "errors": {
-          "false_negative_case_ids": [
-            "fg-046",
-            "fg-047"
-          ],
+          "false_negative_case_ids": [],
           "false_positive_case_ids": []
         },
         "scope": "warn only when both agree"
       },
       "rule_or_llm": {
         "binary": {
-          "accuracy": 0.95082,
-          "f1": 0.962963,
+          "accuracy": 0.967213,
+          "f1": 0.975,
           "false_negative": 0,
-          "false_positive": 3,
-          "false_positive_rate": 0.136364,
-          "precision": 0.928571,
+          "false_positive": 2,
+          "false_positive_rate": 0.090909,
+          "precision": 0.95122,
           "recall": 1.0,
-          "true_negative": 19,
+          "true_negative": 20,
           "true_positive": 39
         },
         "errors": {
           "false_negative_case_ids": [],
           "false_positive_case_ids": [
-            "fg-049",
             "fg-054",
             "fg-058"
           ]
@@ -82,15 +78,15 @@
       "status": "measured"
     },
     "binary": {
-      "accuracy": 0.95082,
-      "f1": 0.961039,
-      "false_negative": 2,
-      "false_positive": 1,
-      "false_positive_rate": 0.045455,
-      "precision": 0.973684,
-      "recall": 0.948718,
-      "true_negative": 21,
-      "true_positive": 37
+      "accuracy": 1.0,
+      "f1": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "false_positive_rate": 0.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 22,
+      "true_positive": 39
     },
     "detection_identical_to": "scenario_engine_v0_1",
     "evidence_coverage": 1.0,
@@ -100,8 +96,8 @@
       "model": "gemini-3.6-flash",
       "note": "설명 문장의 근거 이탈률과 안전 필터 차단율은 아직 측정하지 않았다. 여기 숫자는 탐지 성능이며 설명 품질이 아니다."
     },
-    "required_action_coverage": 0.966667,
-    "scenario_policy_accuracy": 0.967213,
+    "required_action_coverage": 1.0,
+    "scenario_policy_accuracy": 1.0,
     "scope": "deterministic engine decides; the model only rewrites that decision in plain Korean",
     "status": "measured",
     "why_identical": "explain_analysis 는 AnalyzeResponse 를 받아 str | None 을 돌려준다. 설명 계층은 위험 수준·유형·행동을 구조적으로 바꿀 수 없다 (app/services/llm/explanation.py)."
@@ -238,24 +234,19 @@
   "report_version": "fraud_benchmark_v0.1",
   "scenario_engine_v0_1": {
     "binary": {
-      "accuracy": 0.95082,
-      "f1": 0.961039,
-      "false_negative": 2,
-      "false_positive": 1,
-      "false_positive_rate": 0.045455,
-      "precision": 0.973684,
-      "recall": 0.948718,
-      "true_negative": 21,
-      "true_positive": 37
+      "accuracy": 1.0,
+      "f1": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "false_positive_rate": 0.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 22,
+      "true_positive": 39
     },
     "errors": {
-      "false_negative_case_ids": [
-        "fg-046",
-        "fg-047"
-      ],
-      "false_positive_case_ids": [
-        "fg-049"
-      ]
+      "false_negative_case_ids": [],
+      "false_positive_case_ids": []
     },
     "evidence_coverage": 1.0,
     "fraud_types": {
@@ -266,9 +257,9 @@
         "support": 11
       },
       "authority_impersonation": {
-        "f1": 0.875,
-        "precision": 0.875,
-        "recall": 0.875,
+        "f1": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
         "support": 8
       },
       "card_delivery_impersonation": {
@@ -278,8 +269,8 @@
         "support": 5
       },
       "loan_policy_impersonation": {
-        "f1": 0.833333,
-        "precision": 0.833333,
+        "f1": 0.909091,
+        "precision": 1.0,
         "recall": 0.833333,
         "support": 6
       },
@@ -290,15 +281,15 @@
         "support": 6
       },
       "smishing_malware": {
-        "f1": 0.941177,
+        "f1": 1.0,
         "precision": 1.0,
-        "recall": 0.888889,
+        "recall": 1.0,
         "support": 9
       }
     },
-    "required_action_coverage": 0.966667,
-    "required_signal_coverage": 0.943396,
-    "scenario_policy_accuracy": 0.967213,
+    "required_action_coverage": 1.0,
+    "required_signal_coverage": 0.981132,
+    "scenario_policy_accuracy": 1.0,
     "scope": "deterministic signals, taxonomy, state policy and evidence"
   }
 }

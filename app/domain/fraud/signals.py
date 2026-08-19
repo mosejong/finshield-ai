@@ -32,6 +32,19 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "정부기관",
             "공공기관",
             "수사기관",
+            # v0.2 추가. 2026-08-19 LLM 단독 판정이 잡고 규칙이 놓친 fg-046 에서
+            # 드러난 구멍이다(`docs/32`). 실제 사칭에 쓰이는 기관인데 어휘에
+            # 없어서 못 잡은 것이지, 판정 로직의 문제가 아니었다.
+            # 부분 문자열로 매칭하므로 "검찰"이 "검찰청"을, "경찰"이 "경찰청"을
+            # 이미 덮는다. 그래서 접미사 변형은 넣지 않는다.
+            #
+            # 여기서 멈춘 이유는 `docs/32` 에 적어 뒀다. 국세청·건강보험공단처럼
+            # 사칭이 잦은 기관을 함께 넣어 봤더니, 골든셋 점수는 그대로인데
+            # 골든셋 밖 정상 문장("국세청 홈택스에서 조회할 수 있습니다")에서
+            # 오탐이 났다. 측정이 요구하지 않은 어휘는 넣지 않는다 - 넣으려면
+            # held-out 셋으로 오탐을 재고 넣는다.
+            "법원",
+            "집행관",
         ),
         25,
         "공식 기관 사칭 가능성",
@@ -77,7 +90,22 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
     ),
     SignalRule(
         "app_install_request",
-        ("앱 설치", "어플 설치", "apk", "프로그램 설치", "실행파일"),
+        (
+            "앱 설치",
+            "어플 설치",
+            "apk",
+            "프로그램 설치",
+            "실행파일",
+            # v0.2 추가. fg-047("보안 모듈을 내려받아 실행")이 여기서 빠졌다.
+            # 기존 어휘가 전부 "설치"라는 단어에 걸려 있어서, 같은 요구를
+            # "내려받다"로 쓰면 통과했다. 잡는 것은 **받아서 실행하라는 지시**이지
+            # 대상 파일의 이름이 아니다 - "보안 모듈" 같은 명사를 넣으면 은행
+            # 정상 안내까지 걸린다.
+            "내려받",
+            "다운로드",
+            "설치 파일",
+            "설치 링크",
+        ),
         35,
         "앱 설치 요구",
     ),
@@ -89,7 +117,20 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
     ),
     SignalRule(
         "money_transfer_request",
-        ("송금해", "입금해", "돈을 보내", "안전계좌", "보호계좌"),
+        (
+            "송금해",
+            "입금해",
+            "돈을 보내",
+            "안전계좌",
+            "보호계좌",
+            # v0.2 추가. "송금"의 동의어인 "이체"가 통째로 빠져 있었다.
+            # 지시형만 넣는다. 맨 "이체"를 넣으면 "이체 내역을 확인하세요" 같은
+            # 정상 안내가 걸리고, "이체하지 마세요"는 지시형에 걸리지 않는다.
+            "이체하세요",
+            "이체해",
+            "이체 바랍니다",
+            "이체를 진행",
+        ),
         35,
         "송금 요구",
     ),
@@ -196,6 +237,52 @@ KNOWN_SHORTENERS = {
 }
 
 
+# 사기 문자는 "공식 창구에서 직접 확인하라"고 말하지 않는다. 공식 창구로 가면
+# 거짓이 드러나기 때문이다. 그래서 이 문구는 예방 안내문의 표지로 쓸 수 있다.
+OFFICIAL_VERIFICATION_PHRASES = (
+    "공식 누리집",
+    "공식 홈페이지",
+    "공식 웹사이트",
+    "공식 창구",
+    "공식 대표번호",
+    "대표번호로 확인",
+    "대표번호로 직접",
+)
+
+# 위 문구가 있어도 읽는 사람에게 무언가를 요구하면 억제하지 않는다. 안전 문구를
+# 앞에 붙여 놓고 뒤에서 요구하는 혼합 문장이 실제로 존재하고, 그것이 이 억제
+# 규칙을 노리는 가장 쉬운 우회다.
+READER_DEMAND_PHRASES = (
+    "송금",
+    "입금",
+    "이체",
+    "설치",
+    "내려받",
+    "다운로드",
+    "알려 주세요",
+    "알려주세요",
+    "보내 주세요",
+    "보내주세요",
+    "입력",
+    "전달",
+    "회신",
+    "연락 주세요",
+    "연락주세요",
+)
+
+# 기관명·상품명만으로 켜지는 신호는 예방 안내문에서도 그대로 켜진다.
+# 요구가 하나도 없는 안내문까지 경고로 올리면 사용자는 경고를 무시하게 된다.
+ADVISORY_SUPPRESSIBLE_CODES = frozenset(
+    {"authority_impersonation", "loan_policy_offer"}
+)
+
+
+def _is_official_verification_notice(normalized: str) -> bool:
+    return any(
+        phrase in normalized for phrase in OFFICIAL_VERIFICATION_PHRASES
+    ) and not any(phrase in normalized for phrase in READER_DEMAND_PHRASES)
+
+
 def _detect_by_rules(text: str, rules: tuple[SignalRule, ...]) -> list[RiskSignal]:
     normalized = text.casefold()
     detected = []
@@ -216,6 +303,10 @@ def _safe_context_suppresses(code: str, normalized: str) -> bool:
     일반 negation 해석기가 아니다. 공격 지시가 함께 있는 혼합 문장은 억제하지
     않도록 좁은 문구 조합만 사용한다.
     """
+    if code in ADVISORY_SUPPRESSIBLE_CODES and _is_official_verification_notice(
+        normalized
+    ):
+        return True
     if code in {"credential_request", "account_access_request"}:
         return any(
             phrase in normalized
@@ -252,7 +343,17 @@ def _safe_context_suppresses(code: str, normalized: str) -> bool:
         )
     if code in {"app_install_request", "remote_control_request"}:
         return any(
-            phrase in normalized for phrase in ("설치하지 마세요", "허용하지 마세요")
+            phrase in normalized
+            for phrase in (
+                "설치하지 마세요",
+                "허용하지 마세요",
+                # v0.2. "내려받"·"다운로드"를 어휘에 넣은 순간 그 부정형도
+                # 걸리기 시작했다. "모르는 사람이 보낸 파일은 절대 내려받지
+                # 마세요" 는 예방 안내문이지 설치 요구가 아니다.
+                "내려받지 마세요",
+                "다운로드하지 마세요",
+                "다운로드 하지 마세요",
+            )
         ) and not any(
             phrase in normalized
             for phrase in (
