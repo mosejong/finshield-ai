@@ -137,3 +137,12 @@ find web/app -name page.tsx    11 pages
 3. **daker.ai 공식 요강 재확인** — 4인 이내 팀 규정, 제출물 3종, 세부 일정.
 4. held-out golden v0.2. 개발셋이 변별력을 잃었으므로 이제 이것 없이는 어떤 수치도
    더 나아지지 않는다.
+
+## 커밋 SHA
+
+`99b60a4` — squash 병합 결과. 작업 브랜치의 `c944ee3` 은 squash 로 사라졌으므로
+`main` 에서 찾을 수 있는 SHA 는 `99b60a4` 하나다.
+
+## PR
+
+[#72](https://github.com/mosejong/finshield-ai/pull/72) — CI 8/8 통과 후 병합.
