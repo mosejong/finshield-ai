@@ -438,7 +438,7 @@ CI `deps-lock` job이 `.in`과 lock의 어긋남을 막는다. `--upgrade` 없�
 
 #### 아직 안 된 것
 
-- **태그 push 경로는 안 돌려 봤다.** run #1 은 수동 실행이라 `type=ref,event=tag` 가 아무 태그도 만들지 않았고, 붙은 태그는 `sha-…` 하나뿐이다. `v*` 태그를 미는 순간의 동작은 미검증이다.
+- ~~**태그 push 경로는 안 돌려 봤다.**~~ **2026-08-19 확인.** `v0.1.0` 을 밀어 run #3 이 돌았고 backend/web 두 job 모두 성공했다. `type=ref,event=tag` 가 실제로 `v0.1.0` 태그를 붙였고, 두 패키지 모두 익명 `tags/list` 가 `200` 이라 VM 에서 `docker login` 이 필요 없다. digest 는 `docs/31` 12절 릴리스 대장에 있다. **남은 것은 VM 에서 이 태그를 실제로 pull 해 띄우는 일이다** — 그 절차는 `docs/31` 3-6.
 - **HTTPS 를 얹은 상태는 미검증이다.** 위 측정은 `compose.yaml` + `compose.deploy.yaml` 조합이고 포트는 전부 loopback 바인딩이었다. `compose.https.yaml` 의 Caddy 가 더해지면 30~50MiB 가 추가로 든다 — `available` 234MiB 안에 들어가지만 여유가 그만큼 줄어든다. 도메인이 정해져야 확인할 수 있다.
 - **부하를 준 적이 없다.** 위 숫자는 전부 idle 이다. 동시 요청이 들어왔을 때 uvicorn worker 2개와 Next 가 얼마나 더 먹는지는 모른다.
 - 롤백 리허설 없음. `docs/29` 의 복원 리허설처럼 실제로 되돌려 보는 절차가 필요하다.
