@@ -18,6 +18,7 @@ from app.core.request_limits import (
     verify_request_limit_configuration,
 )
 from app.domain.fraud.sources import verify_official_sources
+from app.services.llm.runtime import verify_llm_runtime_configuration
 from app.api.routes.account import router as account_router
 from app.api.routes.auth import (
     router as auth_router,
@@ -45,6 +46,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     verify_auth_session_storage()
     verify_financial_profile_storage()
     verify_official_sources()
+    verify_llm_runtime_configuration()
     yield
 
 

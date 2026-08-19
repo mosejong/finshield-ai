@@ -81,3 +81,26 @@ class AnalyzeResponse(BaseModel):
     summary: str
     actions: list[Action]
     official_sources: list[OfficialSource]
+
+
+class ExplanationResponse(BaseModel):
+    """설명 전용 응답.
+
+    `AnalyzeResponse` 에 필드를 더하지 않고 별도 응답으로 둔 이유가 둘 있다.
+
+    첫째, **지연이다.** 설명 한 문단에 약 8초가 걸린다(2026-08-19 실측,
+    `docs/34` 2-1절). 판정에 붙여 놓으면 위험 수준을 보여 주기까지 그 8초를
+    기다리게 된다. 지금 문자를 받은 사람에게 가장 나쁜 설계다.
+
+    둘째, **의존 방향이다.** 판정 응답이 설명을 품으면 "설명이 없으면 판정도
+    없다" 는 상태가 코드 모양으로 가능해진다. 나눠 두면 그 상태를 만들 수 없다.
+
+    `available` 은 `explanation is None` 과 다르다. 계층이 꺼져 있는 것과, 켜져
+    있는데 이번에 문장을 못 만든 것은 화면에서 다르게 보여야 한다.
+    """
+
+    available: bool
+    explanation: str | None = None
+    # 어느 모델이 답했는지 남긴다. 대체 모델로 넘어갔을 수 있고, 그것을 모르면
+    # 이 문장이 어느 모델의 것인지 평가에서 다시 세울 수 없다.
+    model: str | None = None

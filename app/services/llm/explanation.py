@@ -31,15 +31,32 @@ FRAUD_EXPLANATION_PROMPT_SHA256 = (
 )
 
 
-def fraud_explanation_contract(*, provider: str, model: str) -> LlmContract:
-    """설명용 고정 계약. provider 와 model 만 다르고 나머지는 고정이다."""
+DEFAULT_TIMEOUT_SECONDS = 8.0
+
+
+def fraud_explanation_contract(
+    *,
+    provider: str,
+    model: str,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+) -> LlmContract:
+    """설명용 고정 계약. provider·model·timeout 만 다르고 나머지는 고정이다.
+
+    timeout 이 인자인 이유는 모델마다 걸리는 시간이 자릿수로 다르기 때문이다
+    (`docs/34` 2절 실측). 하나로 묶으면 둘 중 하나가 손해를 본다 - 느린 모델에
+    맞추면 빠른 모델이 죽었을 때 그만큼 오래 기다리고, 빠른 모델에 맞추면 느린
+    모델은 항상 잘린다. 대체 모델까지 두 번 기다릴 수 있으므로 합계를 보고 정한다.
+
+    prompt·max_input_chars·temperature 는 인자가 아니다. 그쪽이 바뀌면 그 전에 잰
+    벤치마크가 이 시스템을 설명하지 않는다.
+    """
     return LlmContract(
         provider=provider,
         model=model,
         prompt_id=FRAUD_EXPLANATION_PROMPT_ID,
         prompt_sha256=FRAUD_EXPLANATION_PROMPT_SHA256,
         max_input_chars=4_000,
-        timeout_seconds=8.0,
+        timeout_seconds=timeout_seconds,
         # 벤치마크가 재현 가능해야 한다. 0.0 이 결정론을 보장하지는 않지만,
         # 남는 흔들림을 최소로 줄이는 유일한 손잡이다.
         temperature=0.0,

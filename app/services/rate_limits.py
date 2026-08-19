@@ -76,6 +76,21 @@ DEFAULT_POLICIES: tuple[RateLimitPolicy, ...] = (
         methods=frozenset({"POST"}),
         exact_path=True,
     ),
+    # 설명은 분석보다 비싸다. 유료 외부 호출이 나가고, 대체 모델까지 가면 한 요청에
+    # 두 번 나간다. 그리고 `analyze` 정책은 `exact_path` 라서 이 경로를 덮지 않는다 -
+    # 이 항목이 없으면 아래 `write` 정책(60/분)으로 떨어져, 더 비싼 경로가 더 헐거운
+    # 한도를 갖게 된다. 반드시 `analyze` 보다 위에 있어야 한다.
+    #
+    # IP 단위 한도라 분산된 남용은 못 막는다. 그건 여기가 아니라 프로바이더 쪽
+    # 예산 한도로 막을 문제다(`docs/34`).
+    RateLimitPolicy(
+        name="analyze_explanation",
+        limit=10,
+        window_seconds=60,
+        path_prefix="/api/v1/analyze/explanation",
+        methods=frozenset({"POST"}),
+        exact_path=True,
+    ),
     # 분석은 이 서비스에서 가장 비싼 경로이고 인증이 없다.
     RateLimitPolicy(
         name="analyze",

@@ -55,6 +55,7 @@ def _service(
         ("POST", "/api/v1/auth/session", "auth_session"),
         ("DELETE", "/api/v1/auth/session", "write"),
         ("POST", "/api/v1/analyze", "analyze"),
+        ("POST", "/api/v1/analyze/explanation", "analyze_explanation"),
         ("POST", "/api/v1/profiles", "write"),
         ("GET", "/api/v1/products", "read"),
         ("GET", "/health", None),
@@ -77,6 +78,27 @@ def test_health_checks_are_never_limited() -> None:
     for _ in range(1_000):
         decision = service.check(method="GET", path="/health", client_ip="203.0.113.7")
         assert decision.allowed
+
+
+def test_the_explanation_path_is_not_looser_than_the_paths_it_sits_under() -> None:
+    """비싼 경로가 싼 경로보다 헐거운 한도를 갖지 않는다.
+
+    위 `test_policy_selection` 은 이름만 본다. 이름이 맞아도 한도 숫자가 뒤집혀
+    있으면 의미가 없다. 설명 경로는 유료 외부 호출을 내보내고 대체 모델까지 가면
+    한 요청에 두 번 나가므로, `analyze` 와 `write` 중 어느 쪽보다도 좁아야 한다.
+
+    `analyze` 정책이 `exact_path` 라서 이 경로를 덮지 못한다는 점이 함정의 핵심이다 -
+    `analyze_explanation` 을 지우면 이 경로는 조용히 `write`(60/분) 로 떨어진다.
+    """
+    service = _service()
+
+    explanation = service.select_policy("POST", "/api/v1/analyze/explanation")
+    analyze = service.select_policy("POST", "/api/v1/analyze")
+    write = service.select_policy("POST", "/api/v1/profiles")
+
+    assert explanation is not None and analyze is not None and write is not None
+    assert explanation.limit < analyze.limit
+    assert explanation.limit < write.limit
 
 
 # --- 계수 ----------------------------------------------------------------

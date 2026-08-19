@@ -8,7 +8,7 @@
 Fraud evaluation bootstrap policy · `adr/0007-bootstrap-fraud-evaluation.md`
 27 observability/PII masking · `adr/0006-privacy-safe-observability.md`
 26 HTTP security/HTTPS boundary · `adr/0005-http-security-and-https-boundary.md`
-04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · 28 production readiness · 29 backup and recovery · 30 PWA and share target · 31 public deployment (domain/DNS/TLS) · ADR 색인 `adr/README.md`
+04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · 28 production readiness · 29 backup and recovery · 30 PWA and share target · 31 public deployment (domain/DNS/TLS) · 34 LLM explanation runtime · ADR 색인 `adr/README.md`
 
 ## Security
 

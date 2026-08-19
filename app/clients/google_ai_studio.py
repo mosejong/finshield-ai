@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Mapping
 from typing import Any
 
 import httpx
@@ -40,7 +41,26 @@ PROVIDER_NAME = "google_ai_studio"
 
 # 설명은 600자 상한이다(`explanation.py`). 토큰은 넉넉히 주고, 넘치면 잘린 문장을
 # 보여 주는 대신 통째로 버린다 - 아래 finishReason 검사가 그 역할을 한다.
-MAX_OUTPUT_TOKENS = 1024
+#
+# 1024 였다가 4096 으로 올렸다(2026-08-19). 답변 길이 때문이 아니다 - Gemini 3.x
+# flash 계열은 **사고 토큰(thinking)이 같은 예산에서 나간다.** 1024 로 두면 사고에
+# 982 토큰이 나가고 답변 몫으로 38 토큰만 남아, `finishReason` 이 항상 `MAX_TOKENS`
+# 가 된다. 즉 모델은 정상 동작하는데 우리 쪽 예산 때문에 매번 버려졌다.
+# `gemini-3.6-flash` 와 `gemini-3.5-flash` 둘 다 재현됐고, 사고를 하지 않는
+# `gemini-3.1-flash-lite` 만 통과하고 있었다. 이 상수는 답변 길이가 아니라
+# 사고 + 답변의 합으로 잡아야 한다.
+MAX_OUTPUT_TOKENS = 4096
+
+# 사고 깊이. 이 작업은 이미 확정된 판정을 3~5문장으로 옮기는 일이고, 출력은 어차피
+# `validation.py` 를 통과해야 한다. 깊게 생각해서 좋아지는 종류의 과제가 아니다.
+#
+# 실측(2026-08-19): `gemini-3.5-flash` 는 기본값에서 위 `MAX_TOKENS` 에 걸렸고
+# `low` 에서 4.34초에 정상 응답했다. `gemini-3.6-flash` 는 8.30초 -> 6.3~7.4초.
+# 사고를 아예 끄는 `thinkingBudget: 0` 은 `gemini-3.6-flash` 에서 HTTP 400 이다.
+#
+# 이 키를 모르는 모델은 400 을 돌려주고, 그러면 `LlmUnavailable` 로 접혀 다음
+# 모델로 넘어간다. 조용히 품질이 나빠지는 대신 그 모델이 통째로 빠지는 쪽이다.
+THINKING_LEVEL = "low"
 
 # 모델명은 URL 경로에 들어간다. 계약에서 오는 값이라 사용자 입력은 아니지만,
 # 경로에 넣는 문자열은 넣기 전에 본다.
@@ -89,6 +109,7 @@ class GoogleAiStudioProvider:
             "generationConfig": {
                 "temperature": contract.temperature,
                 "maxOutputTokens": MAX_OUTPUT_TOKENS,
+                "thinkingConfig": {"thinkingLevel": THINKING_LEVEL},
             },
         }
         headers = {
@@ -164,14 +185,22 @@ def _extract_text(body: Any) -> str:
     return text
 
 
-def build_google_ai_studio_provider() -> GoogleAiStudioProvider:
+def build_google_ai_studio_provider(
+    values: Mapping[str, str] | None = None,
+) -> GoogleAiStudioProvider:
     """환경에서 키를 읽어 조립한다.
 
     `GEMINI_API_KEY` 또는 `GEMINI_API_KEY_FILE` 을 받는다. 후자가 Docker secret
     경로다 - 키를 환경변수로 두면 `docker inspect` 와 프로세스 목록에 남는다.
+
+    `values` 를 받는 이유는 부르는 쪽(`llm/runtime.py`)이 이미 매핑 하나로 설정을
+    읽고 있기 때문이다. 여기서만 `os.environ` 을 직접 보면, 매핑을 넘겼는데 키만
+    프로세스 환경에서 오는 상태가 된다 - 테스트가 통과하는 이유와 운영이 도는
+    이유가 달라지는 종류의 함정이다.
     """
+    environ = values if values is not None else os.environ
     try:
-        api_key = read_secret_setting(os.environ, "GEMINI_API_KEY")
+        api_key = read_secret_setting(environ, "GEMINI_API_KEY")
     except RuntimeSecretConfigurationError as exc:
         raise GoogleAiStudioConfigurationError(
             "GEMINI_API_KEY secret configuration is invalid"
