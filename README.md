@@ -4,11 +4,15 @@
 
 ## Status
 
-**MVP implementation — 2026-08-13**
+**MVP implementation — 2026-08-19**
 
 목표 대회: **2026 금융 AI Challenge**  
-Fraud Scenario Engine v0.1 백엔드가 `main`에 병합됐다. 현재 분석은 LLM이나
-런타임 웹 검색 없이 결정론적 규칙, 사용자 상태, 정적 공식 근거로 동작한다.
+대회 제출물은 `docs/35-competition-proposal.md`(①기획서)와
+`docs/36-functional-specification.md`(②기능명세서)에 있다.
+Fraud Scenario Engine 백엔드가 `main`에 병합됐다. **판정 경로는 LLM이나 런타임
+웹 검색 없이** 결정론적 규칙, 사용자 상태, 정적 공식 근거로만 동작한다. LLM은
+별도 엔드포인트에서 **이미 확정된 판정을 설명하는 문장만** 만들며, 실패하면 설명
+없이 판정만 나간다.
 Next.js 프론트엔드 MVP도 `main`에 병합되어 실제 분석 API의 위험 유형 후보,
 요약, 행동과 공식 근거를 live로 표시한다.
 공식 금융상품은 최신 활성 기준월 전체를 process-local TTL cache로 재사용하며,
@@ -27,12 +31,19 @@ Next same-origin 프록시로 세션을 자동 준비하며 브라우저에는 p
 남기지 않는다.
 월 현금흐름·월소득 대비 상환액·비상자금
 기간도 backend에서 결정론적으로 계산해 profile과 Home에 같은 값으로 표시한다.
-Fraud evaluation v0.1은 팀이 직접 작성한 합성 61건으로 legacy 5-keyword baseline과
-Scenario Engine을 재현 가능하게 비교한다. bootstrap 개발셋 기준 Scenario Engine은
-precision 0.973684, recall 0.948718, F1 0.961039, FPR 0.045455이며 action-source
-근거 연결 coverage는 1.0이다. 같은 데이터로 규칙을 교정했으므로 독립 held-out
-성능이나 실서비스 정확도로 주장하지 않는다. LLM-only와 Hybrid 비교도 아직
-수행하지 않았다. 상세 결과와 주장 한계는 `docs/32-fraud-evaluation-benchmark.md`와
+Fraud evaluation은 팀이 직접 작성한 합성 61건으로 legacy 5-keyword baseline,
+Scenario Engine, LLM-only를 재현 가능하게 비교한다. 고정 model·prompt·provider
+계약으로 LLM 단독 판정을 유료 측정했고(F1 0.975000, 필수 행동 coverage 0.600000,
+상태 정책 정확도 0.508197, 공식 근거 coverage 0.0), **탐지만 보면 최초 측정에서
+모델이 우리 엔진보다 나았다.** 모델이 못 채운 것은 "그래서 지금 뭘 해야 하는가"와
+"그 근거가 어디 있는가"였다. 모델이 찾아 준 오답은 판정 로직이 아니라 어휘 구멍이
+원인이었으므로, 모델을 판정에 넣는 대신 규칙 어휘를 넓혔다(v0.2). 그 뒤 이 개발셋
+기준 Scenario Engine의 이진 판정은 precision·recall·F1 1.000000, FPR 0.000000이고
+action-source 근거 연결 coverage는 1.0이다. **이 만점은 성능 주장이 아니다** —
+같은 데이터로 규칙을 교정했으므로 독립 held-out 성능이 아니고, 오류가 0건이 된 것은
+개발셋이 더 이상 변별하지 못한다는 뜻이다. 사기 유형 분류는 여전히 만점이 아니다
+(`loan_policy_impersonation` F1 0.909091, `money_mule_transfer` F1 0.923077).
+상세 결과와 주장 한계는 `docs/32-fraud-evaluation-benchmark.md`와
 `docs/33-competition-evidence-pack.md`를 따른다.
 프론트 접근성 v0.1은 본문 건너뛰기, 공통 포커스 링, 로딩·비동기 상태 안내,
 움직임 축소 설정과 구조적 회귀 테스트를 포함한다. PM 브라우저 검수에서
@@ -361,8 +372,9 @@ PWA로 설치되고 문자 앱 공유 시트에서 바로 들어온다. manifest
 
 공개 배포는 도메인만 남았다. ACME 계정 연락처를 필수로 두어(비면 Caddy가 기동을 거부한다) 인증서 갱신이 조용히 실패해도 발급기관이 알릴 통로가 있게 했고, 첫 발급은 Let's Encrypt staging으로 예행연습한다 — 운영 디렉터리는 검증 실패 5회/시간·중복 인증서 5장/주로 막히는데 **한도를 태운 사실은 준비가 끝난 뒤에 알게 된다.** staging을 환경변수가 아니라 mount되는 파일로 둔 이유는 `acme_ca`를 명시하면 기본 발급자 두 개(Let's Encrypt + ZeroSSL 대체)가 모두 하나로 대체되기 때문이다. `scripts/verify_public_deployment.py`가 외부에서 리다이렉트·HSTS·보안 헤더·인증서 만료·주요 화면·공유 시트·내부 포트를 확인하고, 판정 기준 자체는 `tests/test_public_deployment.py`가 네트워크 없이 고정한다. `localhost` 예행연습으로 경로 전체를 확인했다. 절차와 완료 기준은 `docs/31-public-deployment.md`를 따른다.
 
-- 독립 작성·동결한 held-out fraud golden v0.2 평가
-- 고정 model·prompt·provider 계약 후 LLM-only와 Hybrid 비교
+- **독립 작성·동결한 held-out fraud golden v0.2 평가** — 개발셋이 변별력을 잃었으므로
+  이제 이것이 추가 측정의 전제 조건이다
+- 설명 문장 자체의 품질 측정 (근거 이탈률, 안전 필터 차단율, 프롬프트 인젝션 내성)
 - 사회초년생과 소상공인 중 Primary Persona 확정
 - provider latency·error 계측
 - FinancialProfile 기반 deterministic filtering 구현

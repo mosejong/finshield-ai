@@ -3,6 +3,14 @@
 ## Product / research
 01 problem definition · 02 research plan · 03 product scope · 05 data/evaluation · 06 roadmap · 07 official API candidates · 09 financial profile · 10 MVP backlog · 32 fraud evaluation benchmark · 33 competition evidence pack
 
+## Competition submission (2026 금융 AI Challenge)
+
+제출물 ①기획서 · `35-competition-proposal.md`
+제출물 ②기능명세서 · `36-functional-specification.md` — **구현된 기능만** 적고, 미구현·미측정은 13절에 분리한다
+제출물 ③웹서비스 URL · 배포 절차는 `31-public-deployment.md`
+
+두 문서의 수치는 `evaluation/results/fraud-benchmark-v0.1.json` 을 출처로 한다. 재측정하면 두 문서와 `32`, `33` 을 함께 고쳐야 한다 — 한쪽만 고치면 제출물끼리 숫자가 갈라진다.
+
 ## Architecture / engineering
 
 Fraud evaluation bootstrap policy · `adr/0007-bootstrap-fraud-evaluation.md`
@@ -23,6 +31,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-19/competition-submission-docs.md` — 제출물 ①기획서 ②기능명세서 작성·명세를 코드에서 확인·신호 12종 정정·낡은 README 수치 교체
 - `devlog/2026-08-19/rule-vocabulary-v0.2.md` — 모델이 찾아 준 오답 3건을 규칙 어휘로 메움·골든셋 밖 검증·개발셋 변별력 소진
 - `devlog/2026-08-19/llm-only-benchmark.md` — LLM 단독 판정 유료 측정·Rule/LLM/Hybrid 3자 비교·채택하지 않은 조합
 - `devlog/2026-08-18/post-merge-devlog-shas.md` — squash 후 SHA 정정·첫 릴리스 실측·rate limit 고정 창 flake
