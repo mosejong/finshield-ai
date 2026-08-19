@@ -106,3 +106,15 @@ POST /api/proxy/analyze/explanation  404
 3. 밖에서 `scripts/verify_public_deployment.py` 재실행.
 4. 롤백 리허설 — 대장에 되돌릴 대상은 적었지만 **실제로 되돌려 본 적은 없다.**
 5. Google Cloud 예산 알림·일일 상한.
+
+## 커밋 SHA
+
+`d7af623` — squash 병합 결과. 작업 브랜치의 `e9e9120` 은 squash 로 사라졌다.
+
+**태그 `v0.1.0` 은 `30ba35b` 을 가리키며 이 커밋을 포함하지 않는다.** 문서만
+바뀌었으므로 이미지 내용은 같다 — 태그를 옮겨 붙이지 않는다. 태그가 움직이면
+대장의 digest 가 거짓말이 된다.
+
+## PR
+
+[#74](https://github.com/mosejong/finshield-ai/pull/74) — CI 8/8 통과 후 병합.
