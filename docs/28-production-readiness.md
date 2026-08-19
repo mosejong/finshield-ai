@@ -465,17 +465,19 @@ P0-5로 버전은 고정했지만, 고정은 그 자체로 위험을 만든다. 
 - `scripts/evaluate_fraud_engine.py` — 재현 가능한 진입점, p50/p95 실측
 - `tests/test_fraud_evaluation.py` — gate 와 **알려진 오답 3건(fg-046/047/049)이 보고서에서 사라지지 않는지**를 고정한다
 
-Rule-only 베이스라인은 이것으로 확보됐다. 남은 것 셋이다.
+Rule-only 베이스라인은 이것으로 확보됐다. 남은 것 셋이었고, 둘이 닫혔다.
 
-- **held-out v0.2** — 현재 데이터는 non-held-out 이라 보고서가 `dataset.held_out = False` 를 그대로 싣는다. 독립 작성·동결이 필요하다
-- **LLM-only 측정** — 보고서가 `llm_only.status = "not_run"` 이고 사유가 "고정된 model·prompt·provider 계약이 없다" 이다. 즉 P2-2 의 어댑터가 선행이다
-- **Hybrid 비교** — `proposed_hybrid.status = "not_implemented"`
+- **held-out v0.2** — 현재 데이터는 non-held-out 이라 보고서가 `dataset.held_out = False` 를 그대로 싣는다. 독립 작성·동결이 필요하다. **남아 있다**
+- ~~**LLM-only 측정**~~ — 2026-08-19 실행됨. `gemini-3.6-flash`, `fraud_judge_v1`, temperature 0.0, 61건 전건 응답. `llm_only.status = "measured"`
+- ~~**Hybrid 비교**~~ — 2026-08-19 실행됨. 키가 `proposed_hybrid` 에서 `hybrid_v0_1` 로 바뀌었다. 배포본이므로 탐지 숫자는 엔진과 동일하고, 그 동일함을 테스트가 고정한다
+
+**결과를 여기 한 줄로 남긴다: 탐지만 보면 모델이 우리 엔진을 이겼다**(재현율 1.000 대 0.949, F1 0.975 대 0.961). 엔진이 놓친 `fg-046`·`fg-047` 을 둘 다 잡았다. 대신 필수 행동 coverage 0.600(엔진 0.967), 상태 정책 정확도 0.508(엔진 0.967), 공식 근거 0.0(엔진 1.0) 이다. 전체 표와 채택하지 않은 조합(`규칙 ∩ 모델` 은 FPR 0.0 인데도 넣지 않았다)은 `docs/32-fraud-evaluation-benchmark.md` 에 있다. 판정자는 `evaluation/llm_judge.py` 에 있고 제품에는 없다.
 
 ### P2-2. LLM 설명 계층 — 계약 경계와 AI Studio 프로바이더 착지 (2026-08-18), 라우트 연결 완료 (2026-08-19), 미측정
 
 `app/services/llm/` 에 설명 계층의 경계가, `app/clients/google_ai_studio.py` 에 실제 프로바이더가 들어왔다.
 
-**2026-08-19 정정.** 아래 "아직 한 번도 실행하지 않았다" 는 그날의 상태였고 지금은 다르다. 키를 꽂아 실제 응답을 받았고, `POST /api/v1/analyze/explanation` 으로 요청 경로에 연결했다. 조립·스위치·대체 모델·요청 한도·기동 검증은 `docs/34-llm-explanation-runtime.md` 에 따로 적었다. **여전히 안 된 것은 측정이다** — `llm_only.status` 는 `not_run` 그대로이고, 프론트의 설명 텍스트도 아직 mock 계층에서 온다.
+**2026-08-19 정정.** 아래 "아직 한 번도 실행하지 않았다" 는 그날의 상태였고 지금은 다르다. 키를 꽂아 실제 응답을 받았고, `POST /api/v1/analyze/explanation` 으로 요청 경로에 연결했다. 조립·스위치·대체 모델·요청 한도·기동 검증은 `docs/34-llm-explanation-runtime.md` 에 따로 적었다. 측정도 그날 늦게 닫혔다 — `llm_only.status` 가 `measured` 이고 3자 비교표는 `docs/32` 에 있다(P2-1). **아직 안 된 것은 설명 문장 자체의 품질 측정이다** — 근거 이탈률, 안전 필터 차단율, prompt injection 골든셋은 여전히 없다. 위 3자 비교는 전부 탐지·행동에 대한 숫자이지 설명 문장에 대한 숫자가 아니다.
 
 이 절의 나머지는 그날 적은 그대로 둔다. 계약 경계의 설계 이유는 바뀌지 않았다.
 
@@ -497,7 +499,7 @@ Rule-only 베이스라인은 이것으로 확보됐다. 남은 것 셋이다.
 
 검증 32건은 전부 가짜 프로바이더로 돈다(`tests/test_llm_contract.py`). 네트워크가 필요한 검사였다면 CI 에서 꺼졌을 것이고, 꺼진 검사는 없는 검사다.
 
-**남은 것:** ~~키 발급과 `secrets/gemini_api_key.txt` 배치~~(2026-08-19 완료), `evaluation/` 연결로 `llm_only.status` 를 `not_run` 에서 옮기기, 안전 필터 차단율 측정, prompt injection 골든셋, ~~라우트 연결~~(2026-08-19 완료 — `docs/34`)(비동기 경계는 아직 그대로다. 프로바이더가 동기라 5.5초 호출이 스레드풀을 잡는다). 사람 이름과 주소는 한국어에서 신뢰할 만하게 잡히지 않아 최소화 계층이 걸러 주지 못한다 — 이 계층은 "덜 보낸다" 이지 "안전하다" 가 아니다.
+**남은 것:** ~~키 발급과 `secrets/gemini_api_key.txt` 배치~~(2026-08-19 완료), ~~`evaluation/` 연결로 `llm_only.status` 를 `not_run` 에서 옮기기~~(2026-08-19 완료 — P2-1), 안전 필터 차단율 측정, prompt injection 골든셋, ~~라우트 연결~~(2026-08-19 완료 — `docs/34`)(비동기 경계는 아직 그대로다. 프로바이더가 동기라 8초 가까운 호출이 스레드풀을 잡는다. 판정 61건의 실측 지연은 p50 2.21초, p95 5.41초였다). 사람 이름과 주소는 한국어에서 신뢰할 만하게 잡히지 않아 최소화 계층이 걸러 주지 못한다 — 이 계층은 "덜 보낸다" 이지 "안전하다" 가 아니다.
 
 #### 프로바이더 — 유료 등급 (2026-08-18, 앞선 판단 정정)
 

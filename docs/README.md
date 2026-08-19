@@ -23,6 +23,10 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-19/llm-only-benchmark.md` — LLM 단독 판정 유료 측정·Rule/LLM/Hybrid 3자 비교·채택하지 않은 조합
+- `devlog/2026-08-18/post-merge-devlog-shas.md` — squash 후 SHA 정정·첫 릴리스 실측·rate limit 고정 창 flake
+- `devlog/2026-08-18/deploy-image-pipeline.md` — ghcr 릴리스 워크플로·배포 override·expand/contract 롤백 전략
+- `devlog/2026-08-18/llm-explanation-contract.md` — 고정 model·prompt·provider 계약·PII 최소화·출력 검증·판정 경계
 - `devlog/2026-08-17/public-deployment-tls.md` — ACME 연락처 필수화·staging 예행연습 경로·외부 공개 배포 검증기
 - `devlog/2026-08-17/pwa-share-target.md` — PWA manifest·POST 공유 시트 인계·오프라인 셸·설치 유도
 - `devlog/2026-08-17/backup-and-restore-rehearsal.md` — 백업 주기 실행·세대 회전·복호화까지 확인하는 복원 리허설

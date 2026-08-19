@@ -12,7 +12,7 @@
 없으면 아무도 부르지 않는다. 실제로 `app/clients/google_ai_studio.py` 를 import 하는
 운영 코드는 하나도 없었고 — 테스트만 import 하고 있었다 — 배포된 서비스는 100%
 규칙 기반이었다. `evaluation/results/fraud-benchmark-v0.1.json` 의 `llm_only.status`
-가 `"not_run"` 인 것도 같은 원인이다.
+가 `"not_run"` 인 것도 같은 원인이다(2026-08-19 에 `measured` 로 옮겼다 — 9절).
 
 이 문서는 그 빈칸을 메운 작업의 기록이다. 무엇을 만들었고, **왜 그렇게 만들지 않을
 수도 있었는데 그렇게 만들었는지**를 남긴다. 결정의 이유가 없으면 다음 사람이 같은
@@ -352,9 +352,11 @@ docker compose -f compose.yaml -f compose.gemini.yaml --env-file .env.docker up 
   자동으로 멈추는 지점이 없다 — 선불 크레딧 ₩70,000 이 상한의 전부다. Google Cloud
   콘솔에서 일 상한과 예산 알림을 걸어야 하고, 아직 걸지 않았다. `docs/31` 11-5 의
   GCP 예산 알림과 같은 성질의 미완 항목이다.
-- **`evaluation/` 연결.** `llm_only.status` 는 아직 `not_run` 이다. 이 계층이 붙었으니
-  Rule-only / LLM-only / Hybrid 비교표를 만들 수 있다. `CLAUDE.md` 의 Evaluation 항목이
-  요구하는 것이고, 대회 제출물에서도 가장 설득력 있는 표다.
+- ~~**`evaluation/` 연결.**~~ 했다(2026-08-19). `llm_only.status` 가 `measured` 로
+  옮겨졌고 Rule-only / LLM-only / Hybrid 비교표가 `docs/32` 에 있다. **결과를 여기
+  한 줄로 적어 두면: 탐지만 보면 모델이 우리 엔진을 이겼다**(재현율 1.000 대 0.949,
+  F1 0.975 대 0.961). 대신 필수 행동 coverage 0.600, 상태 정책 정확도 0.508, 공식 근거
+  0.0 이다. 판정자는 `evaluation/llm_judge.py` 에 있고 제품에는 없다.
 - ~~**프론트엔드 연결.**~~ 붙였다(2026-08-19). 10절 참고.
 - **안전 필터 차단율 측정.** `finishReason` 이 `SAFETY` 로 오는 비율을 모른다. 사기
   문자를 다루는 서비스라 정상 입력이 차단될 수 있고, 그러면 조용히 설명이 사라진다.

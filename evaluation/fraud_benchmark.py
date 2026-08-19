@@ -2,11 +2,13 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from hashlib import sha256
+from math import ceil
 
 from app.domain.fraud.signals import detect_legacy_signals
 from app.schemas.analysis import AnalyzeResponse
 from app.services.fraud_analysis import analyze_fraud
 from evaluation.fraud_golden import FraudGoldenCase, RISK_RANK
+from evaluation.llm_judge import LlmJudgement, LlmJudgeRun
 
 
 FRAUD_TYPES = (
@@ -32,16 +34,32 @@ class BinaryMetrics:
     accuracy: float
 
 
-def evaluate_golden_set(cases: list[FraudGoldenCase]) -> dict[str, object]:
+def evaluate_golden_set(
+    cases: list[FraudGoldenCase],
+    *,
+    llm_run: LlmJudgeRun | None = None,
+) -> dict[str, object]:
     responses = [analyze_fraud(case.request()) for case in cases]
     scenario_predictions = [bool(response.fraud_types) for response in responses]
     legacy_predictions = [bool(detect_legacy_signals(case.text)) for case in cases]
     truth = [case.is_fraud for case in cases]
+    dataset_sha256 = normalized_dataset_sha256(cases)
+
+    engine = {
+        "scope": "deterministic signals, taxonomy, state policy and evidence",
+        "binary": asdict(_binary_metrics(truth, scenario_predictions)),
+        "errors": _binary_error_case_ids(cases, scenario_predictions),
+        "fraud_types": _fraud_type_metrics(cases, responses),
+        "required_signal_coverage": _required_signal_coverage(cases, responses),
+        "scenario_policy_accuracy": _scenario_policy_accuracy(cases, responses),
+        "required_action_coverage": _required_action_coverage(cases, responses),
+        "evidence_coverage": _evidence_coverage(responses),
+    }
 
     return {
         "dataset": {
             "id": "fraud_golden_v0.1",
-            "normalized_sha256": _normalized_dataset_sha256(cases),
+            "normalized_sha256": dataset_sha256,
             "case_count": len(cases),
             "positive_count": sum(truth),
             "negative_count": len(cases) - sum(truth),
@@ -59,25 +77,197 @@ def evaluate_golden_set(cases: list[FraudGoldenCase]) -> dict[str, object]:
             "binary": asdict(_binary_metrics(truth, legacy_predictions)),
             "errors": _binary_error_case_ids(cases, legacy_predictions),
         },
-        "scenario_engine_v0_1": {
-            "scope": "deterministic signals, taxonomy, state policy and evidence",
-            "binary": asdict(_binary_metrics(truth, scenario_predictions)),
-            "errors": _binary_error_case_ids(cases, scenario_predictions),
-            "fraud_types": _fraud_type_metrics(cases, responses),
-            "required_signal_coverage": _required_signal_coverage(cases, responses),
-            "scenario_policy_accuracy": _scenario_policy_accuracy(cases, responses),
-            "required_action_coverage": _required_action_coverage(cases, responses),
-            "evidence_coverage": _evidence_coverage(responses),
-        },
-        "llm_only": {
+        "scenario_engine_v0_1": engine,
+        "llm_only": _llm_only_section(cases, llm_run, dataset_sha256),
+        "hybrid_v0_1": _hybrid_section(
+            cases, engine, truth, scenario_predictions, llm_run, dataset_sha256
+        ),
+    }
+
+
+def _llm_only_section(
+    cases: list[FraudGoldenCase],
+    run: LlmJudgeRun | None,
+    dataset_sha256: str,
+) -> dict[str, object]:
+    """모델 단독 판정 구간.
+
+    비어 있는 상태를 두 가지로 나눈다. **한 번도 돌리지 않은 것**과 **다른
+    데이터로 돌린 것**은 다르다. 후자를 그대로 실으면 골든셋을 고친 뒤에도 옛
+    숫자가 새 데이터의 성능인 척 남는다 - 프롬프트를 sha256 으로 고정한 것과
+    같은 이유로 여기도 sha256 을 본다.
+    """
+    if run is None:
+        return {
             "status": "not_run",
-            "reason": "No pinned model, prompt, provider contract or safe evaluation budget is configured.",
+            "reason": (
+                "판정 실행 결과 파일이 없다. "
+                "`python -m scripts.run_llm_fraud_judge` 가 유료 호출로 만든다."
+            ),
+        }
+    if run.dataset_sha256 != dataset_sha256:
+        return {
+            "status": "stale",
+            "reason": (
+                "판정 실행 결과가 지금 골든셋과 다른 데이터에서 나왔다. "
+                "다시 돌리거나, 비교를 포기하고 결과 파일을 지운다."
+            ),
+            "judged_dataset_sha256": run.dataset_sha256,
+            "current_dataset_sha256": dataset_sha256,
+        }
+
+    judgements = _aligned_judgements(cases, run)
+    predictions = [judgement.is_fraud for judgement in judgements]
+    failures = [judgement for judgement in judgements if not judgement.ok]
+    latencies = [judgement.latency_ms for judgement in judgements if judgement.ok]
+
+    return {
+        "status": "measured",
+        "scope": (
+            "the model alone decides fraud, type, risk level and actions "
+            "from the message, persona and user state"
+        ),
+        "contract": {
+            "provider": run.provider,
+            "model": run.model,
+            "prompt_id": run.prompt_id,
+            "prompt_sha256": run.prompt_sha256,
+            "temperature": run.temperature,
         },
-        "proposed_hybrid": {
-            "status": "not_implemented",
-            "reason": "The current v0.1 engine is deterministic; an LLM explanation layer is not part of this benchmark.",
+        "run": {
+            "judged_at": run.judged_at,
+            "dataset_sha256": run.dataset_sha256,
+            "case_count": len(judgements),
+            "failure_count": len(failures),
+            "failure_kinds": dict(
+                sorted(Counter(judgement.failure for judgement in failures).items())
+            ),
+            "invented_code_count": sum(
+                len(judgement.dropped_codes) for judgement in judgements
+            ),
+            "p50_ms": _percentile(latencies, 0.50),
+            "p95_ms": _percentile(latencies, 0.95),
+        },
+        "failure_policy": (
+            "답하지 못한 호출은 '경고 없음'으로 집계한다. "
+            "빼고 채점하면 모델이 답한 것만 고른 점수가 된다."
+        ),
+        "binary": asdict(_binary_metrics([case.is_fraud for case in cases], predictions)),
+        "errors": _binary_error_case_ids(cases, predictions),
+        "fraud_types": _judged_fraud_type_metrics(cases, judgements),
+        "scenario_policy_accuracy": _judged_scenario_policy_accuracy(cases, judgements),
+        "required_action_coverage": _judged_action_coverage(cases, judgements),
+        "evidence_coverage": 0.0,
+        "evidence_note": (
+            "0.0 은 측정 실패가 아니라 구조다. 이 경로에는 행동을 뒷받침하는 "
+            "공식 출처가 없다 - 모델은 근거 ID 를 만들지 않고, 만들게 하면 "
+            "그것이야말로 지어낸 근거다."
+        ),
+        "not_measured": {
+            "required_signal_coverage": (
+                "signal 코드는 내부 표현이라 제품 출력 어휘가 아니다. "
+                "모델에게 주지 않았으므로 채점하지 않는다."
+            )
         },
     }
+
+
+def _hybrid_section(
+    cases: list[FraudGoldenCase],
+    engine: dict[str, object],
+    truth: list[bool],
+    scenario_predictions: list[bool],
+    run: LlmJudgeRun | None,
+    dataset_sha256: str,
+) -> dict[str, object]:
+    """실제로 배포된 조합.
+
+    탐지 숫자가 `scenario_engine_v0_1` 과 **같다**. 그것이 결함이 아니라 이
+    제품의 주장이다 - 설명 계층은 `AnalyzeResponse` 를 받아 문자열을 돌려주므로
+    위험 수준·유형·행동을 구조적으로 바꿀 수 없다. 여기서 두 숫자가 달라지는
+    날이 오면 `CLAUDE.md` 의 첫 번째 non-negotiable 이 깨진 것이다.
+
+    그래서 이 구간의 값어치는 `alternatives_considered` 에 있다. "규칙에 판정
+    권한을 남긴다" 는 선택을, 다른 선택을 했다면 어떤 숫자가 나왔는지와 함께
+    남긴다.
+    """
+    section: dict[str, object] = {
+        "status": "measured",
+        "scope": (
+            "deterministic engine decides; "
+            "the model only rewrites that decision in plain Korean"
+        ),
+        "detection_identical_to": "scenario_engine_v0_1",
+        "why_identical": (
+            "explain_analysis 는 AnalyzeResponse 를 받아 str | None 을 돌려준다. "
+            "설명 계층은 위험 수준·유형·행동을 구조적으로 바꿀 수 없다 "
+            "(app/services/llm/explanation.py)."
+        ),
+        "binary": engine["binary"],
+        "scenario_policy_accuracy": engine["scenario_policy_accuracy"],
+        "required_action_coverage": engine["required_action_coverage"],
+        "evidence_coverage": engine["evidence_coverage"],
+        "explanation_layer": {
+            "model": "gemini-3.6-flash",
+            "fallback_model": "gemini-3.1-flash-lite",
+            "measured_in": "docs/34-llm-explanation-runtime.md",
+            "note": (
+                "설명 문장의 근거 이탈률과 안전 필터 차단율은 아직 측정하지 "
+                "않았다. 여기 숫자는 탐지 성능이며 설명 품질이 아니다."
+            ),
+        },
+    }
+
+    if run is None or run.dataset_sha256 != dataset_sha256:
+        section["alternatives_considered"] = {
+            "status": "not_run",
+            "reason": "모델 판정 결과가 없어 조합을 계산할 수 없다.",
+        }
+        return section
+
+    judgements = _aligned_judgements(cases, run)
+    llm_predictions = [judgement.is_fraud for judgement in judgements]
+    union = [rule or model for rule, model in zip(scenario_predictions, llm_predictions, strict=True)]
+    intersection = [
+        rule and model for rule, model in zip(scenario_predictions, llm_predictions, strict=True)
+    ]
+
+    section["alternatives_considered"] = {
+        "status": "measured",
+        "note": (
+            "제품에 넣지 않은 조합이다. 규칙에 판정 권한을 둔 선택을 숫자로 "
+            "남기기 위해 같은 예측 벡터로 계산했다. 두 조합 모두 모델이 위험 "
+            "수준을 움직이게 하므로 CLAUDE.md 의 non-negotiable 과 충돌한다."
+        ),
+        "rule_or_llm": {
+            "scope": "escalate when either the engine or the model calls it fraud",
+            "binary": asdict(_binary_metrics(truth, union)),
+            "errors": _binary_error_case_ids(cases, union),
+        },
+        "rule_and_llm": {
+            "scope": "warn only when both agree",
+            "binary": asdict(_binary_metrics(truth, intersection)),
+            "errors": _binary_error_case_ids(cases, intersection),
+        },
+    }
+    return section
+
+
+def _aligned_judgements(
+    cases: list[FraudGoldenCase], run: LlmJudgeRun
+) -> list[LlmJudgement]:
+    """사례 순서대로 판정을 줄 세운다. 빠진 사례는 실패로 채운다.
+
+    빠뜨린 사례를 조용히 건너뛰면 분모가 줄어 점수가 올라간다.
+    """
+    by_case_id = run.by_case_id()
+    return [
+        by_case_id.get(
+            case.case_id,
+            LlmJudgement(case_id=case.case_id, ok=False, failure="missing_judgement"),
+        )
+        for case in cases
+    ]
 
 
 def check_minimum_quality(report: dict[str, object]) -> list[str]:
@@ -114,7 +304,15 @@ def check_minimum_quality(report: dict[str, object]) -> list[str]:
             lambda value: value == 1.0,
         ),
     )
-    return [name for name, value, passes in checks if not passes(value)]
+    failures = [name for name, value, passes in checks if not passes(value)]
+
+    # 게이트는 **우리 엔진만** 본다. 모델 쪽 숫자에 기준선을 걸면 구글이 모델을
+    # 바꾼 날 우리 CI 가 빨개지고, 그것은 우리가 고칠 수 있는 종류의 실패가 아니다.
+    # 대신 "낡은 비교" 는 막는다 - 골든셋을 고쳤는데 옛 판정 결과가 새 데이터의
+    # 성능인 척 남아 있는 상태다. 다시 재거나, 비교를 포기하고 결과 파일을 지운다.
+    if report.get("llm_only", {}).get("status") == "stale":  # type: ignore[union-attr]
+        failures.append("llm_only_stale")
+    return failures
 
 
 def _binary_metrics(truth: list[bool], predicted: list[bool]) -> BinaryMetrics:
@@ -221,11 +419,63 @@ def _evidence_coverage(responses: list[AnalyzeResponse]) -> float:
     return _ratio(covered, len(with_actions))
 
 
+def _judged_fraud_type_metrics(
+    cases: list[FraudGoldenCase], judgements: list[LlmJudgement]
+) -> dict[str, dict[str, float | int]]:
+    results: dict[str, dict[str, float | int]] = {}
+    for fraud_type in FRAUD_TYPES:
+        truth = [fraud_type in case.expected_fraud_types for case in cases]
+        predicted = [fraud_type in judgement.fraud_types for judgement in judgements]
+        metrics = _binary_metrics(truth, predicted)
+        results[fraud_type] = {
+            "support": sum(truth),
+            "precision": metrics.precision,
+            "recall": metrics.recall,
+            "f1": metrics.f1,
+        }
+    return results
+
+
+def _judged_scenario_policy_accuracy(
+    cases: list[FraudGoldenCase], judgements: list[LlmJudgement]
+) -> float:
+    correct = 0
+    for case, judgement in zip(cases, judgements, strict=True):
+        risk_ok = RISK_RANK[judgement.risk_level] >= RISK_RANK[case.expected_min_risk]
+        actions_ok = set(case.required_action_codes) <= set(judgement.actions)
+        correct += int(risk_ok and actions_ok)
+    return _ratio(correct, len(cases))
+
+
+def _judged_action_coverage(
+    cases: list[FraudGoldenCase], judgements: list[LlmJudgement]
+) -> float:
+    required = 0
+    present = 0
+    for case, judgement in zip(cases, judgements, strict=True):
+        required += len(case.required_action_codes)
+        present += len(set(case.required_action_codes) & set(judgement.actions))
+    return _ratio(present, required)
+
+
+def _percentile(values: list[float], quantile: float) -> float:
+    """`scripts.evaluate_fraud_engine.percentile` 과 같은 nearest-rank 다.
+
+    거기서 import 하지 않는 것은 방향 때문이다 - 평가 라이브러리가 스크립트를
+    끌어오면 스크립트를 부르지 않는 테스트도 스크립트를 로드하게 된다.
+    """
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    index = max(0, ceil(len(ordered) * quantile) - 1)
+    return round(ordered[index], 3)
+
+
 def _ratio(numerator: float, denominator: float) -> float:
     return round(numerator / denominator, 6) if denominator else 0.0
 
 
-def _normalized_dataset_sha256(cases: list[FraudGoldenCase]) -> str:
+def normalized_dataset_sha256(cases: list[FraudGoldenCase]) -> str:
     normalized = "\n".join(
         case.model_dump_json(exclude_none=False) for case in cases
     ).encode("utf-8")
