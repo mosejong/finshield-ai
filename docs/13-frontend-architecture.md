@@ -136,10 +136,12 @@ Scenario Engine v0.1은 legacy 텍스트 점수와 별도로 canonical 위험 �
 lib/api/contracts.ts   zod — Scenario Engine과 프론트 화면 계약
 lib/api/client.ts      fetch 래퍼 (타임아웃 8초, ApiError)
 lib/api/analysis.ts    어댑터: live 응답 변환, 필드별 source 태깅
+lib/api/explanation.ts LLM 설명 — 판정과 별도 호출 (타임아웃 25초)
 lib/api/mode.ts        NEXT_PUBLIC_API_MODE=mock|live
 lib/mock/*.ts          백엔드 미구현 영역의 임시 데이터
 lib/format/*.ts        표시 포맷팅만
 lib/store/*.ts         sessionStorage의 분석 결과·profile identity 보관
+lib/store/explanation-store.ts  원문 인계 — 저장소가 아니라 메모리만 쓴다
 ```
 
 ### 하이브리드 모드
@@ -159,6 +161,7 @@ lib/store/*.ts         sessionStorage의 분석 결과·profile identity 보관
 | 대출 What-if 시뮬레이션 | `/api/v1/loans/simulate` | live, 현재·변경 조건을 각각 계산 |
 | 재테크 기초 가이드 | `/api/v1/guidance/wealth` | live, 입력 없는 고정 교육 계약 |
 | 공식 상품 상세·비교 | `/api/v1/products/{id}`, `/api/v1/products/compare` | live, 같은 snapshot 원문 |
+| 왜 위험한지 — 쉬운 말 설명 | `/api/v1/analyze/explanation` | live, 판정과 별도 호출. 배포에서 꺼져 있으면 자리를 만들지 않는다 |
 
 ### 금융 로직 금지선
 
@@ -168,6 +171,20 @@ lib/store/*.ts         sessionStorage의 분석 결과·profile identity 보관
   mock 모드는 계산식 없는 고정 fixture를 표시한다.
 - `lib/format/` 의 `risk_level → 색` 매핑은 표현이지 판정이 아니다.
 - mock 은 백엔드 `risk_engine.py` 의 키워드 규칙을 복제하지 않는다. mock 모드는 입력과 무관한 고정 예시를 돌려주고 화면에 "예시"라고 적는다.
+
+### 모델 문장은 결정론 요약을 대체하지 않는다
+
+"왜 위험한지" 블록의 첫 문단은 백엔드 `summary` 다 — 규칙에서 바로 나오는 값이고
+즉시 그려진다. LLM 설명은 그것을 **대체하지 않고 아래에 덧붙는다.** 8초쯤 뒤에
+도착하며, 없어도 블록은 성립한다. 판단 근거의 자격을 갖는 것은 결정론 쪽이고,
+화면에도 "위험 수준과 행동은 이 문장이 아니라 규칙 엔진이 정합니다" 를 적는다.
+
+설명 요청은 판정이 아니라 **원문**을 보낸다. 클라이언트가 위험 수준을 실어
+보내면 모델에게 안심시키는 문장을 쓰게 할 수 있기 때문에, 백엔드가 원문으로
+판정을 다시 만든다. 그래서 결과 화면이 원문을 다시 갖고 있어야 하는데, 이것은
+`sessionStorage` 가 아니라 모듈 메모리로만 넘긴다 — 붙여넣은 문자에는 이름과
+계좌번호가 그대로 들어 있을 수 있다. 대가는 **새로고침하면 설명이 다시 붙지
+않는 것**이고, 그 편이 낫다고 봤다. 자세한 근거는 `docs/34` 10절.
 
 ### 근거를 지어내지 않는다
 
@@ -180,6 +197,7 @@ live 모드는 백엔드 `official_sources`를 `verified: true`로 변환하고
 ## 6. 백엔드 연동
 
 현재 백엔드: `GET /health`, `POST /api/v1/analyze`,
+`POST /api/v1/analyze/explanation`,
 `POST/GET/DELETE /api/v1/auth/session`, `DELETE /api/v1/auth/account`,
 `GET /api/v1/products`, `POST /api/v1/recommendations`,
 `POST /api/v1/loans/simulate`, `POST/GET/PUT/DELETE /api/v1/profiles`,
@@ -196,6 +214,10 @@ FastAPI 에 `CORSMiddleware` 가 없어 브라우저가 `localhost:8000` 을 직
 브라우저 → POST /api/proxy/analyze (Next, 같은 오리진)
          → POST /api/v1/analyze     (FastAPI, 서버-서버)
 ```
+
+설명은 같은 구조로 `/api/proxy/analyze/explanation` 을 따로 거친다. 하나로 합치지
+않는 이유는 백엔드가 나눠 둔 이유와 같다 — 판정은 즉시 나오고 설명은 8초쯤 걸리므로,
+합치면 위험 수준 표시가 설명을 기다리게 된다.
 
 프로필도 같은 구조로 `/api/proxy/profiles`를 거친다. 프론트 enum은 backend의
 연령·직업·신용·목표 enum과 일치시키고, adapter가 camelCase를 snake_case로

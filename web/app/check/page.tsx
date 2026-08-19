@@ -14,6 +14,7 @@ import { DisclaimerNote } from "@/components/common/DisclaimerNote";
 import { StateSelector } from "@/components/safety/StateSelector";
 import { analyzeFromClient } from "@/lib/api/analysis";
 import { saveAnalysis } from "@/lib/store/analysis-store";
+import { rememberAnalysisInput } from "@/lib/store/explanation-store";
 import { useProfileStore } from "@/lib/store/profile-store";
 
 /**
@@ -64,11 +65,8 @@ export default function CheckPage() {
     setPending(true);
     setFailure(null);
 
-    const response = await analyzeFromClient({
-      text: trimmed,
-      persona,
-      state,
-    });
+    const request = { text: trimmed, persona, state };
+    const response = await analyzeFromClient(request);
 
     if (!response.ok) {
       setFailure({ message: response.message, hint: response.hint });
@@ -77,6 +75,12 @@ export default function CheckPage() {
     }
 
     saveAnalysis(response.result);
+    /*
+      설명은 결과 화면에서 따로 받아온다. 여기서 기다리면 8초 뒤에야 위험
+      수준이 뜬다. 원문은 저장소가 아니라 메모리로만 넘긴다 - 이유는
+      `explanation-store.ts` 에 적었다.
+    */
+    rememberAnalysisInput(response.result.id, request);
     router.push(`/check/result/${response.result.id}`);
   }
 
