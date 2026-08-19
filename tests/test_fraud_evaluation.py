@@ -59,15 +59,54 @@ def test_scenario_engine_meets_bootstrap_quality_gate_without_claiming_llm() -> 
     assert len(report["dataset"]["normalized_sha256"]) == 64  # type: ignore[index]
 
 
-def test_known_bootstrap_errors_remain_visible_in_report() -> None:
-    report = evaluate_golden_set(load_golden_cases())
-    engine = report["scenario_engine_v0_1"]  # type: ignore[assignment]
-    errors = engine["errors"]  # type: ignore[index]
+def test_bootstrap_errors_were_fixed_without_deleting_the_hard_cases() -> None:
+    # 이 테스트의 원래 목적은 "점수를 좋게 만들려고 어려운 케이스를 지우는 것"을
+    # 막는 것이었다. 2026-08-19 어휘 확장(v0.2)으로 세 오류가 실제로 닫혔으므로
+    # 목적은 그대로 두고 주장을 바꾼다: 세 케이스가 여전히 셋에 남아 있고,
+    # 분모가 61 그대로이며, 그 상태에서 오류 목록이 비어 있어야 한다.
+    cases = load_golden_cases()
+    case_ids = {case.case_id for case in cases}
+    assert {"fg-046", "fg-047", "fg-049"} <= case_ids
 
-    assert errors == {
-        "false_positive_case_ids": ["fg-049"],
-        "false_negative_case_ids": ["fg-046", "fg-047"],
+    report = evaluate_golden_set(cases)
+    engine = report["scenario_engine_v0_1"]  # type: ignore[assignment]
+    binary = engine["binary"]  # type: ignore[index]
+
+    counted = (
+        binary["true_positive"]
+        + binary["true_negative"]
+        + binary["false_positive"]
+        + binary["false_negative"]
+    )
+    assert counted == 61
+
+    assert engine["errors"] == {  # type: ignore[index]
+        "false_positive_case_ids": [],
+        "false_negative_case_ids": [],
     }
+
+
+def test_previously_failing_cases_are_judged_correctly_one_by_one() -> None:
+    # 집계가 아니라 케이스 단위로 못을 박는다. 집계만 보면 어떤 케이스가
+    # 왜 통과했는지 알 수 없고, 나중에 어휘를 줄일 때 이 셋이 조용히
+    # 되돌아가도 f1 만으로는 눈에 잘 띄지 않는다.
+    by_id = {case.case_id: case for case in load_golden_cases()}
+
+    def run(case_id: str):
+        case = by_id[case_id]
+        return analyze_fraud(AnalyzeRequest(text=case.text, state=case.state))
+
+    fg046 = run("fg-046")
+    assert "authority_impersonation" in {signal.code for signal in fg046.signals}
+    assert fg046.fraud_types != []
+
+    fg047 = run("fg-047")
+    assert "remote_app" in {signal.code for signal in fg047.signals}
+    assert fg047.fraud_types != []
+
+    fg049 = run("fg-049")
+    assert fg049.signals == []
+    assert fg049.fraud_types == []
 
 
 def test_explicit_prevention_context_is_not_classified_as_fraud() -> None:

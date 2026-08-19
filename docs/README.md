@@ -23,6 +23,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-19/rule-vocabulary-v0.2.md` — 모델이 찾아 준 오답 3건을 규칙 어휘로 메움·골든셋 밖 검증·개발셋 변별력 소진
 - `devlog/2026-08-19/llm-only-benchmark.md` — LLM 단독 판정 유료 측정·Rule/LLM/Hybrid 3자 비교·채택하지 않은 조합
 - `devlog/2026-08-18/post-merge-devlog-shas.md` — squash 후 SHA 정정·첫 릴리스 실측·rate limit 고정 창 flake
 - `devlog/2026-08-18/deploy-image-pipeline.md` — ghcr 릴리스 워크플로·배포 override·expand/contract 롤백 전략

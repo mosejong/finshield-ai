@@ -314,3 +314,67 @@ def test_existing_response_fields_and_route_are_preserved() -> None:
     )
     assert body["scenario"] == "received_only"
     assert "확정" in body["disclaimer"]
+
+
+# --- 어휘 확장 v0.2 (2026-08-19) -------------------------------------------
+#
+# 아래 문장은 전부 골든셋 61건에 없다. 일부러 그렇게 골랐다. 어휘를 넓힌
+# 변경은 골든셋 안에서는 좋아 보이면서 밖에서 오탐을 늘리기 쉬운데,
+# 골든셋으로 재면 그 손해가 보이지 않는다. 확장 당시 실제로 이 방식으로
+# 오탐 여섯 건을 찾아 되돌렸다(`docs/32`).
+
+
+def test_widened_vocabulary_does_not_fire_on_prevention_and_informational_text() -> (
+    None
+):
+    quiet_messages = (
+        # "내려받"·"다운로드"를 어휘에 넣자 그 부정형이 걸리기 시작했다.
+        "모르는 사람이 보낸 파일은 절대 내려받지 마세요.",
+        "출처가 불분명한 앱은 다운로드하지 마세요.",
+        # "이체"를 통째로 넣으면 걸렸을 문장이다. 그래서 지시형만 넣었다.
+        "이체 내역을 확인하세요. 모르는 출금이 있으면 은행에 문의하세요.",
+        # 기관명을 넓게 넣었다가 되돌린 이유가 이 문장이다.
+        "국세청 홈택스에서 연말정산 자료를 조회할 수 있습니다.",
+        "건강보험공단 고지서는 공식 누리집에서 확인할 수 있습니다.",
+    )
+
+    for text in quiet_messages:
+        body = analyze(text)
+        assert body["fraud_types"] == [], text
+
+
+def test_widened_vocabulary_catches_paraphrases_of_the_two_missed_cases() -> None:
+    # fg-046 계열: 사법기관 사칭 + 이체 지시. 골든셋 문장과 다른 표현을 쓴다.
+    court = analyze("법원 집행관입니다. 오늘까지 안내 계좌로 이체 바랍니다.")
+    signals = {signal["code"] for signal in court["signals"]}
+    assert "authority_impersonation" in signals
+    assert "money_transfer_request" in signals
+    assert court["risk_level"] in {"medium", "high"}
+
+    # fg-047 계열: 파일을 받아 실행하라는 지시. 신호는 파일 이름이 아니라
+    # "받아서 실행하라"는 요구 자체다.
+    install = analyze("본인 확인 설치 파일을 다운로드해 실행해 주세요.")
+    assert install["fraud_types"] != []
+    assert install["risk_level"] in {"medium", "high"}
+
+
+def test_official_verification_notice_is_not_treated_as_impersonation() -> None:
+    # fg-049 를 닫은 억제 규칙이다. 기관명이 나오지만 독자에게 요구하는 것이
+    # "공식 창구에서 직접 확인하라" 뿐이면 사칭 문구가 아니다.
+    body = analyze("정부기관 정책자금 안내는 공식 누리집에서 자격을 확인하세요.")
+    assert body["signals"] == []
+    assert body["fraud_types"] == []
+
+    # 같은 "공식 누리집" 문구가 붙어 있어도 독자에게 돈이나 설치를 요구하면
+    # 억제되지 않아야 한다. 억제 규칙이 사기 문구의 위장 수단이 되면 안 된다.
+    #
+    # fraud_types 가 아니라 신호와 위험 수준으로 확인한다. 이 문장은 송금 요구
+    # 하나만 있어서 이름 붙은 사기 유형(조합이 필요하다)에는 해당하지 않는다.
+    # 억제 여부를 보려는 것이므로 신호가 살아남았는지가 확인할 지점이다.
+    disguised = analyze(
+        "공식 누리집 안내입니다. 지원금 수령을 위해 아래 계좌로 이체해 주세요."
+    )
+    assert "money_transfer_request" in {
+        signal["code"] for signal in disguised["signals"]
+    }
+    assert disguised["risk_level"] != "low"

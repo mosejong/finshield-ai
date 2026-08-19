@@ -28,7 +28,9 @@
 ## P1 — 경쟁력
 - [x] Legacy rule vs Scenario Engine bootstrap benchmark (합성 61건, non-held-out)
 - [x] persona·전체 UserState scenario golden set v0.1 (합성 bootstrap)
-- [ ] 고정 LLM-only vs proposed Hybrid held-out benchmark
+- [x] 고정 LLM-only vs Hybrid 비교 (2026-08-19, non-held-out 61건. `docs/32`)
+- [x] 규칙 신호 어휘 v0.2 — 비교가 찾아 준 오답 3건을 규칙으로 메움 (2026-08-19)
+- [ ] **held-out v0.2 골든셋** — 개발셋에서 엔진 오류가 0건이 되어 변별력을 잃었다. 별도 작성·동결한 셋에서 Rule / LLM / Hybrid 를 다시 재는 것이 다음 측정의 전제다
 - [x] URL lexical feature analysis (offline safe implementation)
 - [ ] URL domain/reputation feature analysis (outbound-fetch policy required)
 - [x] financial profile dashboard shell
