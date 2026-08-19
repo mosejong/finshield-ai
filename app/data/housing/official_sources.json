@@ -1,0 +1,50 @@
+[
+  {
+    "source_id": "housing_lease_act_article3",
+    "organization": "국가법령정보센터",
+    "title": "주택임대차보호법 제3조 대항력 등",
+    "source_url": "https://www.law.go.kr/lsLinkCommonInfo.do?lsJoLnkSeq=1018577211&chrClsCd=010202&ancYnChk=",
+    "retrieved_at": "2026-08-19",
+    "supports": ["REPORT_MOVE_IN", "KEEP_OPPOSING_POWER"]
+  },
+  {
+    "source_id": "easylaw_opposing_power",
+    "organization": "법제처 찾기쉬운 생활법령정보",
+    "title": "주택임대차 > 보증금의 보호 > 대항력 및 우선변제권 취득",
+    "source_url": "https://easylaw.go.kr/CSP/CnpClsMain.laf?popMenu=ov&csmSeq=629&ccfNo=2&cciNo=3&cnpClsNo=1",
+    "retrieved_at": "2026-08-19",
+    "supports": ["REPORT_MOVE_IN", "GET_CONFIRMED_DATE"]
+  },
+  {
+    "source_id": "easylaw_lease_registration_order",
+    "organization": "법제처 찾기쉬운 생활법령정보",
+    "title": "주택임대차 > 보증금의 회수 > 임차권등기명령 신청",
+    "source_url": "https://easylaw.go.kr/CSP/CnpClsMain.laf?popMenu=ov&csmSeq=629&ccfNo=5&cciNo=2&cnpClsNo=1",
+    "retrieved_at": "2026-08-19",
+    "supports": ["APPLY_LEASE_REGISTRATION_ORDER", "KEEP_OPPOSING_POWER"]
+  },
+  {
+    "source_id": "easylaw_property_registry",
+    "organization": "법제처 찾기쉬운 생활법령정보",
+    "title": "부동산/임대차 > 부동산등기부 확인",
+    "source_url": "https://www.easylaw.go.kr/CSP/OnhunqueansInfoRetrieve.laf?onhunqnaAstSeq=84&onhunqueSeq=2746",
+    "retrieved_at": "2026-08-19",
+    "supports": ["CHECK_REGISTRY", "VERIFY_OWNER_IDENTITY"]
+  },
+  {
+    "source_id": "khug_deposit_return_guarantee",
+    "organization": "주택도시보증공사",
+    "title": "전세보증금반환보증 안내",
+    "source_url": "https://www.khug.or.kr/khmb/m/hg/gg/hggg000002_0.jsp",
+    "retrieved_at": "2026-08-19",
+    "supports": ["JOIN_DEPOSIT_GUARANTEE"]
+  },
+  {
+    "source_id": "jeonse_fraud_victim_act_article3",
+    "organization": "국가법령정보센터",
+    "title": "전세사기피해자 지원 및 주거안정에 관한 특별법 제3조 전세사기피해자의 요건",
+    "source_url": "https://law.go.kr/LSW/lsLinkCommonInfo.do?ancYnChk=&chrClsCd=010202&lsJoLnkSeq=1018971415",
+    "retrieved_at": "2026-08-19",
+    "supports": ["CHECK_VICTIM_SUPPORT"]
+  }
+]

@@ -16,7 +16,7 @@
 Fraud evaluation bootstrap policy · `adr/0007-bootstrap-fraud-evaluation.md`
 27 observability/PII masking · `adr/0006-privacy-safe-observability.md`
 26 HTTP security/HTTPS boundary · `adr/0005-http-security-and-https-boundary.md`
-04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · 28 production readiness · 29 backup and recovery · 30 PWA and share target · 31 public deployment (domain/DNS/TLS) · 34 LLM explanation runtime · ADR 색인 `adr/README.md`
+04 architecture · 11 engineering standards · 13 frontend architecture · 14 development workflow · 15 product catalog live profile · 16 product catalog cache · 17 product catalog identity · 18 deterministic product filtering · 19 wealth guidance · 20 product detail/comparison · 21 profile derived metrics · 22 profile persistence/encryption · 23 session/profile ownership · 24 anonymous data lifecycle · 25 Docker/PostgreSQL runtime · 28 production readiness · 29 backup and recovery · 30 PWA and share target · 31 public deployment (domain/DNS/TLS) · 34 LLM explanation runtime · 37 housing deposit risk (전세보증금 위험 점검) · ADR 색인 `adr/README.md`
 
 ## Security
 
@@ -31,6 +31,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-19/housing-deposit-risk.md` — 전세보증금 위험 점검 v0.1 백엔드·근거 6건 선확인·못 연 조문은 넣지 않음·출처 무결성 규칙 공통화
 - `devlog/2026-08-19/first-tagged-release.md` — 첫 태그 릴리스 `v0.1.0`·설명 계층을 담은 이미지가 없었다는 발견·재배포 절차와 릴리스 대장
 - `devlog/2026-08-19/competition-submission-docs.md` — 제출물 ①기획서 ②기능명세서 작성·명세를 코드에서 확인·신호 12종 정정·낡은 README 수치 교체
 - `devlog/2026-08-19/rule-vocabulary-v0.2.md` — 모델이 찾아 준 오답 3건을 규칙 어휘로 메움·골든셋 밖 검증·개발셋 변별력 소진

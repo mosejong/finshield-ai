@@ -1,11 +1,17 @@
 import json
 import logging
-from datetime import date, timedelta
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
 from pydantic import TypeAdapter
 
+from app.domain.official_sources import (
+    OfficialSourceDataError,
+    build_catalog,
+    select_stale,
+)
+from app.domain.official_sources import sources_for_actions as _sources_for_actions
 from app.schemas.analysis import Action, OfficialSource
 
 
@@ -19,53 +25,29 @@ SOURCE_DATA_PATH = (
 # 기간이 지났다는 이유로 분석을 중단하지는 않는다. 안전 안내를 끊는 쪽이 더 위험하다.
 SOURCE_REVIEW_INTERVAL_DAYS = 365
 
-
-class OfficialSourceDataError(ValueError):
-    """official_sources.json 자체가 잘못된 경우. 요청 시점이 아니라 기동 시점에 드러나야 한다."""
-
-
-def _parse_retrieved_at(source: OfficialSource) -> date:
-    try:
-        return date.fromisoformat(source.retrieved_at)
-    except ValueError as exc:
-        raise OfficialSourceDataError(
-            f"official source {source.source_id} has a non ISO-8601 retrieved_at: "
-            f"{source.retrieved_at}"
-        ) from exc
+__all__ = [
+    "OfficialSourceDataError",
+    "SOURCE_DATA_PATH",
+    "SOURCE_REVIEW_INTERVAL_DAYS",
+    "load_official_sources",
+    "sources_for_actions",
+    "stale_official_sources",
+    "verify_official_sources",
+]
 
 
 @lru_cache(maxsize=1)
 def load_official_sources() -> dict[str, OfficialSource]:
     raw_data = json.loads(SOURCE_DATA_PATH.read_text(encoding="utf-8"))
     sources = TypeAdapter(list[OfficialSource]).validate_python(raw_data)
-
-    source_ids = [source.source_id for source in sources]
-    source_urls = [source.source_url for source in sources]
-    if len(source_ids) != len(set(source_ids)):
-        raise OfficialSourceDataError("official source_id must be unique")
-    if len(source_urls) != len(set(source_urls)):
-        raise OfficialSourceDataError("official source_url must be unique")
-
-    today = date.today()
-    for source in sources:
-        # 형식 오류와 미래 날짜만 데이터 오류로 막는다. 오래된 것은 경고로 다룬다.
-        if _parse_retrieved_at(source) > today:
-            raise OfficialSourceDataError(
-                f"official source {source.source_id} has a future retrieved_at: "
-                f"{source.retrieved_at}"
-            )
-
-    return {source.source_id: source for source in sources}
+    return build_catalog(sources)
 
 
 def stale_official_sources(today: date | None = None) -> list[OfficialSource]:
     """재확인 주기가 지난 출처 목록. 기동 시 경고와 운영 점검에 쓴다."""
-    cutoff = (today or date.today()) - timedelta(days=SOURCE_REVIEW_INTERVAL_DAYS)
-    return [
-        source
-        for source in load_official_sources().values()
-        if _parse_retrieved_at(source) < cutoff
-    ]
+    return select_stale(
+        load_official_sources(), SOURCE_REVIEW_INTERVAL_DAYS, today=today
+    )
 
 
 def verify_official_sources() -> None:
@@ -84,20 +66,4 @@ def verify_official_sources() -> None:
 
 
 def sources_for_actions(actions: list[Action]) -> list[OfficialSource]:
-    source_catalog = load_official_sources()
-    related_ids: set[str] = set()
-
-    for action in actions:
-        for source_id in action.source_ids:
-            source = source_catalog.get(source_id)
-            if source is None:
-                raise ValueError(f"unknown official source_id: {source_id}")
-            if action.code not in source.supports:
-                raise ValueError(
-                    f"official source {source_id} does not support action {action.code}"
-                )
-            related_ids.add(source_id)
-
-    return [
-        source for source_id, source in source_catalog.items() if source_id in related_ids
-    ]
+    return _sources_for_actions(load_official_sources(), actions)
