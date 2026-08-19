@@ -222,3 +222,12 @@ scripts.evaluate_fraud_engine --output evaluation/results/fraud-benchmark-v0.1.j
 - 기관명만으로 medium 을 주는 기존 설계가 맞는지는 여전히 미검증이다.
 - `fg-006` 형태(조건절로 표현된 금전 요구)의 실제 빈도를 모른다. held-out 셋에 변형
   문장을 넣어 먼저 재기로 했다.
+
+## 커밋 SHA
+
+`187fd59` (squash merge). 브랜치의 `1c98aa2` 는 squash 로 사라졌다.
+
+## PR
+
+[#70](https://github.com/mosejong/finshield-ai/pull/70) — CI 8건 전부 SUCCESS
+(test / deps-lock / web / container-runtime).
