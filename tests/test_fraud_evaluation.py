@@ -5,9 +5,25 @@ from pydantic import ValidationError
 
 from app.schemas.analysis import AnalyzeRequest
 from app.services.fraud_analysis import analyze_fraud
-from evaluation.fraud_benchmark import check_minimum_quality, evaluate_golden_set
+from app.services.llm.contract import LlmContractError
+from app.services.llm.provider import LlmProvider, LlmUnavailable
+from evaluation.fraud_benchmark import (
+    check_minimum_quality,
+    evaluate_golden_set,
+    normalized_dataset_sha256,
+)
 from evaluation.fraud_golden import FraudGoldenCase, load_golden_cases
-from scripts.evaluate_fraud_engine import measure_asgi_latency, percentile
+from evaluation.llm_judge import (
+    FRAUD_JUDGE_PROMPT,
+    JUDGE_RUN_PATH,
+    LlmJudgement,
+    LlmJudgeRun,
+    build_judge_prompt,
+    fraud_judge_contract,
+    judge_case,
+    parse_judgement,
+)
+from scripts.evaluate_fraud_engine import load_llm_run, measure_asgi_latency, percentile
 
 
 def test_golden_set_is_synthetic_versioned_and_covers_every_state() -> None:
@@ -33,11 +49,12 @@ def test_golden_set_is_synthetic_versioned_and_covers_every_state() -> None:
 
 
 def test_scenario_engine_meets_bootstrap_quality_gate_without_claiming_llm() -> None:
+    # 판정 파일을 주지 않은 경로다. 모델 숫자가 없어도 엔진 게이트는 그대로
+    # 성립해야 한다 - LLM 은 이 게이트의 전제가 아니다.
     report = evaluate_golden_set(load_golden_cases())
 
     assert check_minimum_quality(report) == []
     assert report["llm_only"]["status"] == "not_run"  # type: ignore[index]
-    assert report["proposed_hybrid"]["status"] == "not_implemented"  # type: ignore[index]
     assert report["dataset"]["held_out"] is False  # type: ignore[index]
     assert len(report["dataset"]["normalized_sha256"]) == 64  # type: ignore[index]
 
@@ -119,3 +136,185 @@ def test_latency_measurement_uses_the_supplied_case_collection() -> None:
 
     assert report["sample_count"] == 2
     assert report["scope"] == "in_process_asgi_without_network_or_tls"
+
+
+# --- LLM 단독 판정 --------------------------------------------------------
+#
+# 여기서 지키려는 것은 모델의 점수가 아니라 **집계의 정직성**이다. 모델을
+# 유리하게 재는 방법은 셋뿐이고, 셋 다 아래에서 막는다 - 실패한 호출을 빼는 것,
+# 빠진 사례를 건너뛰는 것, 다른 데이터로 잰 숫자를 그대로 두는 것.
+
+
+def _run_with(judgements: list[LlmJudgement], *, dataset_sha256: str) -> LlmJudgeRun:
+    return LlmJudgeRun(
+        judged_at="2026-08-19T00:00:00+00:00",
+        dataset_id="fraud_golden_v0.1",
+        dataset_sha256=dataset_sha256,
+        provider="google_ai_studio",
+        model="gemini-3.6-flash",
+        prompt_id="fraud_judge_v1",
+        prompt_sha256="0" * 64,
+        temperature=0.0,
+        judgements=judgements,
+    )
+
+
+def test_llm_numbers_measured_on_another_dataset_are_rejected_not_reused() -> None:
+    cases = load_golden_cases()
+    stale = _run_with(
+        [LlmJudgement(case_id=case.case_id, ok=True, is_fraud=True) for case in cases],
+        dataset_sha256="f" * 64,
+    )
+
+    report = evaluate_golden_set(cases, llm_run=stale)
+
+    assert report["llm_only"]["status"] == "stale"  # type: ignore[index]
+    assert "binary" not in report["llm_only"]  # type: ignore[operator]
+    # 게이트가 잡아야 한다. 잡지 않으면 골든셋을 고친 PR 이 옛 숫자를 그대로
+    # 끌고 병합된다.
+    assert "llm_only_stale" in check_minimum_quality(report)
+
+
+def test_a_call_that_never_answered_counts_as_no_warning() -> None:
+    cases = load_golden_cases()
+    run = _run_with(
+        [
+            LlmJudgement(case_id=case.case_id, ok=False, failure="timeout")
+            for case in cases
+        ],
+        dataset_sha256=normalized_dataset_sha256(cases),
+    )
+
+    section = evaluate_golden_set(cases, llm_run=run)["llm_only"]
+
+    assert section["run"]["failure_count"] == len(cases)  # type: ignore[index]
+    # 실패를 빼고 채점하면 분모가 0 이 되어 점수가 사라진다. 사용자 입장에서
+    # 답이 없는 것은 경고가 없는 것이므로 재현율 0 으로 남는다.
+    assert section["binary"]["recall"] == 0.0  # type: ignore[index]
+
+
+def test_cases_the_model_was_never_asked_about_are_not_dropped() -> None:
+    cases = load_golden_cases()
+    run = _run_with(
+        [LlmJudgement(case_id=cases[0].case_id, ok=True, is_fraud=True)],
+        dataset_sha256=normalized_dataset_sha256(cases),
+    )
+
+    section = evaluate_golden_set(cases, llm_run=run)["llm_only"]
+
+    assert section["run"]["case_count"] == len(cases)  # type: ignore[index]
+    assert section["run"]["failure_kinds"] == {"missing_judgement": len(cases) - 1}  # type: ignore[index]
+
+
+def test_the_shipped_hybrid_detects_exactly_what_the_engine_detects() -> None:
+    # 설명 계층은 판정을 바꿀 수 없다. 이 등식이 깨지는 날은 CLAUDE.md 의 첫
+    # non-negotiable 이 깨진 날이다.
+    report = evaluate_golden_set(load_golden_cases())
+
+    assert report["hybrid_v0_1"]["binary"] == report["scenario_engine_v0_1"]["binary"]  # type: ignore[index]
+    assert report["hybrid_v0_1"]["detection_identical_to"] == "scenario_engine_v0_1"  # type: ignore[index]
+
+
+def test_committed_judgement_run_still_describes_the_committed_dataset() -> None:
+    # 커밋된 두 파일이 서로 어긋난 채 병합되는 것을 막는다. 골든셋을 고치고
+    # 재측정을 잊으면 여기서 걸린다.
+    run = load_llm_run(JUDGE_RUN_PATH)
+    if run is None:
+        pytest.skip("판정 결과 파일이 없다")
+
+    cases = load_golden_cases()
+    assert run.dataset_sha256 == normalized_dataset_sha256(cases)
+    assert {judgement.case_id for judgement in run.judgements} == {
+        case.case_id for case in cases
+    }
+
+
+# --- 판정 계약 ------------------------------------------------------------
+
+
+def test_judge_prompt_is_pinned_to_its_hash() -> None:
+    contract = fraud_judge_contract(provider="stub")
+    contract.verify_prompt(FRAUD_JUDGE_PROMPT)
+
+    with pytest.raises(LlmContractError, match="does not match the pinned hash"):
+        contract.verify_prompt(FRAUD_JUDGE_PROMPT + " ")
+
+
+def test_personal_identifiers_do_not_leave_with_the_judge_prompt() -> None:
+    prompt = build_judge_prompt(
+        persona="unknown",
+        state="received_only",
+        message="900101-1234567 계좌 123-456-7890 으로 010-1234-5678 에 연락",
+        max_input_chars=4_000,
+    )
+
+    assert "900101-1234567" not in prompt
+    assert "010-1234-5678" not in prompt
+    assert "123-456-7890" not in prompt
+    # 무엇이 요구됐는지는 남아야 한다. 통째로 지우면 신호까지 사라진다.
+    assert "[계좌번호]" in prompt
+
+
+def test_a_code_fence_does_not_throw_away_a_valid_judgement() -> None:
+    judgement = parse_judgement(
+        "fg-001",
+        '```json\n{"is_fraud": true, "fraud_types": ["authority_impersonation"], '
+        '"risk_level": "high", "actions": ["STOP_CONTACT"]}\n```',
+        latency_ms=1.0,
+    )
+
+    assert judgement.ok
+    assert judgement.fraud_types == ["authority_impersonation"]
+
+
+def test_codes_outside_the_contract_are_dropped_and_recorded() -> None:
+    judgement = parse_judgement(
+        "fg-001",
+        '{"is_fraud": true, "fraud_types": ["romance_scam"], '
+        '"risk_level": "high", "actions": ["CALL_MY_LAWYER", "STOP_CONTACT"]}',
+        latency_ms=1.0,
+    )
+
+    assert judgement.fraud_types == []
+    assert judgement.actions == ["STOP_CONTACT"]
+    assert judgement.dropped_codes == ["romance_scam", "CALL_MY_LAWYER"]
+
+
+@pytest.mark.parametrize(
+    ("raw", "failure"),
+    (
+        ("판정: 사기입니다", "unparsable_json"),
+        ("[]", "not_an_object"),
+        ('{"is_fraud": true, "risk_level": "critical"}', "unknown_risk_level"),
+        ('{"risk_level": "high"}', "missing_is_fraud"),
+    ),
+)
+def test_output_we_cannot_score_is_recorded_as_a_failure(
+    raw: str, failure: str
+) -> None:
+    judgement = parse_judgement("fg-001", raw, latency_ms=1.0)
+
+    assert not judgement.ok
+    assert judgement.failure == failure
+
+
+def test_one_dead_call_does_not_abandon_the_rest_of_the_batch() -> None:
+    class DeadProvider:
+        name = "stub"
+
+        def generate(self, *, contract: object, prompt: str) -> str:
+            raise LlmUnavailable("stub returned HTTP 503")
+
+    provider: LlmProvider = DeadProvider()  # type: ignore[assignment]
+    judgement = judge_case(
+        case_id="fg-001",
+        persona="unknown",
+        state="received_only",
+        message="검찰입니다. 지금 송금하세요.",
+        provider=provider,
+        contract=fraud_judge_contract(provider="stub"),
+        clock=lambda: 0.0,
+    )
+
+    assert not judgement.ok
+    assert judgement.failure == "stub returned HTTP 503"

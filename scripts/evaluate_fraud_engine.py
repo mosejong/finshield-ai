@@ -12,6 +12,7 @@ import httpx
 from app.main import app
 from evaluation.fraud_benchmark import check_minimum_quality, evaluate_golden_set
 from evaluation.fraud_golden import FraudGoldenCase, GOLDEN_SET_PATH, load_golden_cases
+from evaluation.llm_judge import JUDGE_RUN_PATH, LlmJudgeRun
 
 
 def percentile(values: list[float], quantile: float) -> float:
@@ -58,12 +59,30 @@ async def measure_asgi_latency(
     }
 
 
+def load_llm_run(path: Path) -> LlmJudgeRun | None:
+    """모델 판정 결과를 읽는다. 없으면 `None`, 그러면 LLM 구간은 `not_run` 이다.
+
+    이 스크립트는 **네트워크를 쓰지 않는다.** CI 가 매 푸시마다 돌리는 명령이라
+    유료 호출이 여기서 나가면 안 된다. 판정은 `scripts/run_llm_fraud_judge.py`
+    가 한 번 하고, 여기는 그 결과 파일을 읽어 집계만 한다.
+    """
+    if not path.exists():
+        return None
+    return LlmJudgeRun.model_validate_json(path.read_text(encoding="utf-8"))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=Path, default=GOLDEN_SET_PATH)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--performance-repeats", type=int, default=0)
+    parser.add_argument(
+        "--llm-judgements",
+        type=Path,
+        default=JUDGE_RUN_PATH,
+        help="모델 단독 판정 결과 파일. 없으면 LLM 구간을 not_run 으로 남긴다.",
+    )
     args = parser.parse_args()
 
     if args.performance_repeats < 0:
@@ -76,7 +95,7 @@ def main() -> int:
             "python": platform.python_version(),
             "platform": platform.platform(),
         },
-        **evaluate_golden_set(cases),
+        **evaluate_golden_set(cases, llm_run=load_llm_run(args.llm_judgements)),
     }
     if args.performance_repeats:
         report["api_latency"] = asyncio.run(

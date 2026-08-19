@@ -76,6 +76,10 @@
 - `deploy-image-pipeline.md` — ghcr 릴리스 워크플로, 배포 override, expand/contract 롤백 전략 (VM 실배포 미검증)
 - `post-merge-devlog-shas.md` — squash 후 SHA 정정, 첫 릴리스 실측과 문서 정정, rate limit 고정 창 flake
 
+## 2026-08-19
+
+- `llm-only-benchmark.md` — LLM 단독 판정 유료 측정, Rule / LLM / Hybrid 3자 비교, 채택하지 않은 조합
+
 ## 작성 규칙
 
 상세한 필수 항목과 PR 흐름은 `docs/14-development-workflow.md`를 따른다.
