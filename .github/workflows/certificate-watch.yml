@@ -1,0 +1,75 @@
+name: Certificate watch
+
+# 인증서 갱신은 조용히 실패한다. Caddy 는 만료 30일 전부터 갱신을 시도하지만,
+# 실패해도 사용자는 만료 당일까지 아무것도 느끼지 못한다 - 그날 사이트 전체가
+# 브라우저 경고 뒤로 사라진다. 이 워크플로는 그 침묵을 깨는 일만 한다.
+#
+# **VM 밖에서 돈다는 것이 핵심이다.** VM 안의 cron 은 VM 이 죽으면 같이 죽어서,
+# 정작 가장 알아야 할 장애를 못 잡는다. GitHub 러너는 별개 시스템이라 호스트가
+# 통째로 사라져도 검사가 돌고 실패한다.
+#
+# 판정은 여기서 하지 않는다. `scripts/verify_public_deployment.py` 와
+# `app/core/public_deployment.py` 에 이미 있고, 기준(21일/7일)의 근거도 거기
+# 주석에 있다. 이 파일이 더하는 것은 **주기**와 **알림 경로** 둘뿐이다.
+#
+# 알림은 GitHub 이 보낸다. 예약 워크플로의 실패 알림은 **cron 을 마지막으로
+# 수정한 사용자**에게 간다. 계정의 Settings -> Notifications -> Actions 에서
+# 이메일 수신이 켜져 있어야 실제로 도착한다. 설정 확인 절차는 `docs/28` P1-1.
+
+on:
+  schedule:
+    # 매일 02:17 UTC (한국 11:17). 정각을 피하는 이유는 GitHub 이 정각에 몰린
+    # 예약 작업을 지연시키거나 건너뛰기 때문이다. 분 단위 정확도가 필요한
+    # 검사가 아니라 하루 한 번이면 충분하다 - 경보 기준이 21일이므로 하루
+    # 간격이면 손쓸 시간이 20일 남는다.
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: "검사할 도메인 (비우면 운영 도메인)"
+        required: false
+        type: string
+
+# 검사만 하는 작업이다. 토큰에 쓰기 권한을 주지 않는다.
+permissions:
+  contents: read
+
+jobs:
+  certificate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      # 검사기는 `cryptography` 하나만 쓴다. 그래도 런타임 lock 을 통째로
+      # 설치하는 이유는 `ci.yml` 의 container-runtime job 과 같다 - 범위를
+      # 좁혀 따로 설치하면 이 job 만 lock 밖의 버전을 쓰게 된다.
+      - run: pip install --require-hashes -r requirements.txt
+
+      # 도메인을 `run:` 문자열에 직접 끼워 넣지 않고 env 로 넘긴다. `${{ }}` 는
+      # 셸이 보기 전에 치환되므로, 값에 셸 메타문자가 들어오면 그대로 실행된다.
+      # workflow_dispatch 는 쓰기 권한자만 부를 수 있어 위험이 낮지만, 공개
+      # 저장소에서 이 형태를 남겨두면 다음 사람이 복사해 간다.
+      - name: 인증서 만료·체인·TLS 버전 확인
+        env:
+          DOMAIN: ${{ inputs.domain || 'finshield-ai.duckdns.org' }}
+        run: |
+          python -m scripts.verify_public_deployment --domain "$DOMAIN" --certificate-only
+
+      # 위 단계가 실패했을 때만 뜬다. 알림 이메일에는 어떤 검사가 왜 실패했는지
+      # 안 실리므로, 로그 맨 아래에 다음 행동을 적어 둔다.
+      - name: 실패했을 때 할 일
+        if: failure()
+        run: |
+          echo "인증서 검사가 실패했다. 사이트가 아직 살아 있어도 만료일에 죽는다."
+          echo ""
+          echo "1. VM 접속 후 Caddy 로그부터 본다:"
+          echo "     docker compose logs --tail 100 proxy | grep -i 'certificate\\|acme\\|error'"
+          echo "2. 80 과 443 이 둘 다 열려 있는지 확인한다. Caddy 는 tls-alpn-01 실패 시"
+          echo "   http-01 로 내려가고, 그러려면 80 이 필요하다 (docs/31 11-6)."
+          echo "3. DuckDNS 의 A 레코드가 아직 VM 고정 IP 를 가리키는지 확인한다."
+          echo ""
+          echo "기준과 배경: docs/28 P1-1, docs/31 10절"

@@ -266,7 +266,7 @@ docker compose -f compose.yaml -f compose.deploy.yaml up -d
 3절 전체가 2026-08-18 에 `finshield-ai.duckdns.org` 로 실행됐다. 검증기 **27개 전부 통과, 종료코드 0** — `certificate_trusted` 를 포함해서다. 릴리스 파이프라인도 `workflow_dispatch` 로 두 번 돌아 이미지가 실제로 만들어졌다. 남은 것은 아래다.
 
 - 외부 TLS 등급 측정(SSL Labs 등). 검증기는 프로토콜 버전과 체인까지 보고 암호 스위트 등급은 매기지 않는다.
-- 갱신 감시를 cron 이 아니라 알림으로 옮기는 것은 `docs/28` P1-1. **첫 갱신은 2026-10-17 무렵**(만료 30일 전)이므로 그 전에 정리한다.
+- ~~갱신 감시를 cron 이 아니라 알림으로 옮기는 것~~ → 2026-08-19 완료. `.github/workflows/certificate-watch.yml` 이 매일 **VM 밖에서** `--certificate-only` 를 돌린다. **첫 갱신은 2026-10-17 무렵**(만료 30일 전). 알림이 실제로 도착하려면 계정 쪽 설정이 필요하고, 이 방식이 조용히 죽는 경우가 둘 있다 — `docs/28` P1-1 에 적었다. 외부 감시(UptimeRobot 등)는 아직 안 걸었다.
 - CAA 레코드는 발급자가 확정된 뒤에 건다. 지금 걸면 ZeroSSL 대체 발급 경로를 스스로 막는다.
 - **태그 push 경로(`type=ref,event=tag`)는 아직 안 돌았다.** 지금까지 전부 `workflow_dispatch` 였고, 그쪽은 `sha-` 태그만 붙인다. 즉 9-1 의 "이전 버전 태그" 가 아직 사람이 읽을 수 있는 이름으로 존재하지 않는다.
 - 롤백(9-1) 리허설 없음. `docs/29` 의 복원 리허설처럼 실제로 이전 태그로 되돌려 보는 절차가 필요하다.
