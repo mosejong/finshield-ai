@@ -20,6 +20,7 @@ import pytest
 from app.clients.google_ai_studio import (
     API_BASE_URL,
     MAX_OUTPUT_TOKENS,
+    THINKING_LEVEL,
     GoogleAiStudioConfigurationError,
     GoogleAiStudioProvider,
     build_google_ai_studio_provider,
@@ -108,6 +109,25 @@ def test_request_targets_the_contract_model_and_settings(
     assert body["contents"][0]["parts"][0]["text"] == "설명해줘"
     assert body["generationConfig"]["temperature"] == contract.temperature
     assert body["generationConfig"]["maxOutputTokens"] == MAX_OUTPUT_TOKENS
+    assert body["generationConfig"]["thinkingConfig"] == {
+        "thinkingLevel": THINKING_LEVEL
+    }
+
+
+def test_the_token_budget_leaves_room_for_thinking() -> None:
+    """예산은 답변 길이가 아니라 사고 + 답변의 합으로 잡는다.
+
+    2026-08-19 에 실제로 밟은 버그다. 예산이 1024 일 때 `gemini-3.6-flash` 는 사고에
+    982 토큰을 쓰고 답변에 38 토큰만 남겨 매번 `finishReason: MAX_TOKENS` 가 됐다.
+    모델은 멀쩡했고 우리 예산이 작았다. 아래 `test_truncated_output_is_not_shown`
+    가 그 잘린 응답을 버리는 것까지는 검사했지만, **버려질 요청을 우리가 보내고
+    있다는 것**은 잡지 못했다.
+
+    사고 토큰 실측치가 700~1030 이므로 답변 몫 + 넉넉한 사고 몫을 요구한다. 이 값을
+    다시 내리려는 사람은 그 실측을 먼저 뒤집어야 한다.
+    """
+    observed_thinking_tokens = 1_030
+    assert MAX_OUTPUT_TOKENS >= observed_thinking_tokens * 2
 
 
 # --- 실패는 전부 LlmUnavailable 로 수렴한다 --------------------------------

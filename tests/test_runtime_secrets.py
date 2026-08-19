@@ -13,6 +13,19 @@ from app.core.runtime_secrets import (
 )
 
 
+class _ComposeLoader(yaml.SafeLoader):
+    """`!reset` 을 아는 로더.
+
+    Compose 확장 태그라 `safe_load` 는 모른다. `compose.deploy.yaml` 이 쓰고
+    있고, 여기서는 secrets 선언만 보므로 값은 버려도 된다. 같은 로더가
+    `tests/test_deploy_images.py` 에도 있다 - 그쪽은 `!reset` 이 붙은 키를
+    구분해야 해서 sentinel 을 남긴다.
+    """
+
+
+_ComposeLoader.add_constructor("!reset", lambda loader, node: None)
+
+
 def write_secret(path: Path, value: str) -> str:
     path.write_text(value, encoding="utf-8")
     return str(path)
@@ -141,11 +154,19 @@ def test_every_compose_secret_file_is_ignored_by_git() -> None:
 
     이 파일들은 호스트에서 사람이 만든다. 하나라도 커밋되면 되돌릴 수 없다 -
     이력에서 지워도 이미 push 된 값은 유출된 것으로 취급해야 한다.
-    """
-    compose = yaml.safe_load((REPO_ROOT / "compose.yaml").read_text(encoding="utf-8"))
 
-    declared = [entry["file"].lstrip("./") for entry in compose["secrets"].values()]
-    assert declared, "compose.yaml 에 secrets 선언이 없다"
+    `compose.yaml` 만 보지 않고 override 파일까지 훑는 이유는, 선택 기능의 키가
+    거기에 선언되기 때문이다(`compose.public-data.yaml`, `compose.gemini.yaml`).
+    기본 파일만 검사하면 새 비밀은 항상 검사 밖에서 추가된다.
+    """
+    declared: list[str] = []
+    for path in sorted(REPO_ROOT.glob("compose*.yaml")):
+        document = yaml.load(path.read_text(encoding="utf-8"), _ComposeLoader) or {}
+        for entry in (document.get("secrets") or {}).values():
+            location = (entry or {}).get("file")
+            if location:
+                declared.append(location.lstrip("./"))
+    assert declared, "compose 파일에 secrets 선언이 없다"
 
     leaking = [path for path in declared if not _git_ignores(path)]
     assert not leaking, f"커밋 가능한 비밀 파일: {leaking}"

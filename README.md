@@ -249,6 +249,15 @@ Starlette `TestClient` 사용 중단 예정 경고 1건은 별도 유지보수 �
 않으며 비암호화 HTTP, localhost/IP literal, userinfo, shortener, punycode,
 malformed 구조 같은 최소 lexical 특성만 오프라인으로 검사한다.
 
+`POST /api/v1/analyze/explanation`은 같은 입력을 받아 **판정을 문장으로 옮긴
+설명만** 돌려준다. 판정에 붙이지 않고 나눈 이유는 두 가지다. 설명 한 문단에
+약 8초가 걸려(2026-08-19 실측) 판정 표시가 그만큼 늦어지고, 판정 응답이
+설명을 품으면 "설명이 없으면 판정도 없다"는 상태가 구조적으로 가능해진다.
+이 엔드포인트는 클라이언트가 보낸 판정을 설명하지 않는다 — 원문만 받아
+서버가 `analyze_fraud`를 다시 돌린 결과만 설명한다. 설명 계층이 꺼져 있으면
+오류가 아니라 `available: false`로 답한다. 상세는
+`docs/34-llm-explanation-runtime.md`.
+
 `POST /api/v1/loans/simulate`는 LLM 없이 원리금균등상환 또는
 원금균등상환 월별 일정을 계산한다. 월 단위 명목금리(`연이율 / 12`)를
 사용하며, 금액은 소수 둘째 자리에서 `ROUND_HALF_UP`으로 처리하고 마지막
