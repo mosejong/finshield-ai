@@ -21,6 +21,10 @@ import { WhyRiskyPanel } from "@/components/safety/WhyRiskyPanel";
 import { InstallHint } from "@/components/pwa/InstallHint";
 import { demoAnalysisFor } from "@/lib/mock/analysis";
 import { clearAnalysis, useStoredAnalysis } from "@/lib/store/analysis-store";
+import {
+  forgetExplanation,
+  useExplanation,
+} from "@/lib/store/explanation-store";
 import { useHydrated } from "@/lib/store/session-store";
 
 /**
@@ -47,6 +51,13 @@ export default function CheckResultPage({
 
   const result = stored ?? demo;
   const isDemo = stored === null && demo !== null;
+
+  /*
+    "왜 위험한지" 설명. 판정과 따로 받아오므로 위 블록들은 이것을 기다리지
+    않는다. 예시 결과에는 붙이지 않는다 - 예시 화면을 여는 것만으로 유료
+    모델 호출이 나가면 안 된다.
+  */
+  const explanation = useExplanation(id, !isDemo);
 
   if (!loaded) {
     return (
@@ -105,7 +116,10 @@ export default function CheckResultPage({
           <SectionHeading badge={<MockBadge source={result.whySource} />}>
             <span id="result-why">왜 위험한지</span>
           </SectionHeading>
-          <WhyRiskyPanel paragraphs={result.why} />
+          <WhyRiskyPanel
+            paragraphs={result.why}
+            explanation={isDemo ? undefined : explanation}
+          />
         </section>
 
         {/* 4. 사용자가 이미 한 것 */}
@@ -152,6 +166,7 @@ export default function CheckResultPage({
             type="button"
             onClick={() => {
               clearAnalysis(id);
+              forgetExplanation(id);
               router.replace("/check");
             }}
             className="min-h-9 text-caption font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"

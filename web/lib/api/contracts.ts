@@ -131,6 +131,37 @@ export type BackendAnalyzeResponse = z.infer<
   typeof BackendAnalyzeResponseSchema
 >;
 
+/**
+ * `POST /api/v1/analyze/explanation` 응답.
+ *
+ * `available` 과 `explanation` 은 서로 다른 것을 말한다.
+ *   available:false             설명 계층이 꺼져 있다 (오류가 아니다)
+ *   available:true, explanation:null   켜져 있는데 이번에 문장을 못 만들었다
+ * 백엔드가 이 둘을 굳이 나눠 놓았으므로 프론트도 합치지 않는다.
+ */
+export const BackendExplanationResponseSchema = z.object({
+  available: z.boolean(),
+  explanation: z.string().nullable().default(null),
+  model: z.string().nullable().default(null),
+});
+export type BackendExplanationResponse = z.infer<
+  typeof BackendExplanationResponseSchema
+>;
+
+/**
+ * 화면이 쓰는 설명 상태.
+ *
+ * `off` 는 렌더링하지 않는다. `failed` 는 자리를 남기고 못 불러왔다고 말한다.
+ * 둘을 같게 다루면, 계층이 꺼진 배포에서 매번 "불러오지 못했습니다" 가 뜬다.
+ */
+export const ExplanationSchema = z.object({
+  status: z.enum(["off", "failed", "ready"]),
+  text: z.string().nullable(),
+  /** 어느 모델이 답했는지. 대체 모델로 넘어갔을 수 있어 응답에서 그대로 받는다. */
+  model: z.string().nullable(),
+});
+export type Explanation = z.infer<typeof ExplanationSchema>;
+
 /* ------------------------------------------------------------------ */
 /* 사기 분석 — 프론트 계약                                              */
 /* ------------------------------------------------------------------ */
