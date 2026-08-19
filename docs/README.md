@@ -31,6 +31,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-19/first-tagged-release.md` — 첫 태그 릴리스 `v0.1.0`·설명 계층을 담은 이미지가 없었다는 발견·재배포 절차와 릴리스 대장
 - `devlog/2026-08-19/competition-submission-docs.md` — 제출물 ①기획서 ②기능명세서 작성·명세를 코드에서 확인·신호 12종 정정·낡은 README 수치 교체
 - `devlog/2026-08-19/rule-vocabulary-v0.2.md` — 모델이 찾아 준 오답 3건을 규칙 어휘로 메움·골든셋 밖 검증·개발셋 변별력 소진
 - `devlog/2026-08-19/llm-only-benchmark.md` — LLM 단독 판정 유료 측정·Rule/LLM/Hybrid 3자 비교·채택하지 않은 조합

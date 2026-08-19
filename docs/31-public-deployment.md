@@ -139,6 +139,79 @@ python -m scripts.verify_public_deployment --domain finshield.example.com
 
 실패가 하나도 없어야 P0-4 완료다. 종료코드는 0 통과 / 1 실패 / 2 설정 오류.
 
+### 3-6. 재배포 — 이미 떠 있는 스택의 이미지만 바꾼다
+
+3-1~3-4 를 이미 한 서버에는 인증서도 DNS 도 그대로 있다. 바꿀 것은 이미지 태그
+하나뿐이다.
+
+**먼저 마이그레이션이 끼어 있는지 본다.** 없으면 이 절차가 성립하고, 있으면
+`docs/28` P1-3 의 expand/contract 규칙을 지킨 릴리스인지 확인한 뒤에 진행한다.
+
+```bash
+git diff --name-only <직전에_배포한_SHA>..<새_태그> -- migrations/
+```
+
+비어 있으면 코드만 바뀐 것이다.
+
+```bash
+export FINSHIELD_IMAGE_TAG=v0.1.0
+export FINSHIELD_DOMAIN=finshield-ai.duckdns.org
+export FINSHIELD_ACME_EMAIL=<갱신 실패를 실제로 읽을 주소>
+
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml pull
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml up -d
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml images
+```
+
+`-f compose.deploy.yaml` 을 빠뜨리면 VM 이 빌드를 시작하고 OOM 으로 조용히 죽는다
+(11-1). 마지막 `images` 로 digest 를 확인한다 — 태그는 옮겨 붙지만 digest 는 아니다.
+
+#### 설명 계층을 켜려면 키 파일이 서버에 있어야 한다
+
+`compose.gemini.yaml` 은 `./secrets/gemini_api_key.txt` 를 **파일로** 요구한다.
+compose 의 `secrets:` 는 파일이 없으면 스택 자체를 못 올리므로, 키가 아직
+서버에 없다면 **override 없이 먼저 올린다.** 그것만으로도
+`POST /api/v1/analyze/explanation` 이 404 에서 200 + `available: false` 가 된다 —
+경로가 생기고, 계층만 꺼져 있는 상태다. 판정 경로는 어느 쪽이든 영향이 없다.
+
+키를 올릴 때는 **셸 기록에 남기지 않는다.**
+
+```bash
+mkdir -p secrets
+read -rsp 'Gemini API key: ' KEY && printf '%s' "$KEY" > secrets/gemini_api_key.txt
+unset KEY
+chmod 600 secrets/gemini_api_key.txt
+```
+
+`read -rs` 는 입력을 화면에도 히스토리에도 남기지 않는다. `echo '키' > 파일` 로
+쓰면 `~/.bash_history` 에 그대로 박힌다. `printf '%s'` 를 쓰는 이유는 `echo` 가
+줄바꿈을 붙이기 때문이다 — 뒤에 개행이 붙은 키는 인증에 실패한다.
+
+그다음 override 를 끼워 다시 올린다.
+
+```bash
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml \
+  -f compose.gemini.yaml up -d
+```
+
+키 파일은 `.gitignore` 의 `secrets/` 에 걸려 있어 커밋되지 않는다. 값은 어떤
+로그·이슈·채팅에도 붙여 넣지 않는다.
+
+#### 확인
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  https://finshield-ai.duckdns.org/api/proxy/analyze/explanation \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"검찰청 수사관입니다. 안전계좌로 즉시 이체하세요.","state":"received_only"}'
+```
+
+| 결과 | 뜻 |
+|---|---|
+| 404 | 아직 옛 이미지다. pull 이 안 됐거나 `up -d` 가 web 을 갈아끼우지 않았다 |
+| 200 + `available: false` | 새 이미지는 떴고 설명 계층만 꺼져 있다 (키 없음) |
+| 200 + 설명 문장 | 완료 |
+
 ## 4. 무엇을 검사하는가
 
 | 검사 | 통과 기준 | 왜 |
@@ -559,3 +632,31 @@ C   STIME  TIME
 ```
 
 CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `uptime` 의 load average 로 교차 확인한다.
+
+## 12. 릴리스 대장
+
+태그는 옮겨 붙을 수 있고 digest 는 그렇지 않다. 사고 조사 때 "그때 무엇이 돌고
+있었나" 에 답하는 것은 아래 오른쪽 칸이다.
+
+| 태그 | 커밋 | 만든 날 | 이미지 | digest |
+|---|---|---|---|---|
+| `v0.1.0` | `30ba35b` | 2026-08-19 | `finshield-backend` | `sha256:c9c0864ccc28cd5ff500f548b617a3f21200103f3efbd7a1140cd24fc2f00ffe` |
+| `v0.1.0` | `30ba35b` | 2026-08-19 | `finshield-web` | `sha256:38ed9740a6d320fae3b174187246ac5f99202b4da8f383b811502f7e9fb25f15` |
+
+`v0.1.0` 은 **태그로 만든 첫 릴리스**다. 그 이전 두 번은 `workflow_dispatch` 라
+`sha-<커밋>` 태그만 붙었다.
+
+### 되돌릴 대상
+
+`v0.1.0` 직전에 배포돼 있던 것은 `sha-4457f0efa3ec0053ae2b5ab0135167fdec80bc7c`
+(2026-08-18 빌드) 다. 9-1 의 절차에 이 값을 그대로 `FINSHIELD_IMAGE_TAG` 로 넣으면
+된다 — 버전 태그가 아니어도 태그는 태그다.
+
+`4457f0e..30ba35b` 사이에 `migrations/` 변경이 없으므로 이 되돌리기는 스키마를
+건드리지 않는다. **`alembic downgrade` 는 어느 경우에도 부르지 않는다** (9-1).
+
+### 두 이미지 모두 익명 pull 가능하다
+
+2026-08-19 확인. `ghcr.io/mosejong/finshield-backend`, `finshield-web` 둘 다
+토큰 없이 `tags/list` 가 `200` 이므로 VM 에서 `docker login` 이 필요 없다.
+확인 방법은 3-2 에 있다 — **공개 범위는 짐작하지 말고 매번 확인한다.**
