@@ -31,6 +31,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-20/housing-tax-arrears.md` — 임대인 미납 국세·지방세 열람 추가·법이 정한 신청 기간을 단계 창으로·확인 못 한 시행령 금액은 쓰지 않음·조문 직링크 형태(`lsLinkProc.do`) 고정
 - `devlog/2026-08-20/housing-deposit-frontend.md` — `/check/deposit` 화면·"모름"이 브라우저에서 0 이 되지 않게·422를 502로 덮던 문제·서버 시각을 KST 로 모음
 - `devlog/2026-08-19/housing-deposit-risk.md` — 전세보증금 위험 점검 v0.1 백엔드·근거 6건 선확인·못 연 조문은 넣지 않음·출처 무결성 규칙 공통화
 - `devlog/2026-08-19/first-tagged-release.md` — 첫 태그 릴리스 `v0.1.0`·설명 계층을 담은 이미지가 없었다는 발견·재배포 절차와 릴리스 대장

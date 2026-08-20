@@ -749,6 +749,7 @@ export type LeaseStage = z.infer<typeof LeaseStageSchema>;
 export const DepositCheckSchema = z.enum([
   "registry_checked",
   "owner_identity_verified",
+  "tax_arrears_checked",
   "move_in_reported",
   "confirmed_date_obtained",
   "deposit_guarantee_joined",
@@ -820,6 +821,7 @@ export type DepositRatio = z.infer<typeof DepositRatioSchema>;
 export const DepositRiskActionCodeSchema = z.enum([
   "CHECK_REGISTRY",
   "VERIFY_OWNER_IDENTITY",
+  "CHECK_TAX_ARREARS",
   "REPORT_MOVE_IN",
   "GET_CONFIRMED_DATE",
   "JOIN_DEPOSIT_GUARANTEE",

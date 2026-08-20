@@ -74,6 +74,11 @@ export const DEPOSIT_CHECK_OPTIONS: ReadonlyArray<{
     description: "계약 상대와 등기부의 소유자가 같은 사람인지 봤습니다",
   },
   {
+    value: "tax_arrears_checked",
+    label: "임대인의 미납 국세·지방세를 열람했습니다",
+    description: "세무서·지방자치단체에 열람을 신청해 체납 여부를 봤습니다",
+  },
+  {
     value: "move_in_reported",
     label: "전입신고를 마쳤습니다",
     description: "주민센터나 정부24에서 신고를 끝냈습니다",

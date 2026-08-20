@@ -5,6 +5,7 @@
 사용자에게는 보증금 전액의 차이가 된다.
 """
 
+import re
 from datetime import date, timedelta
 
 import pytest
@@ -19,6 +20,7 @@ from app.domain.housing.policy import (
     SIGNAL_MINIMUM_RISK,
     STAGE_ACTIONS,
     STAGE_MINIMUM_RISK,
+    TAX_ARREARS_RELEVANT_STAGES,
 )
 from app.main import app
 from app.schemas.housing import DepositCheck, DepositRiskRequest, LeaseStage
@@ -240,6 +242,76 @@ def test_guarantee_is_not_offered_where_it_cannot_be_used(stage: LeaseStage) -> 
 
     assert "JOIN_DEPOSIT_GUARANTEE" not in {a.code for a in response.actions}
     assert "deposit_guarantee_absent" not in {s.code for s in response.signals}
+
+
+# --- 미납 국세·지방세 열람 ----------------------------------------------
+
+
+@pytest.mark.parametrize("stage", sorted(TAX_ARREARS_RELEVANT_STAGES, key=str))
+def test_tax_arrears_lookup_is_offered_while_the_window_is_open(
+    stage: LeaseStage,
+) -> None:
+    response = check_deposit_risk(_request(stage=stage))
+
+    assert "tax_arrears_unchecked" in {s.code for s in response.signals}
+    assert "CHECK_TAX_ARREARS" in {a.code for a in response.actions}
+
+
+@pytest.mark.parametrize(
+    "stage",
+    [
+        LeaseStage.BALANCE_PAID,
+        LeaseStage.MOVED_IN,
+        LeaseStage.LEASE_ENDING,
+        LeaseStage.DEPOSIT_UNRETURNED,
+    ],
+)
+def test_tax_arrears_lookup_is_not_offered_after_the_window_closes(
+    stage: LeaseStage,
+) -> None:
+    """국세징수법 제109조 제1항의 신청 기간은 임대차 기간이 시작하는 날까지다.
+
+    잔금을 치르고 들어간 사람에게 "열람하세요" 라고 하면 할 수 없는 일을
+    시키는 것이고, 하지 않았다는 신호는 남은 기간 내내 지워지지 않는다.
+    """
+    response = check_deposit_risk(_request(stage=stage))
+
+    assert "tax_arrears_unchecked" not in {s.code for s in response.signals}
+    assert "CHECK_TAX_ARREARS" not in {a.code for a in response.actions}
+
+
+def test_completed_tax_arrears_check_clears_both_signal_and_action() -> None:
+    response = check_deposit_risk(
+        _request(
+            stage=LeaseStage.CONTRACT_SIGNED,
+            completed_checks=[DepositCheck.TAX_ARREARS_CHECKED],
+        )
+    )
+
+    assert "tax_arrears_unchecked" not in {s.code for s in response.signals}
+    assert "CHECK_TAX_ARREARS" not in {a.code for a in response.actions}
+
+
+def test_tax_arrears_action_quotes_the_statute_instead_of_a_won_amount() -> None:
+    """법문의 '대통령령으로 정하는 금액' 을 우리가 아는 숫자로 바꿔 적지 않는다.
+
+    임대인 동의 없이 열람할 수 있는 보증금 기준액은 시행령이 정하는데, 그
+    시행령 조문은 열어 확인하지 못했다. 확인하지 않은 숫자를 적느니 법문의
+    표현을 그대로 둔다. 이 서비스가 금액을 지어내면 사용자는 자기 보증금이
+    기준 아래라고 믿고 신청을 포기할 수 있다.
+    """
+    reason = ACTION_POLICIES["CHECK_TAX_ARREARS"].reason
+
+    assert "대통령령으로 정하는 금액" in reason
+    assert not re.search(r"\d[\d,]*\s*(억|천만|백만|만\s*원|원)", reason)
+
+
+def test_tax_arrears_lookup_comes_after_the_registry_checks() -> None:
+    """등기부와 소유자를 먼저 본 다음에 세금을 본다. 알파벳순이면 뒤집힌다."""
+    response = check_deposit_risk(_request(stage=LeaseStage.BEFORE_CONTRACT))
+    codes = [a.code for a in response.actions]
+
+    assert codes.index("VERIFY_OWNER_IDENTITY") < codes.index("CHECK_TAX_ARREARS")
 
 
 def test_every_action_carries_a_supporting_official_source() -> None:

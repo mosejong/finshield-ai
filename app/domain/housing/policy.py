@@ -53,6 +53,19 @@ ACTION_POLICIES: dict[str, ActionPolicy] = {
         "함께 확인해야 합니다.",
         ("easylaw_property_registry",),
     ),
+    "CHECK_TAX_ARREARS": ActionPolicy(
+        1,
+        "임대인의 미납 국세·지방세를 열람하세요",
+        "국세징수법 제109조와 지방세징수법 제6조는 임차인이 임대인의 동의를 받아 "
+        "미납 세금 열람을 신청할 수 있다고 정하고 있습니다. 보증금이 대통령령으로 "
+        "정하는 금액을 초과하면 임대차 기간이 시작하는 날까지 임대인의 동의 없이도 "
+        "신청할 수 있습니다. 국세는 임차할 건물 소재지의 관할 세무서장에게, "
+        "지방세는 지방자치단체의 장에게 신청합니다.",
+        (
+            "national_tax_collection_act_article109",
+            "local_tax_collection_act_article6",
+        ),
+    ),
     "REPORT_MOVE_IN": ActionPolicy(
         1,
         "입주 후 곧바로 전입신고를 하세요",
@@ -63,8 +76,10 @@ ACTION_POLICIES: dict[str, ActionPolicy] = {
     "GET_CONFIRMED_DATE": ActionPolicy(
         1,
         "임대차계약서에 확정일자를 받으세요",
-        "대항요건과 확정일자를 함께 갖추어야 우선변제권 요건이 충족됩니다.",
-        ("easylaw_opposing_power",),
+        "주택임대차보호법 제3조의2 제2항은 대항요건과 확정일자를 갖춘 임차인이 "
+        "경매·공매의 환가대금에서 후순위권리자보다 우선하여 보증금을 변제받을 "
+        "권리가 있다고 정하고 있습니다.",
+        ("housing_lease_act_article3_2", "easylaw_opposing_power"),
     ),
     "JOIN_DEPOSIT_GUARANTEE": ActionPolicy(
         2,
@@ -99,10 +114,15 @@ ACTION_POLICIES: dict[str, ActionPolicy] = {
 
 # 단계별로 항상 안내할 행동. 신호가 하나도 없어도 남는다.
 STAGE_ACTIONS: dict[LeaseStage, tuple[str, ...]] = {
-    LeaseStage.BEFORE_CONTRACT: ("CHECK_REGISTRY", "VERIFY_OWNER_IDENTITY"),
+    LeaseStage.BEFORE_CONTRACT: (
+        "CHECK_REGISTRY",
+        "VERIFY_OWNER_IDENTITY",
+        "CHECK_TAX_ARREARS",
+    ),
     LeaseStage.CONTRACT_SIGNED: (
         "CHECK_REGISTRY",
         "VERIFY_OWNER_IDENTITY",
+        "CHECK_TAX_ARREARS",
         "JOIN_DEPOSIT_GUARANTEE",
     ),
     LeaseStage.BALANCE_PAID: (
@@ -126,6 +146,7 @@ SIGNAL_ACTIONS: dict[str, tuple[str, ...]] = {
     "senior_lien_unknown": ("CHECK_REGISTRY",),
     "registry_not_checked": ("CHECK_REGISTRY",),
     "owner_identity_unverified": ("VERIFY_OWNER_IDENTITY",),
+    "tax_arrears_unchecked": ("CHECK_TAX_ARREARS",),
     "opposing_power_missing": ("REPORT_MOVE_IN", "GET_CONFIRMED_DATE"),
     "priority_repayment_missing": ("GET_CONFIRMED_DATE",),
     "deposit_guarantee_absent": ("JOIN_DEPOSIT_GUARANTEE",),
@@ -143,6 +164,10 @@ SIGNAL_MINIMUM_RISK: dict[str, str] = {
     "senior_lien_unknown": "medium",
     "registry_not_checked": "medium",
     "owner_identity_unverified": "medium",
+    # 등기부를 안 본 것과 같은 무게다. 확인할 수 있는 사실을 확인하지 않았고,
+    # 법이 정한 신청 기간(임대차 기간이 시작하는 날까지)이 지나면 그 뒤로는
+    # 확인할 방법이 없다.
+    "tax_arrears_unchecked": "medium",
     # 잔금을 치르고 입주까지 했는데 전입신고가 없다는 것은 보증금 전액이
     # 아무 대항력 없이 놓여 있다는 뜻이다. 되돌릴 수 없는 금액에 붙는 신호다.
     "opposing_power_missing": "high",
@@ -168,6 +193,15 @@ GUARANTEE_RELEVANT_STAGES: frozenset[LeaseStage] = frozenset(
     }
 )
 
+# 미납 세금 열람을 신청할 수 있는 단계.
+# 국세징수법 제109조 제1항·지방세징수법 제6조 제1항이 신청 기간을 "임대차계약을
+# 하기 전 또는 임대차계약을 체결하고 임대차 기간이 시작하는 날까지" 로 정하고
+# 있다. 잔금을 치르고 들어간 뒤에는 이 창이 닫혀 있으므로 신호로도 행동으로도
+# 띄우지 않는다 — 할 수 없는 일을 하라고 하면 목록 전체가 소음이 된다.
+TAX_ARREARS_RELEVANT_STAGES: frozenset[LeaseStage] = frozenset(
+    {LeaseStage.BEFORE_CONTRACT, LeaseStage.CONTRACT_SIGNED}
+)
+
 STAGE_MINIMUM_RISK: dict[LeaseStage, str] = {
     LeaseStage.BEFORE_CONTRACT: "low",
     LeaseStage.CONTRACT_SIGNED: "low",
@@ -183,6 +217,7 @@ STAGE_MINIMUM_RISK: dict[LeaseStage, str] = {
 ACTION_ORDER: tuple[str, ...] = (
     "CHECK_REGISTRY",
     "VERIFY_OWNER_IDENTITY",
+    "CHECK_TAX_ARREARS",
     "REPORT_MOVE_IN",
     "GET_CONFIRMED_DATE",
     "KEEP_OPPOSING_POWER",
@@ -194,6 +229,7 @@ ACTION_ORDER: tuple[str, ...] = (
 COMPLETED_CHECK_ACTIONS: dict[DepositCheck, str] = {
     DepositCheck.REGISTRY_CHECKED: "CHECK_REGISTRY",
     DepositCheck.OWNER_IDENTITY_VERIFIED: "VERIFY_OWNER_IDENTITY",
+    DepositCheck.TAX_ARREARS_CHECKED: "CHECK_TAX_ARREARS",
     DepositCheck.MOVE_IN_REPORTED: "REPORT_MOVE_IN",
     DepositCheck.CONFIRMED_DATE_OBTAINED: "GET_CONFIRMED_DATE",
     DepositCheck.DEPOSIT_GUARANTEE_JOINED: "JOIN_DEPOSIT_GUARANTEE",
@@ -206,6 +242,7 @@ SIGNAL_LABELS: dict[str, str] = {
     "senior_lien_unknown": "선순위 채권최고액을 확인하지 않았습니다",
     "registry_not_checked": "등기부등본을 확인하지 않았습니다",
     "owner_identity_unverified": "계약 상대가 등기부상 소유자인지 확인하지 않았습니다",
+    "tax_arrears_unchecked": "임대인의 미납 국세·지방세를 열람하지 않았습니다",
     "opposing_power_missing": "입주했는데 전입신고가 확인되지 않습니다",
     "priority_repayment_missing": "확정일자가 확인되지 않습니다",
     "deposit_guarantee_absent": "전세보증금반환보증에 가입하지 않았습니다",
@@ -263,6 +300,12 @@ def detect_signals(
     if DepositCheck.OWNER_IDENTITY_VERIFIED not in completed_checks:
         codes.append("owner_identity_unverified")
 
+    if (
+        DepositCheck.TAX_ARREARS_CHECKED not in completed_checks
+        and stage in TAX_ARREARS_RELEVANT_STAGES
+    ):
+        codes.append("tax_arrears_unchecked")
+
     # 보증 미가입은 그 자체로 위험이 아니다. 비율이 낮지 않거나 계산조차 안 될
     # 때만 신호로 올린다. 아니면 잘 계약한 사람에게도 늘 경고가 붙는다.
     if (
@@ -311,8 +354,15 @@ def _signal_detail(
         )
     if code == "priority_repayment_missing":
         return (
-            "대항요건은 갖추었지만 확정일자가 없습니다. 우선변제권 요건은 "
-            "대항요건과 확정일자를 함께 갖춘 경우에 충족됩니다."
+            "대항요건은 갖추었지만 확정일자가 없습니다. 주택임대차보호법 "
+            "제3조의2 제2항은 대항요건과 확정일자를 함께 갖춘 경우를 우선변제의 "
+            "요건으로 정하고 있습니다."
+        )
+    if code == "tax_arrears_unchecked":
+        return (
+            "임대인이 세금을 체납했는지는 국세징수법 제109조·지방세징수법 "
+            "제6조의 열람 신청으로 확인합니다. 신청할 수 있는 기간은 임대차 "
+            "기간이 시작하는 날까지입니다."
         )
     if code == "deposit_guarantee_absent":
         return "보증금 반환을 보장하는 별도 장치가 확인되지 않았습니다."

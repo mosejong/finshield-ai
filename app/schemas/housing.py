@@ -42,6 +42,7 @@ class DepositCheck(str, Enum):
 
     REGISTRY_CHECKED = "registry_checked"
     OWNER_IDENTITY_VERIFIED = "owner_identity_verified"
+    TAX_ARREARS_CHECKED = "tax_arrears_checked"
     MOVE_IN_REPORTED = "move_in_reported"
     CONFIRMED_DATE_OBTAINED = "confirmed_date_obtained"
     DEPOSIT_GUARANTEE_JOINED = "deposit_guarantee_joined"
@@ -110,6 +111,7 @@ class DepositRiskAction(BaseModel):
     code: Literal[
         "CHECK_REGISTRY",
         "VERIFY_OWNER_IDENTITY",
+        "CHECK_TAX_ARREARS",
         "REPORT_MOVE_IN",
         "GET_CONFIRMED_DATE",
         "JOIN_DEPOSIT_GUARANTEE",
