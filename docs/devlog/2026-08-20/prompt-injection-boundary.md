@@ -410,9 +410,13 @@ tests/test_llm_prompt_injection.py     122 passed              (직전 81, +41)
 
 ## 커밋 SHA
 
-`d3103badefbd50df0b3f5e94a1dc0355ea390fbd` (squash merge)
+| | SHA | 내용 |
+|---|---|---|
+| 1차 | `d3103badefbd50df0b3f5e94a1dc0355ea390fbd` | 경계 구현·골든셋·유료 측정 |
+| 후속 | `30bc42e99309d3c289a8f6d24006faad70b6c93e` | 코덱스 검토 2건 + 재현 중 발견 2건 |
 
 ## PR
 
-[#82](https://github.com/mosejong/finshield-ai/pull/82) — CI 8건 통과
-(`test` · `web` · `deps-lock` · `container-runtime`, Linux)
+- [#82](https://github.com/mosejong/finshield-ai/pull/82) — CI 8건 통과
+  (`test` · `web` · `deps-lock` · `container-runtime`, Linux)
+- [#84](https://github.com/mosejong/finshield-ai/pull/84) — CI 8건 통과
