@@ -362,9 +362,9 @@ docker compose -f compose.yaml -f compose.gemini.yaml --env-file .env.docker up 
 - ~~**프론트엔드 연결.**~~ 붙였다(2026-08-19). 10절 참고.
 - **안전 필터 차단율 측정.** `finishReason` 이 `SAFETY` 로 오는 비율을 모른다. 사기
   문자를 다루는 서비스라 정상 입력이 차단될 수 있고, 그러면 조용히 설명이 사라진다.
-- **prompt injection 골든셋.** 사용자가 붙여넣는 문자 안에 지시문이 섞여 있을 수 있다.
-  `validation.py` 가 결과를 거르지만, **얼마나 자주 시도가 성공하는지**는 측정한 적이
-  없다.
+- ~~**prompt injection 골든셋.**~~ 만들었다(2026-08-20). 11절 참고. 7가지 기법을
+  **방어를 끄고** 실제로 던져 본 결과 `gemini-3.6-flash` 는 **0/7** 로 하나도 넘어가지
+  않았다. 입력 정화 계층이 그 위에 새로 붙었다.
 - **비동기 경계.** 프로바이더가 동기 `httpx` 라 라우트도 `def` 다(FastAPI 가 스레드풀로
   보낸다). 8초짜리 호출이 스레드를 잡으므로, 동시 요청이 늘면 여기가 먼저 막힌다.
   지금 트래픽에서는 문제가 아니지만 부하 테스트 때 첫 번째로 볼 곳이다.
@@ -448,3 +448,45 @@ docker compose -f compose.yaml -f compose.gemini.yaml --env-file .env.docker up 
 `next dev` → 프록시 → 백엔드 → Gemini 전 경로 1회: **9.29초, `gemini-3.6-flash`**.
 백엔드 직접 호출이 7.40초였으므로 프록시와 dev 서버가 약 1.9초를 더한다.
 프로덕션 빌드에서는 이보다 짧을 것이나 측정하지 않았다.
+
+---
+
+## 11. 신뢰할 수 없는 입력 경계 (2026-08-20)
+
+이 계층에 방어가 한 겹 더 붙었다. 전체 기록은
+`docs/devlog/2026-08-20/prompt-injection-boundary.md` 에 있고, 여기에는 런타임
+동작만 적는다.
+
+### 세 겹이 어떤 순서로 도는가
+
+```python
+minimized   = minimize_for_provider(message)            # 1. 개인정보
+neutralized = neutralize_instructions(minimized.text)   # 2. 모델을 향한 지시문
+raw         = provider.generate(prompt)
+return validate_explanation(raw, ..., risk_level=response.risk_level)  # 3. 출력
+```
+
+순서가 의미를 갖는다. 개인정보를 먼저 걷어내지 않으면 `[전화번호]` 로 바뀌었어야 할
+자리가 지시문 자리표시자 **안에** 숨어 두 계층의 건수가 어긋난다.
+
+### 판정은 이 경계 바깥에 있다
+
+`analyze_fraud()` 가 **원문을 보고** 판정을 끝낸 뒤에야 `explain_analysis()` 가
+호출된다. 그래서 입력 정화가 아무리 과해도 **위험 등급을 낮출 수 없다.** 이건 설계
+의도가 아니라 타입 구조의 결과이고, 테스트가 고정한다.
+
+### 고정 프롬프트는 그대로다
+
+두 계층 다 **프롬프트가 아니라 치환되는 값**을 고친다. 따라서
+`FRAUD_EXPLANATION_PROMPT_SHA256` 이 불변이고, 이 변경은 2절·9절의 유료 측정
+재실행을 요구하지 않는다.
+
+### 출력 검증에 위험 수준이 인자로 들어온다
+
+`validate_explanation(..., risk_level=...)` 로 시그니처가 바뀌었다. 판정이
+`medium`/`high` 일 때만 "안심시키는 문장" 을 거부하기 때문이다. `low` 판정에서는
+같은 문장이 정상이다.
+
+이 검사의 첫 판은 **서술어만** 봤고, 관측된 정당한 경고 8건 중 **4건을 거부했다.**
+한국어 안전 안내가 "…확인하시는 것이 안전합니다" 로 끝나기 때문이다. 지금은
+**메시지를 가리키는 주어**를 함께 요구해서 8건 모두 통과한다. 상세는 데브로그.

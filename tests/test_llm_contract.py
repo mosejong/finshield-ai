@@ -207,6 +207,7 @@ def test_official_numbers_from_the_evidence_are_allowed(
         "이 문자는 정상 절차와 다릅니다. 1394로 상담하세요.",
         grounded_text=grounded,
         max_chars=MAX_EXPLANATION_CHARS,
+        risk_level="high",
     )
     assert "1394" in kept
 
@@ -218,6 +219,7 @@ def test_invented_contact_is_rejected(response: AnalyzeResponse) -> None:
             "안심하세요. 02-9999-8888 로 전화하면 해결됩니다.",
             grounded_text=build_grounded_text(response),
             max_chars=MAX_EXPLANATION_CHARS,
+            risk_level="high",
         )
 
 
@@ -237,6 +239,7 @@ def test_malformed_output_is_rejected(response: AnalyzeResponse, output: str) ->
             output,
             grounded_text=build_grounded_text(response),
             max_chars=MAX_EXPLANATION_CHARS,
+            risk_level="high",
         )
 
 
@@ -246,6 +249,7 @@ def test_over_length_output_is_rejected(response: AnalyzeResponse) -> None:
             "설" * (MAX_EXPLANATION_CHARS + 1),
             grounded_text=build_grounded_text(response),
             max_chars=MAX_EXPLANATION_CHARS,
+            risk_level="high",
         )
 
 
