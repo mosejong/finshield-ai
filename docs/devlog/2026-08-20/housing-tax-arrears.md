@@ -169,8 +169,9 @@ uvicorn:8000 + `next start :3179` 프록시 실측:
 
 ## 커밋 SHA
 
-`<merge 후 채움>`
+`39b5e5545e1abc9eb9143929b432f1f59dca13f0` (squash merge)
 
 ## PR
 
-`<merge 후 채움>`
+[#80](https://github.com/mosejong/finshield-ai/pull/80) — CI 8건 통과
+(`test` · `web` · `deps-lock` · `container-runtime`, Linux)
