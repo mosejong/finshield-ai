@@ -31,6 +31,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
+- `devlog/2026-08-20/fraud-holdout-v0.2.md` — held-out 72건을 동결한 뒤 처음 측정·개발셋 1.000 이 성능이 아니라 기억이었음·오탐 6건이 전부 "누가 누구에게" 를 안 보는 한 가지 원인·`money_transfer_request` 가 유형 표에 없어 등급만 높고 유형이 비는 것·일부러 고치지 않고 남긴 이유
 - `devlog/2026-08-20/prompt-injection-boundary.md` — 붙여넣은 문자를 데이터로 취급·사기 명령문은 증거이므로 보존·주입 골든셋 7건이 첫 실행에서 구멍 3개 발견·유료 측정 0/7·서술어만 보던 출력 검증이 정상 경고 4/8 을 지울 뻔한 것 / 후속: 코덱스 검토 2건 + 재현 중 발견 2건·좁히기를 문장→절→구간 3단계로·마침표 없는 문자가 통째로 지워지던 문제
 - `devlog/2026-08-20/housing-tax-arrears.md` — 임대인 미납 국세·지방세 열람 추가·법이 정한 신청 기간을 단계 창으로·확인 못 한 시행령 금액은 쓰지 않음·조문 직링크 형태(`lsLinkProc.do`) 고정
 - `devlog/2026-08-20/housing-deposit-frontend.md` — `/check/deposit` 화면·"모름"이 브라우저에서 0 이 되지 않게·422를 502로 덮던 문제·서버 시각을 KST 로 모음
