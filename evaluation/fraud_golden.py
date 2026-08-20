@@ -8,6 +8,10 @@ from app.schemas.analysis import AnalyzeRequest, Persona, UserState
 
 
 GOLDEN_SET_PATH = Path(__file__).with_name("data") / "fraud_golden_v0.1.jsonl"
+
+# 개발셋과 **파일이 다르다.** 같은 파일에 플래그만 달면 한 번의 실수로 held-out
+# 사례가 규칙 수정에 쓰인다. 경계는 코드가 아니라 파일이 지킨다.
+HOLDOUT_SET_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.2.jsonl"
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",
@@ -33,7 +37,7 @@ ACTION_CODES = {
 
 
 class FraudGoldenCase(BaseModel):
-    case_id: str = Field(pattern=r"^fg-[0-9]{3}$")
+    case_id: str = Field(pattern=r"^(?:fg|fh)-[0-9]{3}$")
     text: str = Field(min_length=1, max_length=10_000)
     persona: Persona
     state: UserState
@@ -44,6 +48,7 @@ class FraudGoldenCase(BaseModel):
     expected_min_risk: str = Field(pattern=r"^(low|medium|high)$")
     required_action_codes: list[str] = Field(default_factory=list)
     synthetic: bool = True
+    held_out: bool = False
     annotation_note: str
 
     @model_validator(mode="after")
@@ -85,14 +90,35 @@ def load_golden_cases(path: Path = GOLDEN_SET_PATH) -> list[FraudGoldenCase]:
     return cases
 
 
+def load_holdout_cases(path: Path = HOLDOUT_SET_PATH) -> list[FraudGoldenCase]:
+    return load_golden_cases(path)
+
+
+def is_held_out(cases: Iterable[FraudGoldenCase]) -> bool:
+    """섞인 셋은 없다. `_validate_collection` 이 이미 거부했다."""
+    return any(case.held_out for case in cases)
+
+
 def _validate_collection(cases: Iterable[FraudGoldenCase]) -> None:
     materialized = list(cases)
     case_ids = [case.case_id for case in materialized]
     if len(case_ids) != len(set(case_ids)):
         raise ValueError("golden case IDs must be unique")
+    flags = {case.held_out for case in materialized}
+    if len(flags) > 1:
+        raise ValueError("a dataset must be entirely held-out or entirely not")
+    # 접두사와 플래그가 어긋나면 파일 하나가 두 정체성을 갖는다. 그 상태에서
+    # `fh-` 사례를 개발셋에 붙여 넣으면 아무도 눈치채지 못한다.
+    mislabeled = [
+        case.case_id
+        for case in materialized
+        if case.held_out != case.case_id.startswith("fh-")
+    ]
+    if mislabeled:
+        raise ValueError(f"case ID prefix must match held_out: {sorted(mislabeled)}")
     covered_states = {case.state for case in materialized}
     if covered_states != set(UserState):
         missing = sorted(state.value for state in set(UserState) - covered_states)
         raise ValueError(f"golden set must cover every UserState; missing={missing}")
     if len(materialized) < 36:
-        raise ValueError("fraud golden v0.1 requires at least 36 cases")
+        raise ValueError("a fraud evaluation set requires at least 36 cases")

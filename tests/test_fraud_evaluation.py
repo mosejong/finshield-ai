@@ -3,16 +3,23 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.analysis import AnalyzeRequest
+from app.schemas.analysis import AnalyzeRequest, Persona, UserState
 from app.services.fraud_analysis import analyze_fraud
 from app.services.llm.contract import LlmContractError
 from app.services.llm.provider import LlmProvider, LlmUnavailable
 from evaluation.fraud_benchmark import (
+    FRAUD_TYPES,
     check_minimum_quality,
     evaluate_golden_set,
     normalized_dataset_sha256,
 )
-from evaluation.fraud_golden import FraudGoldenCase, load_golden_cases
+from evaluation.fraud_golden import (
+    FraudGoldenCase,
+    _validate_collection,
+    is_held_out,
+    load_golden_cases,
+    load_holdout_cases,
+)
 from evaluation.llm_judge import (
     FRAUD_JUDGE_PROMPT,
     JUDGE_RUN_PATH,
@@ -46,6 +53,66 @@ def test_golden_set_is_synthetic_versioned_and_covers_every_state() -> None:
         for state in {case.state.value for case in cases}
     }
     assert min(state_counts.values()) >= 3
+
+
+# --- held-out 셋 ----------------------------------------------------------
+#
+# 여기에는 **성능 단언이 없다.** 있으면 CI 가 빨개질 때마다 held-out 셋을 보고
+# 규칙을 고치게 되고, 그 순간 held-out 이 아니게 된다. 이 셋에 대해 CI 가 지키는
+# 것은 라벨 무결성과 개발셋과의 분리뿐이다. 숫자는 사람이 날짜를 붙여 잰다
+# (`evaluation/results/fraud-holdout-v0.2.json`).
+
+
+def test_holdout_set_is_labelled_and_separated_from_the_development_set() -> None:
+    holdout = load_holdout_cases()
+    development = load_golden_cases()
+
+    assert len(holdout) == 72
+    assert is_held_out(holdout)
+    assert not is_held_out(development)
+    assert all(case.synthetic for case in holdout)
+    assert {case.case_id for case in holdout}.isdisjoint(
+        case.case_id for case in development
+    )
+    # 문장이 겹치면 개발셋에서 고친 것이 held-out 점수로 되돌아온다.
+    assert {case.text for case in holdout}.isdisjoint(
+        case.text for case in development
+    )
+
+
+def test_holdout_covers_every_state_persona_and_fraud_type() -> None:
+    holdout = load_holdout_cases()
+
+    assert {case.state.value for case in holdout} == {state.value for state in UserState}
+    assert {case.persona.value for case in holdout} == {p.value for p in Persona}
+    covered = {t for case in holdout for t in case.expected_fraud_types}
+    assert covered == set(FRAUD_TYPES)
+    # 부정 사례가 없으면 오탐률을 잴 수 없다.
+    assert sum(not case.is_fraud for case in holdout) >= 20
+
+
+def test_a_dataset_cannot_be_half_held_out() -> None:
+    mixed = load_holdout_cases()[:40] + load_golden_cases()[:40]
+
+    with pytest.raises(ValueError, match="entirely held-out or entirely not"):
+        _validate_collection(mixed)
+
+
+def test_a_holdout_case_cannot_be_smuggled_in_under_a_development_id() -> None:
+    payload = load_holdout_cases()[0].model_dump()
+    payload["case_id"] = "fg-900"
+
+    with pytest.raises(ValueError, match="case ID prefix must match held_out"):
+        _validate_collection([FraudGoldenCase.model_validate(payload)])
+
+
+def test_report_records_which_dataset_it_describes() -> None:
+    report = evaluate_golden_set(
+        load_holdout_cases(), dataset_id="fraud_holdout_v0.2"
+    )
+
+    assert report["dataset"]["id"] == "fraud_holdout_v0.2"  # type: ignore[index]
+    assert report["dataset"]["held_out"] is True  # type: ignore[index]
 
 
 def test_scenario_engine_meets_bootstrap_quality_gate_without_claiming_llm() -> None:

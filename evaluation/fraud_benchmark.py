@@ -7,7 +7,7 @@ from math import ceil
 from app.domain.fraud.signals import detect_legacy_signals
 from app.schemas.analysis import AnalyzeResponse
 from app.services.fraud_analysis import analyze_fraud
-from evaluation.fraud_golden import FraudGoldenCase, RISK_RANK
+from evaluation.fraud_golden import FraudGoldenCase, RISK_RANK, is_held_out
 from evaluation.llm_judge import LlmJudgement, LlmJudgeRun
 
 
@@ -38,6 +38,7 @@ def evaluate_golden_set(
     cases: list[FraudGoldenCase],
     *,
     llm_run: LlmJudgeRun | None = None,
+    dataset_id: str = "fraud_golden_v0.1",
 ) -> dict[str, object]:
     responses = [analyze_fraud(case.request()) for case in cases]
     scenario_predictions = [bool(response.fraud_types) for response in responses]
@@ -58,7 +59,7 @@ def evaluate_golden_set(
 
     return {
         "dataset": {
-            "id": "fraud_golden_v0.1",
+            "id": dataset_id,
             "normalized_sha256": dataset_sha256,
             "case_count": len(cases),
             "positive_count": sum(truth),
@@ -70,7 +71,7 @@ def evaluate_golden_set(
                 sorted(Counter(case.state.value for case in cases).items())
             ),
             "source_kind": "locally_authored_synthetic_reviewed",
-            "held_out": False,
+            "held_out": is_held_out(cases),
         },
         "legacy_rule_v0": {
             "scope": "legacy five-keyword public compatibility baseline",
@@ -476,7 +477,15 @@ def _ratio(numerator: float, denominator: float) -> float:
 
 
 def normalized_dataset_sha256(cases: list[FraudGoldenCase]) -> str:
+    """어떤 **사례와 라벨**로 쟀는지를 식별한다.
+
+    `held_out` 은 뺀다. 그것은 사례의 성질이 아니라 파일의 성질이고, 모델에게
+    보낸 적도 채점에 쓴 적도 없다. 넣으면 이 필드를 추가한 것만으로 이미
+    돈을 주고 받아 둔 판정 결과가 `stale` 이 된다 - 문장도 라벨도 그대로인데.
+    파일이 섞이지 않는다는 보장은 `_validate_collection` 이 따로 한다.
+    """
     normalized = "\n".join(
-        case.model_dump_json(exclude_none=False) for case in cases
+        case.model_dump_json(exclude_none=False, exclude={"held_out"})
+        for case in cases
     ).encode("utf-8")
     return sha256(normalized).hexdigest()
