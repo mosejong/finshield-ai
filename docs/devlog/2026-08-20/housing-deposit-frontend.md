@@ -149,8 +149,8 @@ uvicorn:8000 + `next start` 실측:
 
 ## 커밋 SHA
 
-병합 후 이 자리에 squash 결과 SHA 를 적는다.
+`bd6992596a41f371aacf9c3aa998dfde975d5f80`
 
 ## PR
 
-병합 후 이 자리에 PR 번호를 적는다.
+[#78](https://github.com/mosejong/finshield-ai/pull/78) — CI 8건 통과 후 squash 병합.
