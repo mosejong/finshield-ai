@@ -8,6 +8,30 @@
     "supports": ["REPORT_MOVE_IN", "KEEP_OPPOSING_POWER"]
   },
   {
+    "source_id": "housing_lease_act_article3_2",
+    "organization": "국가법령정보센터",
+    "title": "주택임대차보호법 제3조의2 보증금의 회수",
+    "source_url": "https://www.law.go.kr/LSW/lsLinkProc.do?lsNm=%EC%A3%BC%ED%83%9D%EC%9E%84%EB%8C%80%EC%B0%A8%EB%B3%B4%ED%98%B8%EB%B2%95&joNo=000302&mode=11",
+    "retrieved_at": "2026-08-20",
+    "supports": ["GET_CONFIRMED_DATE"]
+  },
+  {
+    "source_id": "national_tax_collection_act_article109",
+    "organization": "국가법령정보센터",
+    "title": "국세징수법 제109조 미납국세 등의 열람",
+    "source_url": "https://www.law.go.kr/LSW/lsLinkProc.do?lsNm=%EA%B5%AD%EC%84%B8%EC%A7%95%EC%88%98%EB%B2%95&joNo=010900&mode=11",
+    "retrieved_at": "2026-08-20",
+    "supports": ["CHECK_TAX_ARREARS"]
+  },
+  {
+    "source_id": "local_tax_collection_act_article6",
+    "organization": "국가법령정보센터",
+    "title": "지방세징수법 제6조 미납지방세 등의 열람",
+    "source_url": "https://www.law.go.kr/LSW/lsLinkProc.do?lsNm=%EC%A7%80%EB%B0%A9%EC%84%B8%EC%A7%95%EC%88%98%EB%B2%95&joNo=000600&mode=11",
+    "retrieved_at": "2026-08-20",
+    "supports": ["CHECK_TAX_ARREARS"]
+  },
+  {
     "source_id": "easylaw_opposing_power",
     "organization": "법제처 찾기쉬운 생활법령정보",
     "title": "주택임대차 > 보증금의 보호 > 대항력 및 우선변제권 취득",

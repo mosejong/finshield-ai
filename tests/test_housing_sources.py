@@ -116,6 +116,38 @@ def test_sources_are_official_institutions() -> None:
         assert source.source_url.startswith("https://"), source.source_id
 
 
+def test_statute_links_use_a_form_that_renders_the_article() -> None:
+    """조문 직링크는 실제로 본문이 열리는 형태만 쓴다.
+
+    `lsInfoP.do` 는 조문 본문을 열지 못했고, 일련번호를 추측해서 만든 링크는
+    한 번 엉뚱한 법령(국토기본법 시행령)을 가리켰다. 링크가 열리는 것과 그
+    링크가 우리가 인용한 조문인 것은 다른 문제라, 형태만이라도 고정해 둔다.
+    """
+    working_forms = ("lsLinkProc.do", "lsLinkCommonInfo.do")
+
+    for source in load_housing_sources().values():
+        if source.organization != "국가법령정보센터":
+            continue
+        assert any(form in source.source_url for form in working_forms), (
+            source.source_id
+        )
+
+
+def test_priority_repayment_cites_the_statute_not_only_the_plain_language_guide() -> (
+    None
+):
+    """확정일자 안내는 생활법령 해설만으로 두지 않는다.
+
+    우선변제권은 보증금 전액이 걸린 권리다. 해설 페이지는 개편되면 문장이
+    바뀌지만 조문은 조문이므로, 사용자가 원문을 직접 열 수 있어야 한다.
+    """
+    catalog = load_housing_sources()
+    source_ids = ACTION_POLICIES["GET_CONFIRMED_DATE"].source_ids
+
+    assert "housing_lease_act_article3_2" in source_ids
+    assert catalog["housing_lease_act_article3_2"].organization == "국가법령정보센터"
+
+
 def test_startup_verifies_housing_sources(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
     monkeypatch.setattr(
