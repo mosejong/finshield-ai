@@ -200,6 +200,31 @@ export default function CheckPage() {
         </div>
       </form>
 
+      {/*
+        급한 사람의 경로를 막지 않도록 폼 아래에 둔다. 전세 계약 확인은 지금
+        문자를 받은 사람이 먼저 눌러야 할 것이 아니다.
+      */}
+      <section aria-labelledby="check-other" className="mt-10">
+        <SectionHeading>
+          <span id="check-other">다른 확인</span>
+        </SectionHeading>
+
+        <Link
+          href="/check/deposit"
+          className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-secondary"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-body font-medium text-foreground">
+              전세보증금 위험 점검
+            </p>
+            <p className="mt-1 text-caption text-muted-foreground">
+              계약 단계와 금액을 넣으면 등기부 확인·전입신고·확정일자 중 무엇이
+              비어 있는지 짚어드립니다.
+            </p>
+          </div>
+        </Link>
+      </section>
+
       <DisclaimerNote>
         이 확인은 위험 신호를 찾아주는 보조 도구이며 금융·법률 판단을 대신하지
         않습니다. 이미 피해가 발생했다면 경찰(112)과 거래 은행에 먼저 연락하세요.

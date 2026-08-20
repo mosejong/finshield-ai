@@ -723,3 +723,130 @@ export const HomeViewSchema = z.object({
   nextActionSource: SourceKindSchema,
 });
 export type HomeView = z.infer<typeof HomeViewSchema>;
+
+/* ------------------------------------------------------------------ */
+/* 전세보증금 위험 점검                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * `POST /api/v1/housing/deposit-risk` 의 입출력.
+ *
+ * 백엔드 `app/schemas/housing.py` 를 그대로 옮긴 것이다. 여기서 구간을 다시
+ * 나누거나 비율을 계산하지 않는다 — 부채비율도 대항력 발생일도 전부 백엔드
+ * 결정론 코드가 낸 값이고, 화면은 받은 값을 표시만 한다.
+ */
+
+export const LeaseStageSchema = z.enum([
+  "before_contract",
+  "contract_signed",
+  "balance_paid",
+  "moved_in",
+  "lease_ending",
+  "deposit_unreturned",
+]);
+export type LeaseStage = z.infer<typeof LeaseStageSchema>;
+
+export const DepositCheckSchema = z.enum([
+  "registry_checked",
+  "owner_identity_verified",
+  "move_in_reported",
+  "confirmed_date_obtained",
+  "deposit_guarantee_joined",
+]);
+export type DepositCheck = z.infer<typeof DepositCheckSchema>;
+
+/** 백엔드 `MAX_KRW` 와 같은 값. 정상 입력의 상한이 아니라 오타 방어선이다. */
+export const MAX_KRW = 1_000_000_000_000_000;
+
+const WonAmountSchema = z.number().int().min(0).max(MAX_KRW);
+
+const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export const DepositRiskRequestSchema = z.object({
+  stage: LeaseStageSchema,
+  deposit_krw: WonAmountSchema,
+  /**
+   * 모르면 `null` 이다. 0 을 "모른다" 로 쓰지 않는다 — 0 원짜리 주택과 확인하지
+   * 않은 것은 다르고, 그 둘을 섞으면 등기부를 안 본 사람에게 가장 안심되는
+   * 숫자가 나간다.
+   */
+  property_price_krw: WonAmountSchema.nullable(),
+  senior_lien_krw: WonAmountSchema.nullable(),
+  completed_checks: z.array(DepositCheckSchema).max(16),
+  move_in_reported_on: IsoDateSchema.nullable(),
+}).strict();
+export type DepositRiskRequest = z.infer<typeof DepositRiskRequestSchema>;
+
+export const DepositRiskSignalSchema = z.object({
+  code: z.string(),
+  label: z.string(),
+  detail: z.string(),
+});
+export type DepositRiskSignal = z.infer<typeof DepositRiskSignalSchema>;
+
+export const DepositProtectionSchema = z.object({
+  /** 대항력 발생일. 주택임대차보호법 제3조 제1항의 "그 다음 날" 이다. */
+  opposing_power_effective_on: IsoDateSchema.nullable(),
+  has_opposing_power_requirements: z.boolean(),
+  /**
+   * 우선변제권은 요건 충족 여부만 온다. 취득 시점을 날짜로 단정하려면 법문에
+   * 없는 해석이 필요해서 백엔드가 날짜를 만들지 않는다. 화면도 만들지 않는다.
+   */
+  has_priority_repayment_requirements: z.boolean(),
+});
+export type DepositProtection = z.infer<typeof DepositProtectionSchema>;
+
+export const DepositRatioBandSchema = z.enum([
+  "unknown",
+  "low",
+  "elevated",
+  "high",
+]);
+export type DepositRatioBand = z.infer<typeof DepositRatioBandSchema>;
+
+export const DepositRatioSchema = z.object({
+  ratio_percent: z.number().nullable(),
+  band: DepositRatioBandSchema,
+  /**
+   * `z.literal(true)` 로 둔 것은 의도다. 백엔드가 이 표시를 떨어뜨리면 화면이
+   * 조용히 넘어가지 않고 스키마 오류로 멈춘다 — 구간 이름이 공식 기준처럼
+   * 읽히는 상태로 화면에 나가는 것보다 안 나가는 편이 낫다.
+   */
+  band_is_service_rule: z.literal(true),
+  formula: z.string(),
+});
+export type DepositRatio = z.infer<typeof DepositRatioSchema>;
+
+export const DepositRiskActionCodeSchema = z.enum([
+  "CHECK_REGISTRY",
+  "VERIFY_OWNER_IDENTITY",
+  "REPORT_MOVE_IN",
+  "GET_CONFIRMED_DATE",
+  "JOIN_DEPOSIT_GUARANTEE",
+  "KEEP_OPPOSING_POWER",
+  "APPLY_LEASE_REGISTRATION_ORDER",
+  "CHECK_VICTIM_SUPPORT",
+]);
+export type DepositRiskActionCode = z.infer<typeof DepositRiskActionCodeSchema>;
+
+export const DepositRiskActionSchema = z.object({
+  code: DepositRiskActionCodeSchema,
+  priority: z.number().int().min(1).max(3),
+  title: z.string(),
+  reason: z.string(),
+  source_ids: z.array(z.string()),
+});
+export type DepositRiskAction = z.infer<typeof DepositRiskActionSchema>;
+
+export const DepositRiskResponseSchema = z.object({
+  risk_level: RiskLevelSchema,
+  stage: LeaseStageSchema,
+  summary: z.string(),
+  ratio: DepositRatioSchema,
+  protection: DepositProtectionSchema,
+  signals: z.array(DepositRiskSignalSchema),
+  actions: z.array(DepositRiskActionSchema),
+  official_sources: z.array(BackendOfficialSourceSchema),
+  disclaimer: z.string(),
+});
+export type DepositRiskResponse = z.infer<typeof DepositRiskResponseSchema>;
