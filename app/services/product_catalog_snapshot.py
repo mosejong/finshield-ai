@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from math import isfinite
 from threading import Lock
 from time import monotonic
@@ -15,6 +15,7 @@ from app.clients.public_data_products import (
     ProductProviderResponseError,
     PublicDataProductClient,
 )
+from app.core.clock import SEOUL
 from app.domain.finance.product_identity import (
     ProductCatalogIdentityAudit,
     audit_product_catalog_identity,
@@ -23,7 +24,6 @@ from app.domain.finance.product_catalog import normalize_public_data_product
 from app.schemas.product import FinancialProduct
 
 
-SEOUL = timezone(timedelta(hours=9), name="KST")
 ACTIVE_PRODUCT_QUERY = "active:Y"
 
 

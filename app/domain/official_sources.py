@@ -11,6 +11,7 @@
 from datetime import date, timedelta
 from typing import Protocol
 
+from app.core.clock import today_kst
 from app.schemas.analysis import OfficialSource
 
 
@@ -55,7 +56,7 @@ def build_catalog(sources: list[OfficialSource]) -> dict[str, OfficialSource]:
     if len(source_urls) != len(set(source_urls)):
         raise OfficialSourceDataError("official source_url must be unique")
 
-    today = date.today()
+    today = today_kst()
     for source in sources:
         # 형식 오류와 미래 날짜만 데이터 오류로 막는다. 오래된 것은 경고로 다룬다.
         if parse_retrieved_at(source) > today:
@@ -72,7 +73,7 @@ def select_stale(
     interval_days: int,
     today: date | None = None,
 ) -> list[OfficialSource]:
-    cutoff = (today or date.today()) - timedelta(days=interval_days)
+    cutoff = (today or today_kst()) - timedelta(days=interval_days)
     return [
         source
         for source in catalog.values()

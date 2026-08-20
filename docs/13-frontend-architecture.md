@@ -29,6 +29,7 @@ finshield-ai/
 | `/profile` | 내 금융상태 | 구현 |
 | `/check` | 의심 메시지 입력 + 피해 단계 선택 | 구현 |
 | `/check/result/[id]` | 위험 분석 결과 + 대응 액션 | 구현 |
+| `/check/deposit` | 전세보증금 위험 점검 | 구현 |
 | `/products` | 금융 목표 기반 공식 상품 후보 | 구현 |
 | `/products/simulate` | 현재 금리와 변경 금리의 대출 What-if 비교 | 구현 |
 | `/learn/wealth` | 공식 근거 기반 재테크 기초 교육 | 구현 |
@@ -44,6 +45,8 @@ finshield-ai/
 설치 유도(`components/pwa/InstallHint.tsx`)는 **결과 화면에만** 둔다. Home 은 블록 4개로 고정이고, 설치의 값어치는 결과를 한 번 본 뒤에야 와닿는다.
 
 **`/check` 는 프로필 없이 동작한다.** 의심 문자를 방금 받은 사람에게 온보딩을 먼저 요구하면 이탈한다. 프로필은 개인화 품질만 올리는 선택 요소이며, 있으면 `persona` 만 요청에 실린다.
+
+**`/check/deposit` 도 같은 규칙을 따른다.** 계약을 앞둔 사람에게 회원가입을 먼저 요구하지 않는다. 새 탭을 만들지 않고 `/check` 아래에 둔 덕에 BottomNav 의 `startsWith("/check")` 강조가 그대로 동작하고 IA 는 4개 영역 그대로다. `/check` 안의 링크는 **폼 아래**에 둔다 — 방금 사기 문자를 받은 사람의 경로를 전세 도구가 가로막지 않게 하기 위해서다. 설계는 `docs/37-housing-deposit-risk.md` 8절.
 
 ---
 
@@ -137,6 +140,7 @@ lib/api/contracts.ts   zod — Scenario Engine과 프론트 화면 계약
 lib/api/client.ts      fetch 래퍼 (타임아웃 8초, ApiError)
 lib/api/analysis.ts    어댑터: live 응답 변환, 필드별 source 태깅
 lib/api/explanation.ts LLM 설명 — 판정과 별도 호출 (타임아웃 25초)
+lib/api/housing.ts     전세보증금 점검 — 실패를 결과로 바꾸지 않는 outcome 반환
 lib/api/mode.ts        NEXT_PUBLIC_API_MODE=mock|live
 lib/mock/*.ts          백엔드 미구현 영역의 임시 데이터
 lib/format/*.ts        표시 포맷팅만
@@ -162,6 +166,7 @@ lib/store/explanation-store.ts  원문 인계 — 저장소가 아니라 메모�
 | 재테크 기초 가이드 | `/api/v1/guidance/wealth` | live, 입력 없는 고정 교육 계약 |
 | 공식 상품 상세·비교 | `/api/v1/products/{id}`, `/api/v1/products/compare` | live, 같은 snapshot 원문 |
 | 왜 위험한지 — 쉬운 말 설명 | `/api/v1/analyze/explanation` | live, 판정과 별도 호출. 배포에서 꺼져 있으면 자리를 만들지 않는다 |
+| 전세보증금 위험 점검 | `/api/v1/housing/deposit-risk` | live. mock 대체 없음 — 실패는 실패로 보여준다 |
 
 ### 금융 로직 금지선
 
@@ -170,6 +175,7 @@ lib/store/explanation-store.ts  원문 인계 — 저장소가 아니라 메모�
   `/api/v1/profiles/{id}/metrics`의 포맷된 `display` 값을 그대로 표시하고,
   mock 모드는 계산식 없는 고정 fixture를 표시한다.
 - `lib/format/` 의 `risk_level → 색` 매핑은 표현이지 판정이 아니다.
+- `lib/format/housing.ts` 의 `manwonToKrw` 는 **단위 환산**이다. ×10,000 은 0 을 아홉 개 세지 않게 하려는 것이고, 부채비율·대항력·위험 판정은 전부 백엔드에 남아 있다. 빈 칸은 `0` 이 아니라 `null` 로 보낸다 — 모르는 값을 0 으로 채우면 백엔드가 `unknown` 을 낼 기회를 잃고, 등기부를 안 본 사람이 가장 안심되는 숫자를 받는다.
 - mock 은 백엔드 `risk_engine.py` 의 키워드 규칙을 복제하지 않는다. mock 모드는 입력과 무관한 고정 예시를 돌려주고 화면에 "예시"라고 적는다.
 
 ### 모델 문장은 결정론 요약을 대체하지 않는다
@@ -201,7 +207,8 @@ live 모드는 백엔드 `official_sources`를 `verified: true`로 변환하고
 `POST/GET/DELETE /api/v1/auth/session`, `DELETE /api/v1/auth/account`,
 `GET /api/v1/products`, `POST /api/v1/recommendations`,
 `POST /api/v1/loans/simulate`, `POST/GET/PUT/DELETE /api/v1/profiles`,
-`GET /api/v1/profiles/{id}/metrics`, `GET /api/v1/guidance/wealth`
+`GET /api/v1/profiles/{id}/metrics`, `GET /api/v1/guidance/wealth`,
+`POST /api/v1/housing/deposit-risk`
 
 `analyze`는 기존 필드에 더해 `fraud_types`, `summary`, `actions`,
 `official_sources`를 반환한다. 프론트는 이 값을 mock으로 대체하지 않는다.
@@ -232,6 +239,11 @@ FastAPI 에 `CORSMiddleware` 가 없어 브라우저가 `localhost:8000` 을 직
 계약을 읽는다. 프로필·계좌·보유종목을 보내지 않고 backend module과 공식 source를
 그대로 표시한다. 프론트는 투자 가능 여부, 상품 선택, 예상수익률을 판정하지 않는다.
 
+전세보증금 점검은 `/api/proxy/housing/deposit-risk` 를 거친다. **세션 쿠키를
+넘기지 않고 CSRF 검사도 붙이지 않는다** — 상태를 바꾸지 않고 계정에 딸린 자원을
+읽지도 않는, `analyze` 와 같은 성격의 요청이다. 보증금·주택가격은 로그로 남기지
+않는다(ADR 0006).
+
 부수 효과로 백엔드 주소가 클라이언트 번들에 노출되지 않는다. 그래서 `FINSHIELD_API_URL` 에는 `NEXT_PUBLIC_` 접두사를 붙이지 않는다.
 
 ### 실패를 안전으로 바꾸지 않는다
@@ -239,6 +251,7 @@ FastAPI 에 `CORSMiddleware` 가 없어 브라우저가 `localhost:8000` 을 직
 - 백엔드 호출 실패는 502 와 실제 사유로 전달한다. 조용히 "위험 없음"으로 바꾸지 않는다.
 - 알 수 없는 `risk_level` 값은 `high` 로 매핑한다. 낙관하지 않는다.
 - 실패 화면에도 "결과를 확인하지 못했다고 안전한 것은 아니다"라고 적는다.
+- **다만 입력 거부(422)는 장애가 아니다.** `upstreamStatus` 의 기본값은 502 인데, 고칠 수 있는 값 때문에 거부된 요청까지 502 로 덮으면 사용자는 "잠시 후 다시" 만 반복한다. `/api/proxy/housing/deposit-risk` 는 이 경우만 400 으로 옮긴다 — 판단 규칙을 프론트에 한 벌 더 두지 않고, 거부됐다는 사실만 옮긴다. (미래 전입신고일이 이 경로를 탄다. "오늘" 의 기준은 KST 를 아는 백엔드에 있다.)
 
 ### 개인정보
 

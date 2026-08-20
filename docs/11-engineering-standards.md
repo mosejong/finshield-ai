@@ -5,6 +5,8 @@ Grow toward api/, schemas/, domain/finance, domain/fraud, services/, clients/, r
 Provider/network errors must not become “no eligible products”, zero rates, or invented defaults.
 ## Observability
 Structured logs, request IDs, provider/model latency and errors; no raw sensitive profiles/messages in normal logs.
+## Time
+Calendar dates come from `app.core.clock` (`today_kst`, `now_kst`, `SEOUL`) — the container runs UTC and users are in KST, so `date.today()` is the user's yesterday for nine hours a day. Durations (session expiry, retention windows, rate-limit buckets) stay UTC; they measure intervals, not what day it is for the user.
 ## Configuration
 Environment variables for secrets/DB/providers/features; validate at startup.
 ## Performance

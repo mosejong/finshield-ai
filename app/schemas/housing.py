@@ -14,6 +14,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.core.clock import today_kst
 from app.schemas.analysis import OfficialSource
 
 
@@ -64,7 +65,7 @@ class DepositRiskRequest(BaseModel):
 
     @model_validator(mode="after")
     def _reject_future_move_in_date(self) -> "DepositRiskRequest":
-        if self.move_in_reported_on and self.move_in_reported_on > date.today():
+        if self.move_in_reported_on and self.move_in_reported_on > today_kst():
             raise ValueError("move_in_reported_on must not be in the future")
         return self
 

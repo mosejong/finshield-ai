@@ -12,16 +12,28 @@ export function HomeCheckToday() {
   if (profileState.status === "idle" || profileState.status === "loading") {
     return null;
   }
-  const items: CheckItem[] = profileState.profile
-    ? [
-        {
-          id: "official-product-purpose",
-          title: "내 목표와 공식 상품의 용도를 비교해 보세요",
-          reason: `저장한 목표는 ‘${GOAL_LABEL[profileState.profile.goal]}’입니다. 상세 자격은 취급기관에서 확인해야 합니다.`,
-          href: "/products",
-        },
-      ]
-    : [];
+  /*
+    전세 점검은 프로필 없이도 보인다. 계약을 앞둔 사람에게 온보딩을 먼저
+    시키지 않는다는 규칙이 이 항목에도 그대로 적용된다.
+  */
+  const items: CheckItem[] = [
+    {
+      id: "jeonse-deposit-risk",
+      title: "전세 계약이라면 보증금 위험을 점검해 보세요",
+      reason:
+        "등기부 확인·전입신고·확정일자 중 무엇이 비어 있는지 짚어드립니다. 로그인 없이 확인할 수 있습니다.",
+      href: "/check/deposit",
+    },
+  ];
+
+  if (profileState.profile) {
+    items.push({
+      id: "official-product-purpose",
+      title: "내 목표와 공식 상품의 용도를 비교해 보세요",
+      reason: `저장한 목표는 ‘${GOAL_LABEL[profileState.profile.goal]}’입니다. 상세 자격은 취급기관에서 확인해야 합니다.`,
+      href: "/products",
+    });
+  }
 
   return <CheckTodayBlock items={items} source="live" />;
 }
