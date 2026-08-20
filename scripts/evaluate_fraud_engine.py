@@ -89,13 +89,26 @@ def main() -> int:
         parser.error("--performance-repeats must be zero or greater")
 
     cases = load_golden_cases(args.dataset)
+
+    # 기본 판정 결과 파일은 **개발셋을 채점한 것**이다. 다른 데이터셋을 돌리면서
+    # 그 파일을 그대로 읽으면 sha256 이 어긋나 `stale` 이 뜨고, 품질 게이트는
+    # 그것을 "다시 재라" 로 읽는다. 여기서는 낡은 게 아니라 애초에 다른 셋이다.
+    # 그 셋의 모델 판정을 보고 싶으면 `--llm-judgements` 로 직접 지정한다.
+    judgements = args.llm_judgements
+    if args.dataset != GOLDEN_SET_PATH and judgements == JUDGE_RUN_PATH:
+        judgements = None
+
     report = {
         "report_version": "fraud_benchmark_v0.1",
         "environment": {
             "python": platform.python_version(),
             "platform": platform.platform(),
         },
-        **evaluate_golden_set(cases, llm_run=load_llm_run(args.llm_judgements)),
+        **evaluate_golden_set(
+            cases,
+            llm_run=load_llm_run(judgements) if judgements else None,
+            dataset_id=args.dataset.stem,
+        ),
     }
     if args.performance_repeats:
         report["api_latency"] = asyncio.run(

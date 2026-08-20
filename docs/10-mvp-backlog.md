@@ -30,7 +30,11 @@
 - [x] persona·전체 UserState scenario golden set v0.1 (합성 bootstrap)
 - [x] 고정 LLM-only vs Hybrid 비교 (2026-08-19, non-held-out 61건. `docs/32`)
 - [x] 규칙 신호 어휘 v0.2 — 비교가 찾아 준 오답 3건을 규칙으로 메움 (2026-08-19)
-- [ ] **held-out v0.2 골든셋** — 개발셋에서 엔진 오류가 0건이 되어 변별력을 잃었다. 별도 작성·동결한 셋에서 Rule / LLM / Hybrid 를 다시 재는 것이 다음 측정의 전제다
+- [x] **held-out v0.2 골든셋** (2026-08-20, 72건) — 동결 후 첫 측정에서 개발셋 1.000 이 기억이었음을 확인: precision 0.854 / recall 0.795 / 오탐률 0.214 / 상태 정책 정확도 0.681. `docs/32`
+- [ ] **held-out 이 드러낸 엔진 결함 수정** — ① 은행·기관 자칭 사칭 어휘 부재(`authority_impersonation` 재현율 0.333) ② `classify_fraud_types` 에 `money_transfer_request` 분기 없음(등급은 high 인데 유형이 빔) ③ 한국어 어미를 못 넘는 부분 문자열 매칭 ④ 요구 맥락 없이 맨 명사만으로 켜지는 신호(오탐 6건 전부). **고치면 v0.2 는 소진된다**
+- [ ] **held-out v0.3** — 위 수정 이후의 깨끗한 재측정용. 수정 전에 작성·동결해야 한다
+- [ ] **투자·리딩방 유형** — `FRAUD_TYPE_ORDER` 에 자리가 없어 해당 사례는 라벨조차 붙일 수 없다. 데이터가 아니라 taxonomy 의 공백
+- [ ] held-out v0.2 에 대한 LLM-only / Hybrid 3자 비교 (유료 호출 1회 필요. 현재 `not_run`)
 - [x] URL lexical feature analysis (offline safe implementation)
 - [ ] URL domain/reputation feature analysis (outbound-fetch policy required)
 - [x] financial profile dashboard shell
