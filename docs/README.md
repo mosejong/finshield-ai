@@ -31,7 +31,7 @@ Root `CLAUDE.md` · root `SKILL.md` · `.claude/skills/finshield/SKILL.md`
 
 ## Development history
 
-- `devlog/2026-08-20/prompt-injection-boundary.md` — 붙여넣은 문자를 데이터로 취급·사기 명령문은 증거이므로 보존·주입 골든셋 7건이 첫 실행에서 구멍 3개 발견·유료 측정 0/7·서술어만 보던 출력 검증이 정상 경고 4/8 을 지울 뻔한 것
+- `devlog/2026-08-20/prompt-injection-boundary.md` — 붙여넣은 문자를 데이터로 취급·사기 명령문은 증거이므로 보존·주입 골든셋 7건이 첫 실행에서 구멍 3개 발견·유료 측정 0/7·서술어만 보던 출력 검증이 정상 경고 4/8 을 지울 뻔한 것 / 후속: 코덱스 검토 2건 + 재현 중 발견 2건·좁히기를 문장→절→구간 3단계로·마침표 없는 문자가 통째로 지워지던 문제
 - `devlog/2026-08-20/housing-tax-arrears.md` — 임대인 미납 국세·지방세 열람 추가·법이 정한 신청 기간을 단계 창으로·확인 못 한 시행령 금액은 쓰지 않음·조문 직링크 형태(`lsLinkProc.do`) 고정
 - `devlog/2026-08-20/housing-deposit-frontend.md` — `/check/deposit` 화면·"모름"이 브라우저에서 0 이 되지 않게·422를 502로 덮던 문제·서버 시각을 KST 로 모음
 - `devlog/2026-08-19/housing-deposit-risk.md` — 전세보증금 위험 점검 v0.1 백엔드·근거 6건 선확인·못 연 조문은 넣지 않음·출처 무결성 규칙 공통화
