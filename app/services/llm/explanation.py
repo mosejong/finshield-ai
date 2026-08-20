@@ -7,6 +7,12 @@ non-negotiable 을 주석이 아니라 타입으로 지킨다.
 
 검증에 실패하면 설명 없이 간다. 설명이 없는 결과는 불편하지만, 검증을 통과하지
 못한 설명이 붙은 결과는 위험하다.
+
+여기서 사용자 원문이 세 겹을 지난다. `minimization.py` 가 개인정보를 걷어내고,
+`untrusted.py` 가 모델을 향한 지시를 무력화하고, `validation.py` 가 나온 문장을
+다시 본다. 판정은 이미 계산이 끝나서 인자로 들어오므로, 앞의 두 겹이 원문을
+어떻게 고치든 **위험 수준은 영향을 받지 않는다** - 신호 탐지는 이 함수보다 먼저
+끝났다.
 """
 
 from __future__ import annotations
@@ -19,6 +25,7 @@ from app.services.llm.prompts import (
     FRAUD_EXPLANATION_PROMPT_ID,
 )
 from app.services.llm.provider import LlmProvider, LlmUnavailable
+from app.services.llm.untrusted import neutralize_instructions
 from app.services.llm.validation import LlmOutputRejected, validate_explanation
 
 MAX_EXPLANATION_CHARS = 600
@@ -105,7 +112,14 @@ def explain_analysis(
     """
     contract.verify_prompt(FRAUD_EXPLANATION_PROMPT)
 
+    # 순서가 의미를 갖는다. 개인정보를 먼저 걷어내고, 그다음 모델을 향한 지시를
+    # 무력화한다. 반대로 하면 `[전화번호]` 로 바뀔 자리가 지시문 자리표시자 안에
+    # 숨어 버려서 무엇이 지워졌는지 두 계층의 건수가 어긋난다.
+    #
+    # 둘 다 **프롬프트가 아니라 값**을 고친다. 그래서 `FRAUD_EXPLANATION_PROMPT`
+    # 의 sha256 이 그대로고, 이 변경은 `evaluation/` 재실행을 요구하지 않는다.
     minimized = minimize_for_provider(message)
+    neutralized = neutralize_instructions(minimized.text)
     signals, actions, sources = _grounded_blocks(response)
 
     prompt = FRAUD_EXPLANATION_PROMPT.format(
@@ -114,7 +128,7 @@ def explain_analysis(
         signals=signals,
         actions=actions,
         sources=sources,
-        message=minimized.text[: contract.max_input_chars],
+        message=neutralized.text[: contract.max_input_chars],
     )
 
     try:
@@ -127,6 +141,7 @@ def explain_analysis(
             raw,
             grounded_text=build_grounded_text(response),
             max_chars=MAX_EXPLANATION_CHARS,
+            risk_level=response.risk_level,
         )
     except LlmOutputRejected:
         return None
