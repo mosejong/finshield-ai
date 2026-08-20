@@ -256,8 +256,9 @@ LLM 단독 baseline 을 재는 **계측기**이지 사용자 경로가 아니다
 
 ## 커밋 SHA
 
-`TBD`
+`d3103badefbd50df0b3f5e94a1dc0355ea390fbd` (squash merge)
 
 ## PR
 
-`TBD`
+[#82](https://github.com/mosejong/finshield-ai/pull/82) — CI 8건 통과
+(`test` · `web` · `deps-lock` · `container-runtime`, Linux)
