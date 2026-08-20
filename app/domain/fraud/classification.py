@@ -4,6 +4,7 @@ from app.schemas.analysis import RiskSignal
 FRAUD_TYPE_ORDER: tuple[str, ...] = (
     "authority_impersonation",
     "loan_policy_impersonation",
+    "advance_fee_demand",
     "account_access_request",
     "money_mule_transfer",
     "smishing_malware",

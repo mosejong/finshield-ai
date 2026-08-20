@@ -62,6 +62,16 @@ def test_golden_set_is_synthetic_versioned_and_covers_every_state() -> None:
 # 것은 라벨 무결성과 개발셋과의 분리뿐이다. 숫자는 사람이 날짜를 붙여 잰다
 # (`evaluation/results/fraud-holdout-v0.2.json`).
 
+# v0.2 를 얼릴 때의 분류 표. `advance_fee_demand` 는 그 뒤에 생겼다.
+FRAUD_TYPES_AT_HOLDOUT_V0_2_FREEZE = (
+    "authority_impersonation",
+    "loan_policy_impersonation",
+    "account_access_request",
+    "money_mule_transfer",
+    "smishing_malware",
+    "card_delivery_impersonation",
+)
+
 
 def test_holdout_set_is_labelled_and_separated_from_the_development_set() -> None:
     holdout = load_holdout_cases()
@@ -85,8 +95,13 @@ def test_holdout_covers_every_state_persona_and_fraud_type() -> None:
 
     assert {case.state.value for case in holdout} == {state.value for state in UserState}
     assert {case.persona.value for case in holdout} == {p.value for p in Persona}
+    # **동결 시점의 분류 표**를 기준으로 본다. 현재 표를 기준으로 하면, 나중에
+    # 유형이 하나 늘 때마다 이미 얼어붙은 파일의 테스트가 빨개진다. 그때 할 수
+    # 있는 일은 둘뿐인데 - 동결된 셋을 고치거나, 유형 추가를 포기하거나 - 둘 다
+    # 틀렸다. 셋은 자기가 태어난 시점의 표를 덮으면 된다.
     covered = {t for case in holdout for t in case.expected_fraud_types}
-    assert covered == set(FRAUD_TYPES)
+    assert covered == set(FRAUD_TYPES_AT_HOLDOUT_V0_2_FREEZE)
+    assert covered <= set(FRAUD_TYPES)
     # 부정 사례가 없으면 오탐률을 잴 수 없다.
     assert sum(not case.is_fraud for case in holdout) >= 20
 

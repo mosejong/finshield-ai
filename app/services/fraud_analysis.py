@@ -14,6 +14,7 @@ from app.schemas.analysis import AnalyzeRequest, AnalyzeResponse, UserState
 FRAUD_TYPE_LABELS: dict[str, str] = {
     "authority_impersonation": "기관 사칭",
     "loan_policy_impersonation": "대출·정책금융 사칭",
+    "advance_fee_demand": "선입금·수수료 요구",
     "account_access_request": "계좌·인증수단 접근 요구",
     "money_mule_transfer": "자금 수취·재전달 요구",
     "smishing_malware": "스미싱·악성 앱 유도",
