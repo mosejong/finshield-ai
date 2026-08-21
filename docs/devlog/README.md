@@ -92,6 +92,7 @@
 ## 2026-08-21
 
 - `fraud-taxonomy-investment-acquaintance.md` — 투자·리딩방 유인과 지인 사칭 탐지, held-out v0.4 동결·재측정, 오탐률 불변
+- `fraud-clause-scoped-demand.md` — held-out v0.5 동결 후 네 가지 탐지 수정(활용형·반말 요구·예방 안내문·절 범위), 거리가 아니라 절의 시제가 요구와 대상을 묶는다는 판단, 일부러 고치지 않은 6건, 필수 signal 코드 이름 오류로 coverage 가 탐지가 아닌 이름 불일치를 재고 있던 것
 
 ## 작성 규칙
 

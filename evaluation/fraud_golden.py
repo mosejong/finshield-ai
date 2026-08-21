@@ -4,6 +4,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.domain.fraud.signals import CANONICAL_TO_LEGACY_PUBLIC, SIGNAL_RULES
 from app.schemas.analysis import AnalyzeRequest, Persona, UserState
 
 
@@ -16,10 +17,13 @@ GOLDEN_SET_PATH = Path(__file__).with_name("data") / "fraud_golden_v0.1.jsonl"
 # 이라는 이름으로 부를 수 있게 두면 어떤 버전을 쟀는지 기록에 남지 않는다.
 # v0.2 는 규칙 수정에 쓰여 소진되었다. v0.3 은 그 수정 이후의 재측정용이고
 # 요구 조건 수정을 재면서 함께 소진되었다. v0.4 는 투자·지인 사칭 유형이
-# 구현되기 **전에** 얼린 셋이다.
+# 구현되기 **전에** 얼린 셋이고, 그 유형을 재면서 소진되었다. v0.5 는 v0.4 가
+# 찾아낸 여덟 건의 결함을 **고치기 전에** 얼린 셋이다 - 그 결함을 하나라도 먼저
+# 고쳤다면 v0.4 는 성능이 아니라 기억을 재는 자가 된다.
 HOLDOUT_V0_2_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.2.jsonl"
 HOLDOUT_V0_3_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.3.jsonl"
 HOLDOUT_V0_4_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.4.jsonl"
+HOLDOUT_V0_5_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.5.jsonl"
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",
@@ -32,6 +36,18 @@ FRAUD_TYPE_CODES = {
     "smishing_malware",
     "card_delivery_impersonation",
 }
+# 사례가 요구하는 신호 코드는 **응답에 실제로 실리는 이름**이어야 한다.
+#
+# 내부 규칙 이름과 공개 이름이 다르다. `project_public_signals` 가
+# `account_access_request` 를 `account_access` 로 바꿔 내보내기 때문에, 내부
+# 이름을 요구 조건에 적으면 그 조건은 **어떤 엔진으로도 만족될 수 없다.**
+# v0.4 의 11건과 v0.5 의 24건이 그렇게 적혀 있었고, 그동안
+# `required_signal_coverage` 는 탐지 성능이 아니라 이름 불일치를 재고 있었다.
+# 목록을 손으로 적지 않고 도메인에서 끌어오는 이유가 이것이다 - 손으로 적으면
+# 같은 어긋남이 다시 조용히 생긴다.
+SIGNAL_CODES = {
+    CANONICAL_TO_LEGACY_PUBLIC.get(rule.code, rule.code) for rule in SIGNAL_RULES
+} | {"suspicious_link"}
 ACTION_CODES = {
     "STOP_CONTACT",
     "DO_NOT_CLICK",
@@ -75,6 +91,12 @@ class FraudGoldenCase(BaseModel):
         unknown_actions = set(self.required_action_codes) - ACTION_CODES
         if unknown_actions:
             raise ValueError(f"unknown action labels: {sorted(unknown_actions)}")
+        unemittable = set(self.required_signal_codes) - SIGNAL_CODES
+        if unemittable:
+            raise ValueError(
+                "required_signal_codes must name codes the response can carry; "
+                f"unemittable: {sorted(unemittable)}"
+            )
         if len(self.expected_fraud_types) != len(set(self.expected_fraud_types)):
             raise ValueError("expected_fraud_types must not contain duplicates")
         if len(self.required_signal_codes) != len(set(self.required_signal_codes)):
