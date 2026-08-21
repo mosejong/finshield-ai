@@ -93,17 +93,32 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             # 원래 알던 연락처로 확인할 수 없게 만드는 핑계다. 그래서 어휘를
             # 호칭이 아니라 **연락 수단이 바뀐 이유**로 잡는다.
             "폰이 고장",
+            "폰 고장",
             "핸드폰이 고장",
             "휴대폰이 고장",
+            # v0.5. 바로 위 "폰 고장"과 아래 세 줄은 전부 **같은 핑계의
+            # 다른 활용형**이다. 어휘를 조사·어미가 붙은 한 형태로만 적어
+            # 두면 실제 문장과 어긋난다. "폰이 고장"은 있는데 조사를 뺀
+            # "폰 고장"이 없어서 held-out v0.5 의 `fh-301` 이 통째로 빠졌다.
+            "폰이 망가",
+            "핸드폰이 망가",
+            "휴대폰이 망가",
             "액정이 깨",
             "액정 깨",
             "폰 액정",
             "새 번호로",
             "번호가 바뀌었",
             "번호 바뀌었",
+            # 능동형. "번호 바꿨어"는 사칭 문자가 실제로 쓰는 형태다.
+            # "번호가 바뀌어서"(정상 안내)와는 어형이 다르므로 여기서
+            # 갈린다 - 남이 바꾼 것이 아니라 자기가 바꿨다고 말한다.
+            "번호 바꿨",
+            "번호를 바꿨",
             "이 번호로 저장",
             "전화가 안 돼",
             "전화가 안돼",
+            "카톡이 안 돼",
+            "카톡이 안돼",
             "통화가 안 돼",
             "통화가 안돼",
             "전화를 못 받",
@@ -131,8 +146,19 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "손실 보전",
             "손실보전",
             "전액 보전",
+            # 구어형. 약속의 내용이 "손실 보전"과 같다. 보조용언 어간까지만
+            # 적는다 - "드리"로 적어 두면 "메워 드립니다"가 안 걸린다.
+            # 한글은 어미가 앞 음절에 합쳐지므로("드리"+"ㅂ니다"→"드립니다")
+            # 활용형의 접두사가 기본형이 아니다. 여기서 한 번 틀렸다.
+            "메워 드",
+            "메워 주",
+            "메워 줄",
+            "메워 줘",
             "확정 수익",
             "확정수익",
+            # v0.5. "3배 확정입니다" 처럼 배수와 붙는 형태. 맨 "확정"은
+            # 넣지 않는다 - "만기일이 확정되었습니다"가 보장 약속이 된다.
+            "배 확정",
             "수익 보장",
             "수익보장",
             "무조건 수익",
@@ -158,10 +184,19 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "종목추천방",
             "추천방으로",
             "단톡방으로",
+            # v0.5. 오픈채팅방 쪽에 "-으로"만 있고 입장 어형이 없던 비대칭을
+            # 맞춘다. **단톡방 쪽에는 초대 어형을 넣지 않는다.** "회사 동호회
+            # 단톡방 초대 링크입니다"(v0.4 `fh-244`)와 "사장님 전용 단톡방
+            # 초대 링크 보내 드립니다"(v0.5 `fh-308`)는 이 구절이 똑같다.
+            # v0.4 가 남긴 판단이 여기서 그대로 유효하다 - 초대 자체는
+            # 표지가 아니고 **무엇을 위한 초대인가**가 갈림길이다. 그것을
+            # 재려면 투자·매매 맥락 조건이 필요하고, 그것은 v0.6 일감이다.
             "오픈채팅방으로",
+            "오픈채팅방 입장",
             "오픈채팅으로",
             "비공개 방으로",
             "텔레그램 채널",
+            "텔레그램 아이디",
             "텔레그램으로 연락",
             "텔레그램으로 오",
             "1:1 상담방",
@@ -197,6 +232,9 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         demand_gated_keywords=(
             "인증번호",
             "비밀번호",
+            # v0.5. 구어형. 요구 조건이 걸려 있어 "비번 잊어버렸어"는
+            # 켜지지 않는다.
+            "비번",
             "otp",
             "보안카드 번호",
             "일회용 승인코드",
@@ -236,11 +274,23 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         # 실제 문장인 "앱**을** 설치해 주세요" 를 못 잡았다. 조사 조합을 늘리는
         # 대신 동사만 남기고 요구를 조건으로 걸었다. 그러면 "앱 설치했는데
         # 오류가 납니다"(사용자 자신의 행동)는 켜지지 않는다.
-        demand_gated_keywords=("설치", "내려받", "다운로드"),
+        # v0.5. "깔다"는 "설치"의 구어형이고 사칭 문자가 반말일 때 거의
+        # 항상 이쪽을 쓴다. 요구 조건은 그대로 걸려 있어서 "가계부 앱
+        # 깔았는데 편하더라"(자기 행동)는 켜지지 않는다.
+        demand_gated_keywords=("설치", "내려받", "다운로드", "깔아"),
     ),
     SignalRule(
         "remote_control_request",
-        ("원격제어", "원격 접속", "화면 공유", "팀뷰어", "애니데스크"),
+        (
+            "원격제어",
+            "원격 접속",
+            "화면 공유",
+            "팀뷰어",
+            "애니데스크",
+            # v0.5. 띄어쓰기 없는 표준 표기만 있어서 "원격 프로그램"을
+            # 놓쳤다. 맨 "원격"은 넣지 않는다 - 원격근무·원격수업이 있다.
+            "원격 프로그램",
+        ),
         40,
         "원격제어·화면공유 요구",
     ),
@@ -282,7 +332,16 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         # 문장은 "옮겨 주시면" 이라 부분 문자열이 어긋났다. 활용형을 일반 규칙으로
         # 펴는 대신 필요한 형태만 적고, 대신 목적어 조건을 걸어 "인증서는 어떻게
         # 옮기나요" 같은 문장이 걸리지 않게 했다.
-        money_gated_keywords=("다시 보내", "전달해", "옮기", "옮겨"),
+        # v0.5. "빼서 넣어"·"빼서 보내"는 재전달의 구어형이다. 금액 조건은
+        # 그대로라 목적어가 돈일 때만 켜진다.
+        money_gated_keywords=(
+            "다시 보내",
+            "전달해",
+            "옮기",
+            "옮겨",
+            "빼서 넣어",
+            "빼서 보내",
+        ),
     ),
     SignalRule(
         "card_delivery_claim",
@@ -431,6 +490,39 @@ PREVENTION_STATEMENT_MARKERS = (
     "보내지 않",
     "알려 드리지 않",
     "존재하지 않",
+    # v0.5. held-out v0.4 의 오탐 2건과 v0.5 의 3건이 전부 여기서 났다. 목록의
+    # 모양은 그대로 유지한다 - **어간이 붙은 서술형만 넣고 맨 "하지 않"은 넣지
+    # 않는다.** 맨 형태를 넣으면 "소명하지 않으면 계좌가 동결됩니다"·"인증을
+    # 완료하지 않으면 카드가 정지됩니다" 같은 협박문이 통째로 예방 안내문이
+    # 된다. 협박은 부정형을 조건절로 쓰고, 안내문은 종결형으로 쓴다.
+    "드리지 않",
+    "안내하지 않",
+    "추천하지 않",
+    "권유하지 않",
+    "운영하지 않",
+    "보장하지 않",
+    "발송하지 않",
+)
+
+# 이미 일어난 일을 말하는 절이다. **요구도 아니고 요구의 대상도 아니다.**
+#
+# held-out 세 판에 걸쳐 남은 오탐이 전부 이 한 가지였다 - "체크카드 재발급이
+# 발송되었습니다. 공식 앱에서 등록해 주세요"(v0.2 `fh-050`), "입금 확인했습니다.
+# 주소가 바뀌었으면 다시 보내 주세요"(v0.2 `fh-063`), "은행 창구에서 신분증을
+# 제출하고 계좌를 개설했습니다"(v0.4 `fh-252`). 요구는 진짜 요구이고 위험한
+# 명사도 진짜로 들어 있지만, 그 명사가 있는 절은 **끝난 일에 대한 보고**라서
+# 요구의 대상이 될 수 없다.
+#
+# 어간만 세지 않는다. "확인하셨죠"·"보내신"처럼 상대의 행동을 가리키는 높임
+# 과거형까지 걸려서, 자금 재전달 요구("입금된 금액 확인하셨죠 ... 전달해
+# 주시면")가 조용히 꺼진다. 그래서 종결어미까지 함께 본다.
+#
+# **절 끝에 붙은 것만 센다.** 연결어미로 이어지는 과거형은 보고가 아니라
+# 요구의 앞자락이다 - "아까 준 통장이랑 비밀번호로 인증했는데 하나만 더
+# 알려 줘"(v0.4 `fh-224`)는 같은 절 안에서 과거형 뒤에 요구가 온다. 보고는
+# 절을 끝내고, 절이 끝나지 않았다면 그 뒤에 오는 것이 요구다.
+COMPLETED_REPORT_PATTERN = re.compile(
+    r"(?:했|됐|였|웠|았|었)(?:습니다|습니까|어요|아요|다)[\s,·'\")\]]*$"
 )
 
 # 읽는 사람을 향한 요구의 표지. `READER_DEMAND_PHRASES` 보다 넓다 - 저쪽은
@@ -460,6 +552,27 @@ DEMAND_MARKERS = (
     "전송",
     "요청합니다",
     "요청드립니다",
+)
+
+# 반말 요구. 위 목록이 "-아/어 주세요" 계열만 덮고 있어서 **반말로 오는 요구를
+# 통째로 놓쳤다** (held-out v0.4 `fh-219`, v0.5 의 여덟 건).
+#
+# 이것을 뒤늦게 세는 것이 아니라 처음부터 세야 했다. 지인·가족 사칭 문자는 거의
+# 전부 반말로 오고, 그것이 사칭의 일부다 - 존댓말로 "인증번호를 알려 주세요"
+# 라고 쓰는 순간 가족인 척이 무너지기 때문이다. 존댓말 요구만 세는 게이트는
+# 이 제품이 가장 잡아야 할 사기에서 가장 자주 열리지 않는다.
+#
+# 위 목록과 같은 원칙으로 만든다. **맨 명령형 어미는 넣지 않는다** - "확인해",
+# "봐" 를 넣으면 정상 대화가 전부 요구가 된다. 남기는 것은 존댓말 목록의 거울,
+# 즉 "-아/어 주다" 의 반말 활용과 "-아/어 놓다" 의 명령형뿐이다.
+CASUAL_DEMAND_PATTERN = re.compile(
+    # 보내 줘 / 알려 줘 / 넘겨 줘. "보내 줘서 고마워"(고마움)와 "해 줘도"(양보)는
+    # 요구가 아니라서 뺀다.
+    r"줘(?!서|도)"
+    r"|줄래"
+    r"|줄 수 있"
+    # 깔아 놔 / 옮겨 놔. "놔두다"(내버려 두다)는 반대 뜻이라 뺀다.
+    r"|[가-힣]\s*놔(?!두)"
 )
 
 # 요구의 두 번째 계열: **위험한 행동이 동사가 된 자리**.
@@ -553,17 +666,39 @@ def _demanding_clauses(normalized: str) -> list[str]:
     ]
 
 
-def _has_reader_demand(normalized: str) -> bool:
-    for clause in _demanding_clauses(normalized):
+def _open_clauses(normalized: str) -> list[str]:
+    """요구와 그 대상을 함께 공급할 수 있는 절만 남긴다.
+
+    v0.5. 게이트를 **절 단위로 좁힌 것이 아니라 절 단위로 닫았다.** 요구와 대상이
+    몇 번째 절 떨어져 있는지로는 가를 수 없다는 것이 held-out v0.5 를 얼리면서
+    분명해졌다 - "체크카드 실물이 필요합니다. 기사님 보낼 테니 전달해 주세요"
+    (사기)와 "통장 자동이체는 정상 처리되었습니다. 첨부 파일 확인만 부탁드립니다"
+    (정상)는 거리가 똑같다. 거리는 신호가 아니다.
+
+    가르는 것은 **절의 시제**다. 뒤쪽 문장의 '통장'은 끝난 일에 대한 보고 안에
+    있어서 뒤따르는 요구의 대상이 될 수 없다. 그래서 예방 서술과 완료 보고를
+    양쪽 게이트에서 함께 뺀다 - 그런 절은 요구도, 요구의 대상도 공급하지 않는다.
+    """
+    return [
+        clause
+        for clause in _demanding_clauses(normalized)
+        if not COMPLETED_REPORT_PATTERN.search(clause)
+    ]
+
+
+def _has_reader_demand(clauses: list[str]) -> bool:
+    for clause in clauses:
         if any(marker in clause for marker in DEMAND_MARKERS):
             return True
         if ACTION_DEMAND_PATTERN.search(clause):
             return True
+        if CASUAL_DEMAND_PATTERN.search(clause):
+            return True
     return False
 
 
-def _mentions_money(normalized: str) -> bool:
-    return any(term in normalized for term in MONEY_OBJECT_TERMS)
+def _mentions_money(clauses: list[str]) -> bool:
+    return any(term in clause for clause in clauses for term in MONEY_OBJECT_TERMS)
 
 
 def _is_prevention_notice(normalized: str) -> bool:
@@ -591,8 +726,14 @@ def _is_prevention_notice(normalized: str) -> bool:
 
 def _detect_by_rules(text: str, rules: tuple[SignalRule, ...]) -> list[RiskSignal]:
     normalized = text.casefold()
-    has_demand = _has_reader_demand(normalized)
-    has_money = _mentions_money(normalized)
+    # 조건부 어휘는 **열린 절 안에서만** 찾는다. 요구가 어느 절에 있는지는 계속
+    # 메시지 단위로 본다 - 사기 문자는 요구를 마지막 절에 몰아 쓰고 대상은 앞
+    # 절에 흩어 놓기 때문에(`fh-324`는 두 절, `fh-325`는 세 절 떨어져 있다),
+    # 거리를 재는 순간 진짜 사기부터 놓친다.
+    open_clauses = _open_clauses(normalized)
+    open_text = " ".join(open_clauses)
+    has_demand = _has_reader_demand(open_clauses)
+    has_money = _mentions_money(open_clauses)
     detected = []
     for rule in rules:
         matched = (
@@ -600,14 +741,14 @@ def _detect_by_rules(text: str, rules: tuple[SignalRule, ...]) -> list[RiskSigna
             or (
                 has_demand
                 and any(
-                    keyword.casefold() in normalized
+                    keyword.casefold() in open_text
                     for keyword in rule.demand_gated_keywords
                 )
             )
             or (
                 has_money
                 and any(
-                    keyword.casefold() in normalized
+                    keyword.casefold() in open_text
                     for keyword in rule.money_gated_keywords
                 )
             )
