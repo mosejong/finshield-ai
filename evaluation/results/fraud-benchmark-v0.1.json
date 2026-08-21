@@ -1,8 +1,8 @@
 {
   "api_latency": {
-    "max_ms": 30.514,
-    "p50_ms": 2.002,
-    "p95_ms": 2.676,
+    "max_ms": 30.796,
+    "p50_ms": 2.606,
+    "p95_ms": 4.622,
     "sample_count": 1220,
     "scope": "in_process_asgi_without_network_or_tls"
   },
@@ -181,6 +181,12 @@
         "recall": 0.909091,
         "support": 11
       },
+      "acquaintance_impersonation": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0
+      },
       "advance_fee_demand": {
         "f1": 0.0,
         "precision": 0.0,
@@ -198,6 +204,12 @@
         "precision": 1.0,
         "recall": 1.0,
         "support": 5
+      },
+      "investment_scheme": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0
       },
       "loan_policy_impersonation": {
         "f1": 1.0,
@@ -261,6 +273,12 @@
         "recall": 1.0,
         "support": 11
       },
+      "acquaintance_impersonation": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0
+      },
       "advance_fee_demand": {
         "f1": 0.0,
         "precision": 0.0,
@@ -278,6 +296,12 @@
         "precision": 1.0,
         "recall": 1.0,
         "support": 5
+      },
+      "investment_scheme": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0
       },
       "loan_policy_impersonation": {
         "f1": 0.909091,

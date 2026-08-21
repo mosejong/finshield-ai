@@ -81,6 +81,18 @@
 - `llm-only-benchmark.md` — LLM 단독 판정 유료 측정, Rule / LLM / Hybrid 3자 비교, 채택하지 않은 조합
 - `rule-vocabulary-v0.2.md` — 모델이 찾아 준 오답 3건을 규칙 어휘로 메움, 골든셋 밖 검증, 개발셋 변별력 소진
 
+## 2026-08-20
+
+- `fraud-holdout-v0.2.md` — held-out 셋 동결, 처음으로 성능이 아닌 숫자를 봄
+- `fraud-engine-demand-gating.md` — 요구·목적어 게이트로 오탐 6건의 공통 원인을 닫음, v0.3 4-커밋 규율
+- `housing-tax-arrears.md` — 임대인 미납 국세·지방세 열람, 조문 직링크 복구
+- `housing-deposit-frontend.md` — 전세보증금 위험 점검 화면, 서버 시각 KST 통일
+- `prompt-injection-boundary.md` — 프롬프트 주입 경계, 자체 방어가 더 위험했던 사례
+
+## 2026-08-21
+
+- `fraud-taxonomy-investment-acquaintance.md` — 투자·리딩방 유인과 지인 사칭 탐지, held-out v0.4 동결·재측정, 오탐률 불변
+
 ## 작성 규칙
 
 상세한 필수 항목과 PR 흐름은 `docs/14-development-workflow.md`를 따른다.
