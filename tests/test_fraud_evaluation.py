@@ -17,6 +17,7 @@ from evaluation.fraud_benchmark import (
 from evaluation.fraud_golden import (
     HOLDOUT_V0_2_PATH,
     HOLDOUT_V0_3_PATH,
+    HOLDOUT_V0_4_PATH,
     FraudGoldenCase,
     _validate_collection,
     is_held_out,
@@ -88,7 +89,7 @@ FRAUD_TYPES_AT_HOLDOUT_V0_3_FREEZE = (
     "card_delivery_impersonation",
 )
 
-HOLDOUT_SIZES = {HOLDOUT_V0_2_PATH: 72, HOLDOUT_V0_3_PATH: 60}
+HOLDOUT_SIZES = {HOLDOUT_V0_2_PATH: 72, HOLDOUT_V0_3_PATH: 60, HOLDOUT_V0_4_PATH: 60}
 
 
 @pytest.mark.parametrize("path", list(HOLDOUT_SIZES))
@@ -111,14 +112,24 @@ def test_holdout_set_is_labelled_and_separated_from_the_development_set(
     )
 
 
-def test_holdout_versions_do_not_overlap_each_other() -> None:
-    # v0.2 는 규칙 수정에 쓰여 소진되었다. v0.3 이 그 문장을 하나라도 물려받으면
-    # 재측정이 소진된 셋의 점수를 그대로 되받는다.
-    v0_2 = load_holdout_cases(HOLDOUT_V0_2_PATH)
-    v0_3 = load_holdout_cases(HOLDOUT_V0_3_PATH)
+@pytest.mark.parametrize(
+    ("earlier", "later"),
+    [
+        (HOLDOUT_V0_2_PATH, HOLDOUT_V0_3_PATH),
+        (HOLDOUT_V0_2_PATH, HOLDOUT_V0_4_PATH),
+        (HOLDOUT_V0_3_PATH, HOLDOUT_V0_4_PATH),
+    ],
+)
+def test_holdout_versions_do_not_overlap_each_other(
+    earlier: Path, later: Path
+) -> None:
+    # 앞 버전은 규칙 수정에 쓰여 소진되었다. 뒤 버전이 그 문장을 하나라도
+    # 물려받으면 재측정이 소진된 셋의 점수를 그대로 되받는다.
+    old = load_holdout_cases(earlier)
+    new = load_holdout_cases(later)
 
-    assert {c.case_id for c in v0_3}.isdisjoint(c.case_id for c in v0_2)
-    assert {c.text for c in v0_3}.isdisjoint(c.text for c in v0_2)
+    assert {c.case_id for c in new}.isdisjoint(c.case_id for c in old)
+    assert {c.text for c in new}.isdisjoint(c.text for c in old)
 
 
 @pytest.mark.parametrize("path", list(HOLDOUT_SIZES))
@@ -153,6 +164,29 @@ def test_holdout_v0_3_covers_the_taxonomy_it_was_frozen_against() -> None:
 
     assert covered == set(FRAUD_TYPES_AT_HOLDOUT_V0_3_FREEZE)
     assert covered <= set(FRAUD_TYPES)
+
+
+def test_holdout_v0_4_covers_the_taxonomy_it_was_frozen_against() -> None:
+    # v0.4 는 투자·지인 사칭 유형이 선언된 뒤에 얼렸으므로 현재 표 전체를 덮는다.
+    covered = {
+        t for case in load_holdout_cases(HOLDOUT_V0_4_PATH)
+        for t in case.expected_fraud_types
+    }
+
+    assert covered == set(FRAUD_TYPES)
+
+
+def test_holdout_v0_4_prices_the_new_vocabulary_against_normal_sentences() -> None:
+    # 투자 어휘는 정상 금융 문장과 거의 겹친다 - 원금·수익률·투자·단톡방은
+    # 매일 오는 정상 안내에 들어 있다. 부정 사례가 충분히 없으면 새 어휘의
+    # 오탐 비용을 잴 수 없고, 그러면 이 셋은 새 유형을 재는 자가 되지 못한다.
+    negatives = [c for c in load_holdout_cases(HOLDOUT_V0_4_PATH) if not c.is_fraud]
+    collision_terms = ("원금", "수익률", "투자", "단톡방", "리딩방", "폰", "번호")
+
+    assert len(negatives) >= 20
+    assert sum(
+        any(term in case.text for term in collision_terms) for case in negatives
+    ) >= 10
 
 
 def test_a_dataset_cannot_be_half_held_out() -> None:

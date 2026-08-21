@@ -14,9 +14,12 @@ GOLDEN_SET_PATH = Path(__file__).with_name("data") / "fraud_golden_v0.1.jsonl"
 #
 # held-out 은 버전마다 다른 파일이고, **기본값을 두지 않는다.** "held-out 셋"
 # 이라는 이름으로 부를 수 있게 두면 어떤 버전을 쟀는지 기록에 남지 않는다.
-# v0.2 는 규칙 수정에 쓰여 소진되었다. v0.3 은 그 수정 이후의 재측정용이다.
+# v0.2 는 규칙 수정에 쓰여 소진되었다. v0.3 은 그 수정 이후의 재측정용이고
+# 요구 조건 수정을 재면서 함께 소진되었다. v0.4 는 투자·지인 사칭 유형이
+# 구현되기 **전에** 얼린 셋이다.
 HOLDOUT_V0_2_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.2.jsonl"
 HOLDOUT_V0_3_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.3.jsonl"
+HOLDOUT_V0_4_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.4.jsonl"
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",
