@@ -14,11 +14,13 @@ from evaluation.fraud_benchmark import (
     evaluate_golden_set,
     normalized_dataset_sha256,
 )
+from app.domain.fraud.signals import CANONICAL_TO_LEGACY_PUBLIC, SIGNAL_RULES
 from evaluation.fraud_golden import (
     HOLDOUT_V0_2_PATH,
     HOLDOUT_V0_3_PATH,
     HOLDOUT_V0_4_PATH,
     HOLDOUT_V0_5_PATH,
+    SIGNAL_CODES,
     FraudGoldenCase,
     _validate_collection,
     is_held_out,
@@ -242,6 +244,31 @@ def test_holdout_v0_5_keeps_the_prevention_marker_widening_honest() -> None:
 
     assert len(with_negated_clause) >= 5
     assert len({t for c in with_negated_clause for t in c.expected_fraud_types}) >= 4
+
+
+def test_a_required_signal_must_be_one_the_response_can_actually_carry() -> None:
+    """엔진이 절대 만족시킬 수 없는 요구 조건은 결함이 아니라 오탈자다.
+
+    내부 규칙 이름(`account_access_request`)과 응답에 실리는 이름
+    (`account_access`)이 다르다. 내부 이름을 적으면 그 조건은 영원히 미달로
+    집계되고, `required_signal_coverage` 는 탐지가 아니라 이름 불일치를 잰다.
+    v0.4·v0.5 를 얼릴 때 실제로 그렇게 적었다.
+    """
+    payload = load_holdout_cases(HOLDOUT_V0_5_PATH)[0].model_dump()
+    payload["required_signal_codes"] = ["account_access_request"]
+
+    with pytest.raises(ValueError, match="unemittable"):
+        FraudGoldenCase.model_validate(payload)
+
+
+def test_every_public_signal_code_is_reachable_from_the_rule_table() -> None:
+    """허용 목록을 손으로 적지 않았다는 것을 고정한다."""
+    reachable = {
+        CANONICAL_TO_LEGACY_PUBLIC.get(rule.code, rule.code) for rule in SIGNAL_RULES
+    }
+
+    assert reachable < SIGNAL_CODES
+    assert SIGNAL_CODES - reachable == {"suspicious_link"}
 
 
 def test_a_dataset_cannot_be_half_held_out() -> None:
