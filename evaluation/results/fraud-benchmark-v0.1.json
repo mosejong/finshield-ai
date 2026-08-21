@@ -1,8 +1,8 @@
 {
   "api_latency": {
-    "max_ms": 26.546,
-    "p50_ms": 2.222,
-    "p95_ms": 3.565,
+    "max_ms": 30.514,
+    "p50_ms": 2.002,
+    "p95_ms": 2.676,
     "sample_count": 1220,
     "scope": "in_process_asgi_without_network_or_tls"
   },
@@ -104,15 +104,15 @@
   },
   "legacy_rule_v0": {
     "binary": {
-      "accuracy": 0.606557,
-      "f1": 0.6,
-      "false_negative": 21,
+      "accuracy": 0.622951,
+      "f1": 0.62295,
+      "false_negative": 20,
       "false_positive": 3,
       "false_positive_rate": 0.136364,
-      "precision": 0.857143,
-      "recall": 0.461538,
+      "precision": 0.863636,
+      "recall": 0.487179,
       "true_negative": 19,
-      "true_positive": 18
+      "true_positive": 19
     },
     "errors": {
       "false_negative_case_ids": [
@@ -135,7 +135,6 @@
         "fg-046",
         "fg-047",
         "fg-053",
-        "fg-057",
         "fg-059"
       ],
       "false_positive_case_ids": [
@@ -181,6 +180,12 @@
         "precision": 0.909091,
         "recall": 0.909091,
         "support": 11
+      },
+      "advance_fee_demand": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0
       },
       "authority_impersonation": {
         "f1": 1.0,
@@ -255,6 +260,12 @@
         "precision": 1.0,
         "recall": 1.0,
         "support": 11
+      },
+      "advance_fee_demand": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0
       },
       "authority_impersonation": {
         "f1": 1.0,
