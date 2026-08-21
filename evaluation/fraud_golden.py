@@ -20,7 +20,9 @@ HOLDOUT_V0_3_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.3.jsonl
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",
+    "acquaintance_impersonation",
     "loan_policy_impersonation",
+    "investment_scheme",
     "advance_fee_demand",
     "account_access_request",
     "money_mule_transfer",
@@ -34,6 +36,7 @@ ACTION_CODES = {
     "DO_NOT_SHARE_ACCESS",
     "DO_NOT_FORWARD_MONEY",
     "VERIFY_OFFICIAL_CHANNEL",
+    "VERIFY_BY_KNOWN_CONTACT",
     "CONTACT_FINANCIAL_INSTITUTION",
     "CONTACT_1394",
     "CONTACT_112",

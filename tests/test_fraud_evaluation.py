@@ -75,6 +75,19 @@ FRAUD_TYPES_AT_HOLDOUT_V0_2_FREEZE = (
     "card_delivery_impersonation",
 )
 
+# v0.3 을 얼릴 때의 분류 표. `investment_scheme`·`acquaintance_impersonation` 은
+# 그 뒤에 생겼다. v0.2 와 같은 이유로 동결 시점 표에 고정한다 - 표가 자랄 때마다
+# 얼어붙은 파일이 빨개지면, 고칠 수 있는 것이 동결된 셋뿐이 된다.
+FRAUD_TYPES_AT_HOLDOUT_V0_3_FREEZE = (
+    "authority_impersonation",
+    "loan_policy_impersonation",
+    "advance_fee_demand",
+    "account_access_request",
+    "money_mule_transfer",
+    "smishing_malware",
+    "card_delivery_impersonation",
+)
+
 HOLDOUT_SIZES = {HOLDOUT_V0_2_PATH: 72, HOLDOUT_V0_3_PATH: 60}
 
 
@@ -132,14 +145,14 @@ def test_holdout_v0_2_covers_the_taxonomy_it_was_frozen_against() -> None:
     assert covered <= set(FRAUD_TYPES)
 
 
-def test_holdout_v0_3_covers_the_current_taxonomy() -> None:
-    # v0.3 은 `advance_fee_demand` 가 생긴 뒤에 얼렸으므로 현재 표 전체를 덮는다.
+def test_holdout_v0_3_covers_the_taxonomy_it_was_frozen_against() -> None:
     covered = {
         t for case in load_holdout_cases(HOLDOUT_V0_3_PATH)
         for t in case.expected_fraud_types
     }
 
-    assert covered == set(FRAUD_TYPES)
+    assert covered == set(FRAUD_TYPES_AT_HOLDOUT_V0_3_FREEZE)
+    assert covered <= set(FRAUD_TYPES)
 
 
 def test_a_dataset_cannot_be_half_held_out() -> None:
