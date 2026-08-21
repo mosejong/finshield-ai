@@ -25,6 +25,7 @@
       "STOP_CONTACT",
       "DO_NOT_FORWARD_MONEY",
       "VERIFY_OFFICIAL_CHANNEL",
+      "VERIFY_BY_KNOWN_CONTACT",
       "CONTACT_1394"
     ]
   },

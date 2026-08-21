@@ -138,6 +138,12 @@
         "recall": 0.833333,
         "support": 12
       },
+      "acquaintance_impersonation": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0
+      },
       "advance_fee_demand": {
         "f1": 0.0,
         "precision": 0.0,
@@ -155,6 +161,12 @@
         "precision": 1.0,
         "recall": 1.0,
         "support": 4
+      },
+      "investment_scheme": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0
       },
       "loan_policy_impersonation": {
         "f1": 0.909091,

@@ -107,21 +107,24 @@
 | `received_unknown_money` | 모르는 돈이 입금됐음 | **high** |
 | `transferred_money` | 송금했음 | **high** |
 
-### 4.3 위험 신호 — 12종
+### 4.3 위험 신호 — 15종
 
-문구 규칙 11종: `urgency_pressure`, `authority_impersonation`, `secrecy_isolation`,
-`loan_policy_offer`, `credential_request`, `account_access_request`,
-`app_install_request`, `remote_control_request`, `money_transfer_request`,
-`receive_and_forward_money`, `card_delivery_claim`
+문구 규칙 14종: `urgency_pressure`, `authority_impersonation`,
+`familiar_person_claim`, `secrecy_isolation`, `loan_policy_offer`,
+`guaranteed_return_offer`, `private_channel_invite`, `credential_request`,
+`account_access_request`, `app_install_request`, `remote_control_request`,
+`money_transfer_request`, `receive_and_forward_money`, `card_delivery_claim`
 
 URL 형태 분석 1종: `suspicious_link`
 
-### 4.4 사기 유형 (`fraud_types`) — 7종
+### 4.4 사기 유형 (`fraud_types`) — 9종
 
 | 유형 | 발생 조건 (신호) |
 |---|---|
 | `authority_impersonation` | `authority_impersonation` |
+| `acquaintance_impersonation` | `familiar_person_claim` |
 | `loan_policy_impersonation` | `loan_policy_offer` |
+| `investment_scheme` | `guaranteed_return_offer` 또는 `private_channel_invite` |
 | `advance_fee_demand` | `money_transfer_request` **그리고** 선입금·수수료 표지 |
 | `account_access_request` | `credential_request` 또는 `account_access_request` |
 | `money_mule_transfer` | `receive_and_forward_money` |
@@ -134,13 +137,26 @@ URL 형태 분석 1종: `suspicious_link`
 이고 그 표지는 낱말에 있다. 낱말을 공개 신호로 승격시키면 어휘 하나가 API 계약에
 박히므로, 판단은 신호가 하고 낱말은 유형을 좁히기만 한다.
 
-### 4.5 대응 행동 (`actions[].code`) — 11종
+`acquaintance_impersonation` 은 자칭 관계("엄마야")가 아니라 **원래 알던 연락처로
+확인할 수 없게 만드는 핑계**("폰이 고장 나서 새 번호로")로 판정한다. 진짜 가족도
+자기를 엄마라고 부르기 때문이다.
+
+`investment_scheme` 은 두 신호 중 하나만 있어도 성립한다. 보장 약속과 폐쇄 채널
+유도는 같은 사기의 서로 다른 단계이고, 앞 단계에서만 접촉한 사용자를 유형 없이
+돌려보내면 자기가 무엇을 마주했는지 이름을 얻지 못한다.
+
+### 4.5 대응 행동 (`actions[].code`) — 12종
 
 `STOP_CONTACT`, `DO_NOT_CLICK`, `DO_NOT_INSTALL`, `DO_NOT_SHARE_ACCESS`,
-`DO_NOT_FORWARD_MONEY`, `VERIFY_OFFICIAL_CHANNEL`, `CONTACT_FINANCIAL_INSTITUTION`,
-`CONTACT_1394`, `CONTACT_112`, `CONTACT_KISA_118`, `PRESERVE_EVIDENCE`
+`DO_NOT_FORWARD_MONEY`, `VERIFY_OFFICIAL_CHANNEL`, `VERIFY_BY_KNOWN_CONTACT`,
+`CONTACT_FINANCIAL_INSTITUTION`, `CONTACT_1394`, `CONTACT_112`, `CONTACT_KISA_118`,
+`PRESERVE_EVIDENCE`
 
 각 행동은 `priority` 1~3을 가지며, **반드시 하나 이상의 `source_ids`를 갖는다.**
+
+`VERIFY_BY_KNOWN_CONTACT` 는 `VERIFY_OFFICIAL_CHANNEL` 과 별도 항목이다. 기관
+사칭에는 확인할 공식 대표번호가 실제로 존재하지만 **자칭 지인에게는 대표번호가
+없다.** 하나로 묶으면 사용자에게 존재하지 않는 창구를 찾으라고 말하게 된다.
 
 ### 4.6 공식 근거 — 8건
 
@@ -184,7 +200,7 @@ URL 형태 분석 1종: `suspicious_link`
 
 ```
 1. 정규화        casefold
-2. 신호 탐지     SIGNAL_RULES 부분 문자열 매칭 (11종)
+2. 신호 탐지     SIGNAL_RULES 부분 문자열 매칭 (14종)
                  - 요구 조건부 어휘는 같은 메시지에 요구가 있을 때만 (5.4)
                  - 금액 조건부 어휘는 목적어가 돈일 때만 (5.4)
                  + URL 형태 분석 (suspicious_link)
@@ -253,6 +269,19 @@ URL 형태 분석 1종: `suspicious_link`
 마세요. 하지만 본인 확인을 위해 인증번호를 답장해 주세요"는 억제되지 않는다.
 이 두 방향은 테스트로 고정돼 있다.
 
+3. **제도 근거 문맥** — `guaranteed_return_offer` 하나에만 적용된다. 예금자보호법상
+   한도 안의 예금은 **실제로** 원금이 보장된다. 같은 "원금 보장"이 예금 안내문에서는
+   사실이고 투자 권유에서는 자본시장법이 금지한 거짓이다. 예금자보호·예금보험공사를
+   함께 대는 문맥이면 이 신호를 끈다.
+
+#### (4) 요구 조건을 걸지 않은 신호
+
+`familiar_person_claim`은 일부러 조건 없이 켠다. 다른 맨 명사 어휘와 판단이
+다른 이유는 **틀렸을 때의 비용**이다. 이 신호가 잘못 켜지면 사용자가 듣는 조언은
+"원래 알던 번호로 직접 전화해 보세요"뿐이고, 상대가 진짜 지인이면 그 전화는 그냥
+연결된다. 통화 한 통이 오탐 비용의 전부인 신호에 요구 조건을 걸어 진짜 사칭을
+놓치는 쪽이 훨씬 비싸다.
+
 #### 알려진 한계
 
 요구·금액 조건은 **메시지 단위**로 본다. 요구가 어느 대상을 향한 것인지까지는
@@ -268,7 +297,7 @@ URL 형태 분석 1종: `suspicious_link`
 | `risk_score` | 0~100 |
 | `risk_level` | `low` / `medium` / `high` |
 | `signals[]` | `code`, `label`, `weight` |
-| `fraud_types[]` | 4.4의 7종 중 해당하는 것 |
+| `fraud_types[]` | 4.4의 9종 중 해당하는 것 |
 | `scenario` | 판정에 사용된 사용자 상태 |
 | `summary` | 한 문장 요약 |
 | `actions[]` | `code`, `priority`, `title`, `reason`, `source_ids[]` |
@@ -606,6 +635,30 @@ URL 형태 분석 1종: `suspicious_link`
 그리고 **이 만점은 성능 주장이 아니다.** 같은 데이터로 규칙을 교정했으므로 독립
 held-out 성능이 아니며, 오류가 0건이 됐다는 것은 **개발셋이 더 이상 변별하지
 못한다**는 뜻이다. 근거와 해석은 `docs/32-fraud-evaluation-benchmark.md`.
+
+### 12.3-b 정확도 (독립 held-out v0.4, 60건)
+
+**이쪽이 성능 수치다.** 아래 셋은 탐지 코드가 작성되기 **전에** 얼려 커밋했고
+(`5ab2bad`), 구현은 그 다음 커밋(`6951b2e`)이다. 순서는 `git log`에서 확인된다.
+
+| 항목 | 구현 전 | 구현 후 |
+|---|---:|---:|
+| 이진 판정 F1 | 0.6552 | **0.9459** |
+| Precision / Recall | 0.8636 / 0.5278 | 0.9211 / **0.9722** |
+| FPR | 0.1250 | **0.1250** |
+| 필수 신호 coverage | 0.3214 | 0.6786 |
+| 필수 행동 coverage | 0.8102 | 0.9927 |
+| 상태 정책 정확도 | 0.5667 | 0.8333 |
+| 공식 근거 coverage | 1.0000 | 1.0000 |
+
+**오탐률이 그대로인 것이 이 표에서 가장 중요한 줄이다.** 새로 넣은 투자 어휘는
+정상 은행 문자와 심하게 겹치는데("원금 보장"은 예금 안내문에서 사실이다), v0.4의
+정상 24건 중 12건이 일부러 그 어휘를 달고 있음에도 새로 깨진 문장이 없었다. 남은
+오탐 3건은 구현 전 baseline에 이미 있던 것과 동일하다.
+
+**만점이 아니며, 남은 결함 8건을 문서에 이름으로 적어 두었다**(`docs/32`). 재는
+셋 안에서 찾은 결함은 고치지 않는다 — 고치는 순간 그 셋은 성능이 아니라 기억을
+재게 된다.
 
 ### 12.4 접근성
 

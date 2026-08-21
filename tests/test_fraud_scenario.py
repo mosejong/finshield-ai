@@ -93,6 +93,59 @@ def test_card_delivery_claim() -> None:
     assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
 
 
+def test_investment_scheme_from_guarantee_and_private_channel() -> None:
+    body = analyze("원금 보장 확정 수익 종목 드립니다. 무료 리딩방에 초대할게요.")
+
+    assert "investment_scheme" in body["fraud_types"]
+    assert body["risk_level"] == "medium"
+    assert {"guaranteed_return_offer", "private_channel_invite"} <= {
+        signal["code"] for signal in body["signals"]
+    }
+    assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
+
+
+def test_deposit_protection_notice_is_not_a_guaranteed_return_offer() -> None:
+    """예금자보호법상 원금 보장은 사실이다. 같은 문구라도 사기가 아니다."""
+    body = analyze("이 상품은 예금자보호법에 따라 5천만원까지 원금 보장이 됩니다.")
+
+    assert body["fraud_types"] == []
+    assert body["risk_level"] == "low"
+
+
+def test_investment_disclosure_negation_does_not_fire() -> None:
+    body = analyze("본 펀드는 원금이 보장되지 않으며 손실이 발생할 수 있습니다.")
+
+    assert body["fraud_types"] == []
+    assert body["risk_level"] == "low"
+
+
+def test_victim_self_report_mentioning_a_leading_room_does_not_fire_the_invite() -> None:
+    """피해자가 겪은 일을 말하는 것과, 읽는 사람을 방으로 들이는 것은 다르다."""
+    body = analyze("리딩방에서 알려준 계좌로 500만원을 보냈는데 연락이 끊겼어요.")
+
+    assert "private_channel_invite" not in {
+        signal["code"] for signal in body["signals"]
+    }
+
+
+def test_acquaintance_impersonation_with_a_transfer_demand_is_high_risk() -> None:
+    body = analyze("엄마 나야. 폰이 고장나서 새 번호로 연락해. 200만원만 송금해 줘.")
+
+    assert "acquaintance_impersonation" in body["fraud_types"]
+    assert body["risk_level"] == "high"
+    assert "VERIFY_BY_KNOWN_CONTACT" in action_codes(body)
+
+
+def test_verify_by_known_contact_carries_an_official_source() -> None:
+    body = analyze("아빠야, 액정이 깨져서 이 번호로 저장해 둬.")
+
+    known_contact = next(
+        action for action in body["actions"] if action["code"] == "VERIFY_BY_KNOWN_CONTACT"
+    )
+    assert known_contact["source_ids"]
+    assert body["official_sources"]
+
+
 def test_benign_message_has_no_fraud_type_or_sources() -> None:
     body = analyze("내일 오전 10시에 회의실에서 만나요.")
 
