@@ -48,8 +48,15 @@ def classify_fraud_types(signals: list[RiskSignal], text: str = "") -> list[str]
 
     if "authority_impersonation" in codes:
         matched.add("authority_impersonation")
+    if "familiar_person_claim" in codes:
+        matched.add("acquaintance_impersonation")
     if "loan_policy_offer" in codes:
         matched.add("loan_policy_impersonation")
+    # v0.4. 두 신호 중 **하나만 있어도** 투자 유인으로 부른다. 보장 약속과 폐쇄
+    # 채널 유도는 같은 사기의 서로 다른 단계이고, 앞 단계에서만 접촉한 사용자를
+    # 유형 없이 돌려보내면 그 사람이 무엇을 마주한 것인지 이름을 얻지 못한다.
+    if codes & {"guaranteed_return_offer", "private_channel_invite"}:
+        matched.add("investment_scheme")
     if codes & {"credential_request", "account_access_request"}:
         matched.add("account_access_request")
     if "receive_and_forward_money" in codes:

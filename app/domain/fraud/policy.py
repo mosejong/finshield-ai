@@ -109,6 +109,11 @@ SIGNAL_ACTIONS: dict[str, tuple[str, ...]] = {
         "DO_NOT_SHARE_ACCESS",
         "VERIFY_OFFICIAL_CHANNEL",
     ),
+    # v0.4. 지인 사칭만 **다른 확인 수단**을 쓴다. 나머지 사칭은 기관을
+    # 자칭하므로 공식 대표번호가 존재하지만, 자칭 지인에게는 대표번호가 없다.
+    "familiar_person_claim": ("STOP_CONTACT", "VERIFY_BY_KNOWN_CONTACT"),
+    "guaranteed_return_offer": ("STOP_CONTACT", "VERIFY_OFFICIAL_CHANNEL"),
+    "private_channel_invite": ("STOP_CONTACT", "VERIFY_OFFICIAL_CHANNEL"),
 }
 
 # 상태는 진행 순서가 아니라 서로 독립적인 사실이다. 각 상태에 직접 정책을 연결한다.
@@ -181,12 +186,23 @@ SIGNAL_MINIMUM_RISK: dict[str, str] = {
     "receive_and_forward_money": "high",
     "suspicious_link": "medium",
     "card_delivery_claim": "medium",
+    "familiar_person_claim": "medium",
+    "guaranteed_return_offer": "medium",
+    "private_channel_invite": "medium",
 }
 
 HIGH_RISK_SIGNAL_COMBINATIONS: tuple[frozenset[str], ...] = (
     frozenset({"authority_impersonation", "money_transfer_request"}),
     frozenset({"loan_policy_offer", "account_access_request"}),
     frozenset({"app_install_request", "remote_control_request"}),
+    # v0.4. **새 신호가 들어간 조합만 추가한다.** 기존 신호끼리의 조합을 같이
+    # 손대면 v0.3 held-out 의 정책 수치가 무엇 때문에 움직였는지 갈라낼 수
+    # 없어진다. 기존 조합의 공백(`docs/10`)은 별도 작업으로 남긴다.
+    frozenset({"familiar_person_claim", "money_transfer_request"}),
+    frozenset({"familiar_person_claim", "credential_request"}),
+    frozenset({"familiar_person_claim", "account_access_request"}),
+    frozenset({"guaranteed_return_offer", "money_transfer_request"}),
+    frozenset({"private_channel_invite", "money_transfer_request"}),
 )
 
 # 사용자에게 보이는 등급을 직접 결정하는 임계값이다.
