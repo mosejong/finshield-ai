@@ -31,9 +31,13 @@
 - [x] 고정 LLM-only vs Hybrid 비교 (2026-08-19, non-held-out 61건. `docs/32`)
 - [x] 규칙 신호 어휘 v0.2 — 비교가 찾아 준 오답 3건을 규칙으로 메움 (2026-08-19)
 - [x] **held-out v0.2 골든셋** (2026-08-20, 72건) — 동결 후 첫 측정에서 개발셋 1.000 이 기억이었음을 확인: precision 0.854 / recall 0.795 / 오탐률 0.214 / 상태 정책 정확도 0.681. `docs/32`
-- [ ] **held-out 이 드러낸 엔진 결함 수정** — ① 은행·기관 자칭 사칭 어휘 부재(`authority_impersonation` 재현율 0.333) ② `classify_fraud_types` 에 `money_transfer_request` 분기 없음(등급은 high 인데 유형이 빔) ③ 한국어 어미를 못 넘는 부분 문자열 매칭 ④ 요구 맥락 없이 맨 명사만으로 켜지는 신호(오탐 6건 전부). **고치면 v0.2 는 소진된다**
-- [ ] **held-out v0.3** — 위 수정 이후의 깨끗한 재측정용. 수정 전에 작성·동결해야 한다
-- [ ] **투자·리딩방 유형** — `FRAUD_TYPE_ORDER` 에 자리가 없어 해당 사례는 라벨조차 붙일 수 없다. 데이터가 아니라 taxonomy 의 공백
+- [x] **held-out v0.3** (2026-08-20, 60건) — 엔진 수정 **전에** 동결하고 수정 전 baseline 을 같은 커밋에 넣었다. 커밋 순서가 증거다
+- [x] **held-out 이 드러낸 엔진 결함 수정** (2026-08-20) — 네 가지 모두 닫았다. v0.3 에서 f1 0.677 → 0.984, 오탐 10건 → 0건. **v0.2 는 소진됐다.** 이 숫자는 표적 회귀 셋의 값이지 일반화 성능이 아니다. `docs/32`
+- [ ] **held-out v0.4** — 위 표가 답하지 못하는 일반화 질문용. 아래 절 단위 수정 **전에** 얼려야 한다
+- [ ] **요구·대상을 절 단위로 묶기** — 요구·금액 조건이 지금은 메시지 단위라 요구가 어느 대상을 향한 것인지 보지 않는다. v0.2 잔여 오탐 2건(`fh-050`·`fh-063`)이 이 형태이며 v0.3 에는 이 형태가 없다
+- [ ] **`HIGH_RISK_SIGNAL_COMBINATIONS` 확장** — 사칭·제안 + 요구를 더 넓게 덮는다. 지금은 두 쌍뿐이라 v0.3 의 10건이 라벨 `high` 인데 `medium` 이 나온다. 탐지 수정과 섞이지 않도록 일부러 분리했다
+- [ ] **판정 프롬프트 v0.2 + 유료 재실행** — `FRAUD_JUDGE_PROMPT` 가 6종 taxonomy 위에 있어 `advance_fee_demand` 를 만들지 못한다. 프롬프트를 바꾸면 sha256 이 바뀌어 기존 판정 파일과의 연결이 끊긴다
+- [ ] **투자·리딩방 / 지인 사칭 유형** — `FRAUD_TYPE_ORDER` 에 자리가 없어 해당 사례는 라벨조차 붙일 수 없다. 데이터가 아니라 taxonomy 의 공백
 - [ ] held-out v0.2 에 대한 LLM-only / Hybrid 3자 비교 (유료 호출 1회 필요. 현재 `not_run`)
 - [x] URL lexical feature analysis (offline safe implementation)
 - [ ] URL domain/reputation feature analysis (outbound-fetch policy required)
@@ -56,6 +60,6 @@
 - [ ] STT
 - [ ] voice scam scenario
 - [ ] AI red-team suite
-- [ ] prompt injection benchmark
+- [x] prompt injection benchmark (2026-08-20, 7건 개발셋) — `evaluation/data/injection_golden_v0.1.jsonl`, `tests/test_llm_prompt_injection.py`. **held-out 아니고 방어 교정에 쓴 셋이라 통과율을 방어 성능으로 주장하지 않는다**
 - [ ] screenshot/phishing-page analysis
 - [ ] advanced personalization

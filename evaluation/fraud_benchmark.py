@@ -14,6 +14,7 @@ from evaluation.llm_judge import LlmJudgement, LlmJudgeRun
 FRAUD_TYPES = (
     "authority_impersonation",
     "loan_policy_impersonation",
+    "advance_fee_demand",
     "account_access_request",
     "money_mule_transfer",
     "smishing_malware",

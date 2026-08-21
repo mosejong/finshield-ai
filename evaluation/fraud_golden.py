@@ -11,11 +11,17 @@ GOLDEN_SET_PATH = Path(__file__).with_name("data") / "fraud_golden_v0.1.jsonl"
 
 # 개발셋과 **파일이 다르다.** 같은 파일에 플래그만 달면 한 번의 실수로 held-out
 # 사례가 규칙 수정에 쓰인다. 경계는 코드가 아니라 파일이 지킨다.
-HOLDOUT_SET_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.2.jsonl"
+#
+# held-out 은 버전마다 다른 파일이고, **기본값을 두지 않는다.** "held-out 셋"
+# 이라는 이름으로 부를 수 있게 두면 어떤 버전을 쟀는지 기록에 남지 않는다.
+# v0.2 는 규칙 수정에 쓰여 소진되었다. v0.3 은 그 수정 이후의 재측정용이다.
+HOLDOUT_V0_2_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.2.jsonl"
+HOLDOUT_V0_3_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.3.jsonl"
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",
     "loan_policy_impersonation",
+    "advance_fee_demand",
     "account_access_request",
     "money_mule_transfer",
     "smishing_malware",
@@ -90,7 +96,8 @@ def load_golden_cases(path: Path = GOLDEN_SET_PATH) -> list[FraudGoldenCase]:
     return cases
 
 
-def load_holdout_cases(path: Path = HOLDOUT_SET_PATH) -> list[FraudGoldenCase]:
+def load_holdout_cases(path: Path) -> list[FraudGoldenCase]:
+    """어느 버전인지 반드시 호출부가 말하게 한다. 기본값은 없다."""
     return load_golden_cases(path)
 
 

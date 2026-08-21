@@ -12,6 +12,13 @@ class SignalRule:
     keywords: tuple[str, ...]
     weight: int
     label: str
+    # 맨 명사만으로는 신호가 되지 않는 어휘다. "체크카드"·"비밀번호"·"은행"은
+    # 정상 문자에 매일 등장한다. 같은 메시지 안에 **읽는 사람을 향한 요구**가
+    # 있어야 켠다. held-out v0.2 의 오탐 6건이 전부 이 구분을 안 해서 났다.
+    demand_gated_keywords: tuple[str, ...] = ()
+    # 동사만으로는 신호가 되지 않는 어휘다. "전달해"·"다시 보내"는 계약서에도
+    # 쓴다. 목적어가 돈일 때만 자금 재전달이다.
+    money_gated_keywords: tuple[str, ...] = ()
 
 
 SIGNAL_RULES: tuple[SignalRule, ...] = (
@@ -48,6 +55,29 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         ),
         25,
         "공식 기관 사칭 가능성",
+        # v0.3. held-out v0.2 에서 이 신호의 재현율이 0.333 이었다. 못 잡은
+        # 사례가 전부 은행·카드사·공단을 자칭한 것이었는데, 그 어휘를 위 목록에
+        # 그냥 넣었다가 정상 안내문에서 오탐이 났던 것이 v0.2 의 기록이다
+        # (`docs/32`). 그래서 **두 층으로 나눈다.**
+        #
+        # 위 목록(수사기관·법원)은 언급만으로 켠다. 실제로 그 기관들은 문자를
+        # 보내지 않는다. 아래 목록(은행·카드사·공단·세무 관청)은 **요구가 함께
+        # 있을 때만** 켠다. 이들은 정상 문자를 매일 보내기 때문이다.
+        # "하나은행 이용 안내입니다" 와 "하나은행입니다. 본인인증을 완료해
+        # 주세요" 를 가르는 것은 기관명이 아니라 뒤에 붙은 요구다.
+        demand_gated_keywords=(
+            "은행",
+            "뱅크",
+            "카드사",
+            "공단",
+            "국세청",
+            "관세청",
+            "병무청",
+            "우체국",
+            "건강보험",
+            "국민연금",
+            "근로복지",
+        ),
     ),
     SignalRule(
         "secrecy_isolation",
@@ -71,15 +101,22 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
     ),
     SignalRule(
         "credential_request",
-        ("인증번호", "비밀번호", "otp", "보안카드 번호", "일회용 승인코드"),
+        (),
         40,
         "인증정보 요구",
+        # 전부 맨 명사다. "OTP 카드를 재발급받았습니다"·"비밀번호는 은행 직원도
+        # 묻지 않습니다" 는 인증정보 요구가 아니다.
+        demand_gated_keywords=(
+            "인증번호",
+            "비밀번호",
+            "otp",
+            "보안카드 번호",
+            "일회용 승인코드",
+        ),
     ),
     SignalRule(
         "account_access_request",
         (
-            "체크카드",
-            "통장",
             "계좌를 빌려",
             "계좌 대여",
             "카드를 보내",
@@ -87,27 +124,31 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         ),
         40,
         "계좌·접근수단 요구",
+        # 위 네 개는 그 자체가 요구문이다. 아래는 명사뿐이라 요구가 필요하다.
+        # "계좌번호" 는 v0.3 에서 새로 넣었다 - held-out v0.2 의 `fh-005` 가
+        # 계좌번호를 요구하는데 어휘에 없어 통째로 빠졌다.
+        demand_gated_keywords=("체크카드", "통장", "계좌번호"),
     ),
     SignalRule(
         "app_install_request",
         (
-            "앱 설치",
-            "어플 설치",
             "apk",
-            "프로그램 설치",
             "실행파일",
             # v0.2 추가. fg-047("보안 모듈을 내려받아 실행")이 여기서 빠졌다.
             # 기존 어휘가 전부 "설치"라는 단어에 걸려 있어서, 같은 요구를
             # "내려받다"로 쓰면 통과했다. 잡는 것은 **받아서 실행하라는 지시**이지
             # 대상 파일의 이름이 아니다 - "보안 모듈" 같은 명사를 넣으면 은행
             # 정상 안내까지 걸린다.
-            "내려받",
-            "다운로드",
             "설치 파일",
             "설치 링크",
         ),
         35,
         "앱 설치 요구",
+        # v0.3. 어휘가 "앱 설치"·"프로그램 설치" 처럼 조사 없는 형태로만 있어서
+        # 실제 문장인 "앱**을** 설치해 주세요" 를 못 잡았다. 조사 조합을 늘리는
+        # 대신 동사만 남기고 요구를 조건으로 걸었다. 그러면 "앱 설치했는데
+        # 오류가 납니다"(사용자 자신의 행동)는 켜지지 않는다.
+        demand_gated_keywords=("설치", "내려받", "다운로드"),
     ),
     SignalRule(
         "remote_control_request",
@@ -121,8 +162,6 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "송금해",
             "입금해",
             "돈을 보내",
-            "안전계좌",
-            "보호계좌",
             # v0.2 추가. "송금"의 동의어인 "이체"가 통째로 빠져 있었다.
             # 지시형만 넣는다. 맨 "이체"를 넣으면 "이체 내역을 확인하세요" 같은
             # 정상 안내가 걸리고, "이체하지 마세요"는 지시형에 걸리지 않는다.
@@ -133,20 +172,29 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         ),
         35,
         "송금 요구",
+        # v0.3. "안전계좌라는 것은 존재하지 않습니다" 가 v0.2 오탐이었다.
+        # 계좌 이름은 명사일 뿐이고, 요구가 붙어야 요구다.
+        demand_gated_keywords=("안전계좌", "보호계좌"),
     ),
     SignalRule(
         "receive_and_forward_money",
         (
             "입금받고",
             "재송금",
-            "다시 보내",
-            "전달해",
             "돈을 받아서 보내",
             "수령한 금액",
-            "제3자 계좌로 옮기",
         ),
         70,
         "자금 수취·재전달 요구",
+        # v0.3. "전달해"·"다시 보내" 는 v0.2 오탐 2건의 원인이었다. 계약서도
+        # 명함도 "다시 보내" 달라고 한다. 자금 재전달로 만드는 것은 동사가 아니라
+        # **목적어**다.
+        #
+        # "옮겨" 는 어미 문제다. 어휘에는 "제3자 계좌로 옮기" 가 있었는데 실제
+        # 문장은 "옮겨 주시면" 이라 부분 문자열이 어긋났다. 활용형을 일반 규칙으로
+        # 펴는 대신 필요한 형태만 적고, 대신 목적어 조건을 걸어 "인증서는 어떻게
+        # 옮기나요" 같은 문장이 걸리지 않게 했다.
+        money_gated_keywords=("다시 보내", "전달해", "옮기", "옮겨"),
     ),
     SignalRule(
         "card_delivery_claim",
@@ -163,26 +211,38 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
     ),
 )
 
+# 호환 기준선이지만 **점수를 만드는 것은 이쪽이다**(`baseline_score`). 정상
+# 문자에서 켜지면 등급이 그대로 올라간다. 그래서 어휘는 늘리지 않되 v0.3 의
+# 요구·목적어 조건은 그대로 적용한다.
 LEGACY_RULES: tuple[SignalRule, ...] = (
     SignalRule("urgency", ("오늘까지", "즉시", "긴급", "지금 바로"), 12, "긴급한 행동 요구"),
-    SignalRule("credential", ("인증번호", "비밀번호", "otp"), 25, "인증정보 요구"),
+    SignalRule(
+        "credential",
+        (),
+        25,
+        "인증정보 요구",
+        demand_gated_keywords=("인증번호", "비밀번호", "otp"),
+    ),
     SignalRule(
         "account_access",
-        ("체크카드", "통장", "계좌를 빌려", "계좌 대여"),
+        ("계좌를 빌려", "계좌 대여"),
         35,
         "계좌·접근수단 요구",
+        demand_gated_keywords=("체크카드", "통장"),
     ),
     SignalRule(
         "remote_app",
-        ("원격제어", "앱 설치", "apk"),
+        ("원격제어", "apk"),
         30,
         "앱 설치·원격접속 요구",
+        demand_gated_keywords=("설치",),
     ),
     SignalRule(
         "money_mule",
-        ("입금받고", "재송금", "다시 보내", "전달해"),
+        ("입금받고", "재송금"),
         35,
         "자금 수취·재전달 요구",
+        money_gated_keywords=("다시 보내", "전달해"),
     ),
 )
 
@@ -270,27 +330,201 @@ READER_DEMAND_PHRASES = (
     "연락주세요",
 )
 
-# 기관명·상품명만으로 켜지는 신호는 예방 안내문에서도 그대로 켜진다.
-# 요구가 하나도 없는 안내문까지 경고로 올리면 사용자는 경고를 무시하게 된다.
-ADVISORY_SUPPRESSIBLE_CODES = frozenset(
-    {"authority_impersonation", "loan_policy_offer"}
+# "저희는 …를 요구하지 않습니다" 는 요구가 아니라 요구에 대한 서술이다.
+# 예방 안내문과 사기 문자는 어휘가 거의 같고, 갈리는 자리가 여기다.
+# 서술형만 넣는다. "설치하지 마세요" 같은 부정 명령형을 넣으면 "아무에게도
+# 말하지 마시고 통화를 끊지 마세요"(실제 사기 문장)까지 예방 안내문이 된다.
+PREVENTION_STATEMENT_MARKERS = (
+    "요구하지 않",
+    "요청하지 않",
+    "요구하는 일은 없",
+    "묻지 않",
+    "물어보지 않",
+    "보내지 않",
+    "알려 드리지 않",
+    "존재하지 않",
 )
 
+# 읽는 사람을 향한 요구의 표지. `READER_DEMAND_PHRASES` 보다 넓다 - 저쪽은
+# "안내문인가"를 가리는 좁고 위험한 요구만 모은 목록이고, 이쪽은 맨 명사를
+# 신호로 승격시킬지 판단하는 데 쓴다.
+#
+# **맨 명령형 어미는 넣지 않는다.** "하세요"·"바랍니다"를 넣었더니 "이체 내역을
+# 확인하세요. 모르는 출금이 있으면 은행에 문의하세요" 가 은행 사칭이 됐다.
+# 정상 안내도 명령형을 쓴다. 그래서 이 목록에는 "-아/어 주세요" 계열(무언가를
+# 해 달라는 부탁)과 대상이 분명한 동사만 남긴다.
+DEMAND_MARKERS = (
+    "주세요",
+    "주십시오",
+    "주시기",
+    "주시면",
+    "주실",
+    "주시길",
+    "주셔야",
+    "부탁",
+    "빌려",
+    "알려",
+    "불러",
+    "입력",
+    "회신",
+    "제출해",
+    "등록해",
+    "전송",
+    "요청합니다",
+    "요청드립니다",
+)
 
-def _is_official_verification_notice(normalized: str) -> bool:
-    return any(
+# 요구의 두 번째 계열: **위험한 행동이 동사가 된 자리**.
+#
+# 위 목록만으로는 부탁의 형식을 빌리지 않은 지시를 놓친다. "앱 설치가
+# 필요합니다"·"내려받아 실행하면 본인 확인이 끝납니다"·"지금 설치하세요" 에는
+# "주세요"가 없다. 반대로 맨 어미를 세면 정상 안내가 걸린다.
+#
+# 가르는 자리는 어미가 아니라 **어근에 무엇이 붙었는가**다. "이체 내역"의
+# '이체'는 뒤에 명사가 오므로 서술이고, "이체하세요"·"이체가 필요합니다"의
+# '이체'는 읽는 사람이 할 행동이다. 과거형("송금했습니다")은 넣지 않는다 -
+# 이미 한 일을 말하는 것은 요구가 아니라 자기 보고다.
+RISKY_ACTION_STEMS = (
+    "설치",
+    "다운로드",
+    "송금",
+    "입금",
+    "이체",
+    "인증",
+    "입력",
+    "전송",
+    "제출",
+    "회신",
+    "실행",
+    "허용",
+    "클릭",
+)
+
+# "…가 필요합니다" 는 부탁의 형식을 빌리지 않은 요구다. 다만 무엇이 필요하다고
+# 말하는지가 갈림길이다 - "본인 확인이 필요합니다" 는 정상 안내에도 흔하다.
+# 그래서 위험한 행동과 **넘겨줄 수 있는 물건**만 대상으로 센다.
+DEMANDABLE_OBJECTS = RISKY_ACTION_STEMS + (
+    "체크카드",
+    "통장",
+    "계좌번호",
+    "인증번호",
+    "비밀번호",
+    "otp",
+    "보안카드",
+)
+
+_RISKY_ACTION_ALTERNATION = "|".join(RISKY_ACTION_STEMS)
+_DEMANDABLE_OBJECT_ALTERNATION = "|".join(DEMANDABLE_OBJECTS)
+#
+# 부정형("설치하지 마세요")은 제외한다. 하지 말라는 말은 요구가 아니다.
+ACTION_DEMAND_PATTERN = re.compile(
+    # 어근 + 하다-동사화. "했"·"됐" 같은 완료형은 의도적으로 빠져 있다.
+    rf"(?:{_RISKY_ACTION_ALTERNATION})(?:하|해|한|할)(?!지\s*마)"
+    # 대상 + 필요 서술. "설치가 필요합니다"·"체크카드가 필요합니다" 는 부탁이
+    # 아니지만 요구다.
+    rf"|(?:{_DEMANDABLE_OBJECT_ALTERNATION})(?:을|를|가|이)?\s*필요"
+    # 대상 + 완료·진행 요구. "설치를 완료하세요" 는 위 두 가지에 다 걸리지
+    # 않는다 - 어근에 붙은 것이 조사라 동사화가 아니고, 필요 서술도 아니다.
+    # 능동형만 센다. "인증이 완료되었습니다" 는 요구가 아니라 결과 통보다.
+    rf"|(?:{_DEMANDABLE_OBJECT_ALTERNATION})(?:을|를|가|이)?\s*(?:완료|진행)(?:하|해)(?!지\s*마)"
+    # "내려받"은 명사로 쓰이지 않아 어근만으로 이미 행동을 가리킨다.
+    r"|내려받(?!지\s*마)"
+)
+
+# 돈을 가리키는 목적어. "원"은 넣지 않는다 - 원격·지원·직원·병원에 다 들어간다.
+MONEY_OBJECT_TERMS = (
+    "돈",
+    "금액",
+    "자금",
+    "대금",
+    "현금",
+    "입금",
+    "송금",
+    "잔액",
+    "수익금",
+    "수수료",
+    "이체",
+)
+
+CLAUSE_BOUNDARY_PATTERN = re.compile(r"[.!?\n]+")
+
+def _clauses(normalized: str) -> list[str]:
+    return [part for part in CLAUSE_BOUNDARY_PATTERN.split(normalized) if part.strip()]
+
+
+def _demanding_clauses(normalized: str) -> list[str]:
+    """예방 서술이 든 절은 요구를 공급하지 못한다.
+
+    "안전계좌로 송금하라고 요구하는 일은 없습니다" 에는 '송금'이 들어 있지만
+    이 문장은 송금을 요구하지 않는다. 절 단위로 걸러야 이 구분이 선다.
+    """
+    return [
+        clause
+        for clause in _clauses(normalized)
+        if not any(marker in clause for marker in PREVENTION_STATEMENT_MARKERS)
+    ]
+
+
+def _has_reader_demand(normalized: str) -> bool:
+    for clause in _demanding_clauses(normalized):
+        if any(marker in clause for marker in DEMAND_MARKERS):
+            return True
+        if ACTION_DEMAND_PATTERN.search(clause):
+            return True
+    return False
+
+
+def _mentions_money(normalized: str) -> bool:
+    return any(term in normalized for term in MONEY_OBJECT_TERMS)
+
+
+def _is_prevention_notice(normalized: str) -> bool:
+    """요구가 하나도 없는 예방·정상 이용 안내문인가.
+
+    표지는 두 가지다. 공식 창구를 직접 가리키거나("공식 대표번호로 확인하세요"),
+    무엇을 요구하지 않는지 서술하거나("OTP 는 은행 직원도 묻지 않습니다").
+    사기 문자는 둘 다 하지 않는다 - 공식 창구로 가면 거짓이 드러나기 때문이다.
+
+    표지가 있어도 예방 서술 밖의 절에 위험한 요구가 있으면 억제하지 않는다.
+    안전 문구를 앞에 붙이고 뒤에서 요구하는 혼합 문장이 이 규칙을 노리는 가장
+    쉬운 우회다.
+    """
+    has_marker = any(
         phrase in normalized for phrase in OFFICIAL_VERIFICATION_PHRASES
-    ) and not any(phrase in normalized for phrase in READER_DEMAND_PHRASES)
+    ) or any(marker in normalized for marker in PREVENTION_STATEMENT_MARKERS)
+    if not has_marker:
+        return False
+    return not any(
+        phrase in clause
+        for clause in _demanding_clauses(normalized)
+        for phrase in READER_DEMAND_PHRASES
+    )
 
 
 def _detect_by_rules(text: str, rules: tuple[SignalRule, ...]) -> list[RiskSignal]:
     normalized = text.casefold()
+    has_demand = _has_reader_demand(normalized)
+    has_money = _mentions_money(normalized)
     detected = []
     for rule in rules:
-        if (
+        matched = (
             any(keyword.casefold() in normalized for keyword in rule.keywords)
-            and not _safe_context_suppresses(rule.code, normalized)
-        ):
+            or (
+                has_demand
+                and any(
+                    keyword.casefold() in normalized
+                    for keyword in rule.demand_gated_keywords
+                )
+            )
+            or (
+                has_money
+                and any(
+                    keyword.casefold() in normalized
+                    for keyword in rule.money_gated_keywords
+                )
+            )
+        )
+        if matched and not _safe_context_suppresses(rule.code, normalized):
             detected.append(
                 RiskSignal(code=rule.code, label=rule.label, weight=rule.weight)
             )
@@ -303,9 +537,10 @@ def _safe_context_suppresses(code: str, normalized: str) -> bool:
     일반 negation 해석기가 아니다. 공격 지시가 함께 있는 혼합 문장은 억제하지
     않도록 좁은 문구 조합만 사용한다.
     """
-    if code in ADVISORY_SUPPRESSIBLE_CODES and _is_official_verification_notice(
-        normalized
-    ):
+    # v0.3. 예방 안내문 억제를 **모든 신호**로 넓혔다. 전에는 기관명·상품명
+    # 신호에만 걸려 있어서 "금융감독원은 앱 설치를 요구하지 않습니다" 가
+    # 사칭 신호는 면했지만 설치 요구 신호에 그대로 걸렸다.
+    if _is_prevention_notice(normalized):
         return True
     if code in {"credential_request", "account_access_request"}:
         return any(
