@@ -27,11 +27,20 @@ GOLDEN_SET_PATH = Path(__file__).with_name("data") / "fraud_golden_v0.1.jsonl"
 # 이번 세 수정 중 둘은 **좁히는** 것이다 - 기관 게이트에 민감 요구 조건을
 # 걸고, 공식 창구 안내 절을 요구에서 뺀다. 좁히기의 값은 **사기 쪽에서**
 # 치러진다. 그래서 이 셋은 좁히기가 끊을 수 있는 양성 사례를 함께 담는다.
+#
+# v0.7 은 v0.6 이 남긴 세 결함을 고치기 전에 얼린 셋이고, 방향이 또 다르다.
+# 세 수정 중 하나(`HIGH_RISK_SIGNAL_COMBINATIONS` 확장)는 **등급을 올린다.**
+# 넓히기는 정상 문장으로, 좁히기는 사기 문장으로 값을 쟀는데 **등급을 올리는
+# 수정의 값을 잴 자리는 지금까지 없었다** - `expected_min_risk` 는 바닥만
+# 보므로 모든 문자를 high 로 찍는 엔진이 만점을 받는다. v0.7 이 천장을
+# 들고 온 이유이고, 천장은 **정상 문장에만** 선언한다. 사기를 필요 이상으로
+# 높게 매기는 것은 결함이 아니라 신중함이다.
 HOLDOUT_V0_2_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.2.jsonl"
 HOLDOUT_V0_3_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.3.jsonl"
 HOLDOUT_V0_4_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.4.jsonl"
 HOLDOUT_V0_5_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.5.jsonl"
 HOLDOUT_V0_6_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.6.jsonl"
+HOLDOUT_V0_7_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.7.jsonl"
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",
@@ -43,6 +52,16 @@ FRAUD_TYPE_CODES = {
     "money_mule_transfer",
     "smishing_malware",
     "card_delivery_impersonation",
+    # v0.7 에서 선언한다. **엔진은 아직 이 유형을 내지 못한다.**
+    #
+    # 라벨 어휘가 엔진보다 앞서는 것은 v0.4 에서 이미 한 일이다(투자·지인
+    # 사칭). 셋을 먼저 얼리려면 라벨이 먼저 있어야 하고, 동결 시점 baseline
+    # 에서 이 유형의 f1 이 0.0 으로 찍히는 것이 정확한 출발점이다.
+    #
+    # `secrecy_isolation` 신호는 v0.1 부터 있었지만 대응하는 유형이 없었다.
+    # 이진 판정이 `bool(fraud_types)` 이므로, **유형이 없는 신호는 등급만
+    # 올리고 판정은 정상으로 내보낸다.** v0.6 `fh-454` 가 그렇게 미탐이 됐다.
+    "isolation_coercion",
 }
 # 사례가 요구하는 신호 코드는 **응답에 실제로 실리는 이름**이어야 한다.
 #
@@ -82,6 +101,19 @@ class FraudGoldenCase(BaseModel):
     expected_fraud_types: list[str]
     required_signal_codes: list[str] = Field(default_factory=list)
     expected_min_risk: str = Field(pattern=r"^(low|medium|high)$")
+    # v0.7. **재는 자에 천장이 없었다.**
+    #
+    # `expected_min_risk` 는 바닥만 정한다. 그래서 등급을 올리는 수정은 이
+    # 셋의 어떤 지표에서도 점수를 잃을 수 없다 - 모든 문자를 high 로 찍는
+    # 엔진이 상태 정책 정확도 1.0 을 받는다. 넓히기의 값을 부정 사례로
+    # 재고 좁히기의 값을 양성 사례로 재 왔으면서, **등급을 올리는 수정의
+    # 값을 잴 자리는 아예 없었다.**
+    #
+    # 이 회차가 `HIGH_RISK_SIGNAL_COMBINATIONS` 를 넓히므로 여기서 닫는다.
+    # 비워 두면 제약이 없다. v0.1~v0.6 은 비어 있고, 그래서 그 셋들의
+    # `risk_ceiling_accuracy` 는 1.0 이 아니라 **null** 로 나간다 - 재지
+    # 않은 것을 만점으로 적으면 그것이 곧 지어낸 근거다.
+    expected_max_risk: str | None = Field(default=None, pattern=r"^(low|medium|high)$")
     required_action_codes: list[str] = Field(default_factory=list)
     synthetic: bool = True
     held_out: bool = False
@@ -104,6 +136,13 @@ class FraudGoldenCase(BaseModel):
             raise ValueError(
                 "required_signal_codes must name codes the response can carry; "
                 f"unemittable: {sorted(unemittable)}"
+            )
+        if (
+            self.expected_max_risk is not None
+            and RISK_RANK[self.expected_max_risk] < RISK_RANK[self.expected_min_risk]
+        ):
+            raise ValueError(
+                "expected_max_risk must not be below expected_min_risk"
             )
         if len(self.expected_fraud_types) != len(set(self.expected_fraud_types)):
             raise ValueError("expected_fraud_types must not contain duplicates")
