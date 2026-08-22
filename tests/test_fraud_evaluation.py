@@ -20,6 +20,7 @@ from evaluation.fraud_golden import (
     HOLDOUT_V0_3_PATH,
     HOLDOUT_V0_4_PATH,
     HOLDOUT_V0_5_PATH,
+    HOLDOUT_V0_6_PATH,
     SIGNAL_CODES,
     FraudGoldenCase,
     _validate_collection,
@@ -97,6 +98,7 @@ HOLDOUT_SIZES = {
     HOLDOUT_V0_3_PATH: 60,
     HOLDOUT_V0_4_PATH: 60,
     HOLDOUT_V0_5_PATH: 72,
+    HOLDOUT_V0_6_PATH: 72,
 }
 
 
@@ -129,6 +131,10 @@ def test_holdout_set_is_labelled_and_separated_from_the_development_set(
         (HOLDOUT_V0_2_PATH, HOLDOUT_V0_5_PATH),
         (HOLDOUT_V0_3_PATH, HOLDOUT_V0_5_PATH),
         (HOLDOUT_V0_4_PATH, HOLDOUT_V0_5_PATH),
+        (HOLDOUT_V0_2_PATH, HOLDOUT_V0_6_PATH),
+        (HOLDOUT_V0_3_PATH, HOLDOUT_V0_6_PATH),
+        (HOLDOUT_V0_4_PATH, HOLDOUT_V0_6_PATH),
+        (HOLDOUT_V0_5_PATH, HOLDOUT_V0_6_PATH),
     ],
 )
 def test_holdout_versions_do_not_overlap_each_other(
@@ -244,6 +250,47 @@ def test_holdout_v0_5_keeps_the_prevention_marker_widening_honest() -> None:
 
     assert len(with_negated_clause) >= 5
     assert len({t for c in with_negated_clause for t in c.expected_fraud_types}) >= 4
+
+
+def test_holdout_v0_6_covers_the_taxonomy_it_was_frozen_against() -> None:
+    covered = {
+        t for case in load_holdout_cases(HOLDOUT_V0_6_PATH)
+        for t in case.expected_fraud_types
+    }
+
+    assert covered == set(FRAUD_TYPES)
+
+
+def test_holdout_v0_6_prices_two_narrowings_with_fraud_not_with_normal_text() -> None:
+    """**좁히는 수정은 사기 쪽에서 값을 치른다.**
+
+    v0.2~v0.5 가 잰 수정은 전부 넓히는 것이었고, 그 값은 정상 문장에서
+    치러지므로 부정 사례를 모으면 됐다. 이번 회차는 방향이 반대다 - 기관
+    게이트에 민감 요구 조건을 걸고, 공식 창구를 가리키는 절을 요구에서 뺀다.
+    두 수정 다 오탐을 줄이는 대신 **진짜 사기를 끊을 수 있다.**
+
+    그래서 이 셋의 안전장치는 부정 사례 수가 아니라, 좁히기가 끊을 수 있는
+    자리에 놓인 **양성** 사례 수다. 이것이 없으면 오탐률만 떨어지고 그 대가가
+    측정에 나타나지 않는다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V0_6_PATH)
+    positives = [case for case in cases if case.is_fraud]
+    negatives = [case for case in cases if not case.is_fraud]
+
+    def counting(pool, *terms: str) -> int:
+        return sum(any(term in case.text for term in terms) for case in pool)
+
+    referral = ("영업점", "창구", "홈페이지", "고객센터", "대표번호", "공식 앱")
+    institutions = ("은행", "뱅크", "공단", "국세청", "세무서", "카드사", "증권사", "농협", "토스")
+
+    # 좁히기가 끊을 수 있는 양성. 여기가 이 셋의 존재 이유다.
+    assert counting(positives, *referral) >= 4
+    assert counting(positives, *institutions) >= 6
+    # 좁히기가 실제로 지워야 할 정상 문장.
+    assert counting(negatives, *referral) >= 8
+    assert counting(negatives, *institutions) >= 8
+    # 유일하게 넓히는 수정(폐쇄 채널 초대의 맥락 조건)은 여전히 정상 문장으로 잰다.
+    assert counting(negatives, "단톡방", "오픈채팅방", "초대") >= 5
 
 
 def test_a_required_signal_must_be_one_the_response_can_actually_carry() -> None:

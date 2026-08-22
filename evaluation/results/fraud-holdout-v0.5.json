@@ -1,4 +1,11 @@
 {
+  "api_latency": {
+    "max_ms": 31.013,
+    "p50_ms": 2.707,
+    "p95_ms": 4.19,
+    "sample_count": 216,
+    "scope": "in_process_asgi_without_network_or_tls"
+  },
   "dataset": {
     "case_count": 72,
     "held_out": true,
@@ -32,15 +39,15 @@
       "status": "not_run"
     },
     "binary": {
-      "accuracy": 0.916667,
-      "f1": 0.934783,
-      "false_negative": 1,
-      "false_positive": 5,
-      "false_positive_rate": 0.178571,
-      "precision": 0.895833,
-      "recall": 0.977273,
-      "true_negative": 23,
-      "true_positive": 43
+      "accuracy": 0.958333,
+      "f1": 0.967033,
+      "false_negative": 0,
+      "false_positive": 3,
+      "false_positive_rate": 0.107143,
+      "precision": 0.93617,
+      "recall": 1.0,
+      "true_negative": 25,
+      "true_positive": 44
     },
     "detection_identical_to": "scenario_engine_v0_1",
     "evidence_coverage": 1.0,
@@ -50,22 +57,22 @@
       "model": "gemini-3.6-flash",
       "note": "설명 문장의 근거 이탈률과 안전 필터 차단율은 아직 측정하지 않았다. 여기 숫자는 탐지 성능이며 설명 품질이 아니다."
     },
-    "required_action_coverage": 0.985612,
-    "scenario_policy_accuracy": 0.986111,
+    "required_action_coverage": 1.0,
+    "scenario_policy_accuracy": 1.0,
     "scope": "deterministic engine decides; the model only rewrites that decision in plain Korean",
     "status": "measured",
     "why_identical": "explain_analysis 는 AnalyzeResponse 를 받아 str | None 을 돌려준다. 설명 계층은 위험 수준·유형·행동을 구조적으로 바꿀 수 없다 (app/services/llm/explanation.py)."
   },
   "legacy_rule_v0": {
     "binary": {
-      "accuracy": 0.638889,
-      "f1": 0.60606,
+      "accuracy": 0.652778,
+      "f1": 0.615384,
       "false_negative": 24,
-      "false_positive": 2,
-      "false_positive_rate": 0.071429,
-      "precision": 0.909091,
+      "false_positive": 1,
+      "false_positive_rate": 0.035714,
+      "precision": 0.952381,
       "recall": 0.454545,
-      "true_negative": 26,
+      "true_negative": 27,
       "true_positive": 20
     },
     "errors": {
@@ -96,8 +103,7 @@
         "fh-343"
       ],
       "false_positive_case_ids": [
-        "fh-358",
-        "fh-361"
+        "fh-358"
       ]
     },
     "scope": "legacy five-keyword public compatibility baseline"
@@ -109,33 +115,29 @@
   "report_version": "fraud_benchmark_v0.1",
   "scenario_engine_v0_1": {
     "binary": {
-      "accuracy": 0.916667,
-      "f1": 0.934783,
-      "false_negative": 1,
-      "false_positive": 5,
-      "false_positive_rate": 0.178571,
-      "precision": 0.895833,
-      "recall": 0.977273,
-      "true_negative": 23,
-      "true_positive": 43
+      "accuracy": 0.958333,
+      "f1": 0.967033,
+      "false_negative": 0,
+      "false_positive": 3,
+      "false_positive_rate": 0.107143,
+      "precision": 0.93617,
+      "recall": 1.0,
+      "true_negative": 25,
+      "true_positive": 44
     },
     "errors": {
-      "false_negative_case_ids": [
-        "fh-308"
-      ],
+      "false_negative_case_ids": [],
       "false_positive_case_ids": [
         "fh-352",
         "fh-354",
-        "fh-358",
-        "fh-360",
-        "fh-361"
+        "fh-358"
       ]
     },
     "evidence_coverage": 1.0,
     "fraud_types": {
       "account_access_request": {
-        "f1": 0.928572,
-        "precision": 0.866667,
+        "f1": 0.962963,
+        "precision": 0.928571,
         "recall": 1.0,
         "support": 13
       },
@@ -152,8 +154,8 @@
         "support": 2
       },
       "authority_impersonation": {
-        "f1": 0.933333,
-        "precision": 0.875,
+        "f1": 1.0,
+        "precision": 1.0,
         "recall": 1.0,
         "support": 7
       },
@@ -164,9 +166,9 @@
         "support": 2
       },
       "investment_scheme": {
-        "f1": 0.923077,
+        "f1": 1.0,
         "precision": 1.0,
-        "recall": 0.857143,
+        "recall": 1.0,
         "support": 7
       },
       "loan_policy_impersonation": {
@@ -188,9 +190,9 @@
         "support": 7
       }
     },
-    "required_action_coverage": 0.985612,
-    "required_signal_coverage": 0.983607,
-    "scenario_policy_accuracy": 0.986111,
+    "required_action_coverage": 1.0,
+    "required_signal_coverage": 1.0,
+    "scenario_policy_accuracy": 1.0,
     "scope": "deterministic signals, taxonomy, state policy and evidence"
   }
 }
