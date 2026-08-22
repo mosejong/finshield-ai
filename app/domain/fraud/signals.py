@@ -19,6 +19,17 @@ class SignalRule:
     # 동사만으로는 신호가 되지 않는 어휘다. "전달해"·"다시 보내"는 계약서에도
     # 쓴다. 목적어가 돈일 때만 자금 재전달이다.
     money_gated_keywords: tuple[str, ...] = ()
+    # 방 이름만으로는 신호가 되지 않는 어휘다. 단톡방·오픈채팅방·텔레그램은
+    # 학부모 공지에도 워크샵 안내에도 쓴다. 같은 메시지 안에 **매매 맥락**이
+    # 있어야 켠다. v0.6.
+    investment_gated_keywords: tuple[str, ...] = ()
+    # **요구의 대상이 아니라 보내는 쪽의 정체를 가리키는 어휘다.**
+    #
+    # 위 세 게이트와 조건의 모양이 다르다. 저쪽은 '이 명사가 요구의 대상인가'를
+    # 묻고, 이쪽은 '이 메시지가 기관이 하지 않는 요구를 하고 있는가'를 묻는다.
+    # 그래서 어휘는 **메시지 전체에서** 찾고(자칭은 끝난 일을 말하는 절에도
+    # 들어간다), 조건은 다른 민감 요구 신호가 함께 켜졌는지로 본다. v0.6.
+    request_gated_keywords: tuple[str, ...] = ()
 
 
 SIGNAL_RULES: tuple[SignalRule, ...] = (
@@ -61,11 +72,28 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         # (`docs/32`). 그래서 **두 층으로 나눈다.**
         #
         # 위 목록(수사기관·법원)은 언급만으로 켠다. 실제로 그 기관들은 문자를
-        # 보내지 않는다. 아래 목록(은행·카드사·공단·세무 관청)은 **요구가 함께
-        # 있을 때만** 켠다. 이들은 정상 문자를 매일 보내기 때문이다.
-        # "하나은행 이용 안내입니다" 와 "하나은행입니다. 본인인증을 완료해
-        # 주세요" 를 가르는 것은 기관명이 아니라 뒤에 붙은 요구다.
-        demand_gated_keywords=(
+        # 보내지 않는다. 아래 목록(은행·카드사·공단·세무 관청)은 조건부다.
+        #
+        # v0.6. 그 조건을 **요구 있음**에서 **민감 요구 있음**으로 바꾼다.
+        # 전에는 기관명이 열린 절에 있고 메시지 어딘가에 요구가 있으면 켰다.
+        # held-out v0.6 의 오탐 4건이 전부 그래서 났다 - `fh-422`
+        # ("하나은행 앱 정기 점검 안내입니다 ... 문의는 고객센터로 부탁드립니다"),
+        # `fh-423`·`fh-463`·`fh-464` 는 전부 기관 + **무해한 요구**다. 정상
+        # 안내문도 회신을 부탁하고 문의를 권한다. 요구가 있다는 사실만으로는
+        # 아무것도 갈리지 않는다.
+        #
+        # 두 가지를 함께 고친다.
+        #
+        # 첫째, **자칭은 요구의 대상이 아니다.** 전에는 기관명을 열린 절에서만
+        # 찾았는데, 보내는 쪽의 정체는 끝난 일을 말하는 절에도 들어간다("○○
+        # 은행입니다. 이상 거래가 감지되었습니다"). 정체는 요구의 목적어가
+        # 아니므로 절 시제로 가릴 대상이 아니다. 그래서 메시지 전체에서 찾는다.
+        #
+        # 둘째, 게이트를 **민감 요구**로 좁힌다. 기관을 자칭하는 문자를 위험하게
+        # 만드는 것은 요구의 존재가 아니라 요구의 내용이다 - 인증정보·계좌·앱
+        # 설치·원격·송금·본인 인증처럼 진짜 기관이 문자로 시키지 않는 것.
+        # 좁히는 수정이므로 값을 사기 쪽에서 치른다. 그 값은 v0.6 이 재고 있다.
+        request_gated_keywords=(
             "은행",
             "뱅크",
             "카드사",
@@ -77,6 +105,19 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "건강보험",
             "국민연금",
             "근로복지",
+            # v0.6. 게이트가 민감 요구를 요구하게 되면서 기관 어휘를 넓혀도
+            # 정상 안내문이 걸리지 않는다. v0.2 에서 국세청을 넣었다가 물러섰던
+            # 이유("국세청 홈택스에서 조회할 수 있습니다")가 여기서 해소된다 -
+            # 조회 안내에는 민감 요구가 없다. held-out v0.6 의 정상 사례
+            # `fh-425`~`fh-428` 이 이 어휘들을 그대로 쓰고 있고, 전부 조용해야
+            # 한다.
+            "농협",
+            "토스",
+            "증권사",
+            "새마을금고",
+            "세무서",
+            "신용정보원",
+            "금융결제원",
         ),
     ),
     SignalRule(
@@ -183,22 +224,18 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "종목 추천방",
             "종목추천방",
             "추천방으로",
-            "단톡방으로",
-            # v0.5. 오픈채팅방 쪽에 "-으로"만 있고 입장 어형이 없던 비대칭을
-            # 맞춘다. **단톡방 쪽에는 초대 어형을 넣지 않는다.** "회사 동호회
-            # 단톡방 초대 링크입니다"(v0.4 `fh-244`)와 "사장님 전용 단톡방
-            # 초대 링크 보내 드립니다"(v0.5 `fh-308`)는 이 구절이 똑같다.
-            # v0.4 가 남긴 판단이 여기서 그대로 유효하다 - 초대 자체는
-            # 표지가 아니고 **무엇을 위한 초대인가**가 갈림길이다. 그것을
-            # 재려면 투자·매매 맥락 조건이 필요하고, 그것은 v0.6 일감이다.
-            "오픈채팅방으로",
-            "오픈채팅방 입장",
-            "오픈채팅으로",
-            "비공개 방으로",
-            "텔레그램 채널",
-            "텔레그램 아이디",
-            "텔레그램으로 연락",
-            "텔레그램으로 오",
+            # v0.6. 단톡방·오픈채팅방·텔레그램·비공개 방은 **여기서 뺐다.**
+            # 아래 `investment_gated_keywords` 로 내려간다. 조사가 붙은 형태
+            # ("단톡방으로"·"오픈채팅방 입장")만 적어 두는 것으로는 아무것도
+            # 갈리지 않는다는 것이 v0.6 에서 드러났다 - "워크샵 안내는
+            # 오픈채팅방으로 옮겼습니다"(`fh-410`)가 오탐이 되고, "주식 스터디
+            # 단톡방 초대할게"(`fh-405`)는 어형이 없어 빠졌다. 방 이름의
+            # 활용형을 쫓는 일은 끝이 없고, 끝까지 쫓아도 정상 단톡방과
+            # 사기 단톡방은 여전히 같은 말을 쓴다.
+            #
+            # v0.4 `fh-244` 와 v0.5 `fh-308` 이 남긴 질문의 답이 이것이다 -
+            # 갈림길은 초대의 어형이 아니라 **무엇을 위한 초대인가**이고,
+            # 그것은 방 이름 옆의 매매 어휘로만 보인다.
             "1:1 상담방",
             "1대1 상담방",
             "전담 애널리스트",
@@ -207,6 +244,19 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         ),
         25,
         "폐쇄 채널·리딩방 유도",
+        # 맨 방 이름이다. 그 자체로는 학부모 공지·동아리·워크샵 안내에 그대로
+        # 쓰인다(held-out v0.6 `fh-407`~`fh-411`). 같은 메시지에 매매 맥락이
+        # 있을 때만 켠다. **리딩방·종목추천방 계열은 위 목록에 그대로 둔다** -
+        # 그쪽은 이름 자체가 이미 매매를 말하고 있어 조건이 필요 없다.
+        investment_gated_keywords=(
+            "단톡방",
+            "오픈채팅방",
+            "오픈 채팅방",
+            "오픈채팅",
+            "비공개 방",
+            "체험방",
+            "텔레그램",
+        ),
     ),
     SignalRule(
         "loan_policy_offer",
@@ -647,6 +697,125 @@ MONEY_OBJECT_TERMS = (
     "이체",
 )
 
+# 매매 맥락. 방 이름을 신호로 승격시킬지 가르는 어휘다.
+#
+# **"투자"·"주식"은 넣지 않았다.** 주식회사·투자자 보호 안내처럼 정상 문장이
+# 매일 쓰는 말이라, 방 이름과 만나면 학부모 단톡방 하나로도 오탐이 난다. 여기
+# 있는 것은 값이 움직이는 것을 사고파는 자리에서만 쓰는 말이다.
+INVESTMENT_CONTEXT_TERMS = (
+    "종목",
+    "매수",
+    "매도",
+    # v0.6. 아래 네 개는 held-out v0.4 `fh-214`("AI 자동매매 봇")와 v0.5
+    # `fh-307`("장 마감 전까지만 열어 둡니다")·`fh-309`("실시간 매매 신호")가
+    # 요구했다. 맨 방 이름을 이 게이트로 내리면서 그 세 건이 함께 꺼졌는데,
+    # 그것은 좁히기의 값이 아니라 이 목록의 구멍이었다.
+    "매매",
+    "장 마감",
+    "시황",
+    "종가",
+    "수익률",
+    "수익 나",
+    "수익 인증",
+    "코인",
+    "비트코인",
+    "급등",
+    "상한가",
+    "단타",
+    "시드",
+    "리딩",
+    "애널리스트",
+    "차트",
+    "공모주",
+    "선물 거래",
+    "원금 보장",
+    "투자금",
+    "재테크",
+)
+
+# 기관 자칭을 신호로 승격시키는 **민감 요구** 신호들.
+#
+# 진짜 기관도 문자를 보내고 회신을 부탁한다. 진짜 기관이 문자로 시키지 않는
+# 것은 이쪽이다 - 인증정보·계좌·접근수단을 넘기라거나, 앱을 깔라거나, 원격을
+# 열라거나, 돈을 보내라거나, 받은 돈을 다시 보내라는 것.
+SENSITIVE_REQUEST_SIGNALS = frozenset(
+    {
+        "credential_request",
+        "account_access_request",
+        "app_install_request",
+        "remote_control_request",
+        "money_transfer_request",
+        "receive_and_forward_money",
+        "card_delivery_claim",
+    }
+)
+
+# 위 신호 어디에도 걸리지 않는 민감 요구가 둘 있다. 넘겨주는 물건이 없어서
+# 어느 규칙의 대상도 아니지만, 기관이 문자로 시키지 않는 행동이다.
+#
+# 하나는 본인 인증이다. 계정이 잠겼으니 지금 본인 인증을 완료하라는 문자는
+# 기관이 보내지 않는다(held-out v0.6 `fh-414`). 다른 하나는 링크를 누르라는
+# 요구다. 이것은 v0.6 이 아니라 주입 골든셋 `pi-002`("국민은행입니다. 계좌
+# 확인을 위해 링크를 눌러 주세요")가 요구했다 - 게이트를 민감 요구로 좁히자
+# 이 사례가 함께 꺼졌고, 그것은 좁히기의 값이 아니라 목록의 구멍이었다.
+#
+# 요구와 **같은 절**에 있을 때만 센다. "공식 앱에서 본인 인증을 완료하시면
+# 조회 가능합니다"(`fh-433`)는 안내이지 요구가 아니고, 그 절은 아래 창구 안내
+# 규칙에서 이미 빠진다.
+SENSITIVE_DEMAND_TERMS = (
+    "본인 인증",
+    "본인인증",
+    "본인확인",
+    "본인 확인",
+    "재인증",
+    "계정 잠금 해제",
+    "계정 해제",
+    "링크",
+    # **정상 기관은 이미 아는 창구로 보내고, 사기는 자기가 만든 창구로 부른다.**
+    # 아래 창구 안내 규칙과 같은 자를 반대 방향으로 쓴 것이다. held-out v0.2
+    # `fh-007`·`fh-011` 과 v0.3 `fh-109` 가 전부 이 모양이고, `fh-109` 는
+    # 아예 "카드사 대표번호 말고 아래 담당자 번호로" 라고 쓴다 - 공식 창구를
+    # 명시적으로 밀어내는 것이야말로 이 사기의 서명이다.
+    "담당자 번호",
+    "안내 번호",
+    "아래 번호",
+    "아래 연락처",
+    "직통 번호",
+    "전용 번호",
+)
+
+# **정상 기관은 이미 아는 창구로 보내고, 사기는 자기가 만든 창구로 부른다.**
+#
+# v0.6. held-out 다섯 판에 걸쳐 남은 오탐 중 마지막 무리가 이 모양이었다 -
+# "통장 재발급은 창구에서만 처리 가능합니다"(`fh-430`), "비밀번호 변경은
+# 인터넷뱅킹 홈페이지에서 직접 처리 가능합니다"(`fh-431`), "계좌번호 변경은
+# 영업점에서만 신청 가능합니다"(`fh-432`). 위험한 명사가 진짜로 들어 있고 절에
+# 요구도 붙어 있지만, 그 절이 가리키는 곳은 **읽는 사람이 이미 알고 있는
+# 창구**다. 사기 문자는 이 말을 할 수 없다 - 그 창구로 가면 거짓이 드러난다.
+#
+# 두 조각을 함께 요구한다. 창구 이름에 **조사가 붙어 방향을 가리켜야** 하고
+# (그래야 "○○은행 고객센터입니다" 같은 자칭이 걸리지 않는다), 같은 절에
+# **안내 서술어**가 있어야 한다. 절 단위로만 본다. 메시지 단위로 보면 안전한
+# 첫 문장 하나로 나머지 전부가 통과한다.
+CHANNEL_REFERRAL_PATTERN = re.compile(
+    r"(?:영업점|창구|고객센터|대표번호|홈페이지|누리집|인터넷뱅킹|공식 앱|모바일 앱|앱 내)"
+    r"(?:에서만|에서도|에서|으로만|으로도|으로|로만|로도|로|에|\s*방문)"
+)
+CHANNEL_REFERRAL_VERBS = (
+    "가능",
+    "확인",
+    "조회",
+    "열람",
+    "문의",
+    "신청",
+    "처리",
+    "접수",
+    "출력",
+    "방문",
+    "지참",
+)
+
+
 CLAUSE_BOUNDARY_PATTERN = re.compile(r"[.!?\n]+")
 
 def _clauses(normalized: str) -> list[str]:
@@ -678,12 +847,25 @@ def _open_clauses(normalized: str) -> list[str]:
     가르는 것은 **절의 시제**다. 뒤쪽 문장의 '통장'은 끝난 일에 대한 보고 안에
     있어서 뒤따르는 요구의 대상이 될 수 없다. 그래서 예방 서술과 완료 보고를
     양쪽 게이트에서 함께 뺀다 - 그런 절은 요구도, 요구의 대상도 공급하지 않는다.
+
+    v0.6 에서 세 번째 종류를 함께 뺀다. **이미 아는 창구를 가리키는 절**이다.
+    시제가 아니라 방향으로 갈린다 - 그 절의 요구는 읽는 사람을 이 메시지 밖의
+    공식 창구로 보내므로, 이 메시지가 무엇을 받아 가려는지에 대해 아무것도
+    말하지 않는다.
     """
     return [
         clause
         for clause in _demanding_clauses(normalized)
         if not COMPLETED_REPORT_PATTERN.search(clause)
+        and not _is_channel_referral(clause)
     ]
+
+
+def _is_channel_referral(clause: str) -> bool:
+    """읽는 사람을 이미 아는 공식 창구로 보내는 절인가."""
+    if not CHANNEL_REFERRAL_PATTERN.search(clause):
+        return False
+    return any(verb in clause for verb in CHANNEL_REFERRAL_VERBS)
 
 
 def _has_reader_demand(clauses: list[str]) -> bool:
@@ -701,6 +883,21 @@ def _mentions_money(clauses: list[str]) -> bool:
     return any(term in clause for clause in clauses for term in MONEY_OBJECT_TERMS)
 
 
+def _mentions_investment(clauses: list[str]) -> bool:
+    return any(
+        term in clause for clause in clauses for term in INVESTMENT_CONTEXT_TERMS
+    )
+
+
+def _demands_something_sensitive(clauses: list[str]) -> bool:
+    """넘겨줄 물건은 없지만 기관이 시키지 않는 요구가 한 절 안에 있는가."""
+    return any(
+        any(term in clause for term in SENSITIVE_DEMAND_TERMS)
+        and _has_reader_demand([clause])
+        for clause in clauses
+    )
+
+
 def _is_prevention_notice(normalized: str) -> bool:
     """요구가 하나도 없는 예방·정상 이용 안내문인가.
 
@@ -711,20 +908,29 @@ def _is_prevention_notice(normalized: str) -> bool:
     표지가 있어도 예방 서술 밖의 절에 위험한 요구가 있으면 억제하지 않는다.
     안전 문구를 앞에 붙이고 뒤에서 요구하는 혼합 문장이 이 규칙을 노리는 가장
     쉬운 우회다.
+
+    v0.6. 그 탈출구를 `READER_DEMAND_PHRASES` 목록에서 **요구 판정 전체**로
+    넓힌다. 좁은 목록으로는 어형 하나만 비켜 가면 통과했다 - held-out v0.6
+    `fh-435` 는 "공식 홈페이지에서도 확인 가능합니다" 를 앞에 붙이고 뒤에서
+    "인증번호를 알려 주시면" 이라고 한다. 목록에 있는 것은 "알려 주세요"
+    뿐이라 이 문장은 예방 안내문으로 통과했다.
+
+    넓혀도 정상 안내문이 걸리지 않는 이유는 창구 안내 절이 이제 열린 절에서
+    빠지기 때문이다. "의심되면 대표번호로 확인해 주세요" 는 요구의 형식을
+    갖췄지만 그 절은 창구 안내라 애초에 세지 않는다. 두 수정은 함께여야
+    한다 - 하나만 넣으면 정상 예방 문자가 무너진다.
     """
     has_marker = any(
         phrase in normalized for phrase in OFFICIAL_VERIFICATION_PHRASES
     ) or any(marker in normalized for marker in PREVENTION_STATEMENT_MARKERS)
     if not has_marker:
         return False
-    return not any(
-        phrase in clause
-        for clause in _demanding_clauses(normalized)
-        for phrase in READER_DEMAND_PHRASES
-    )
+    return not _has_reader_demand(_open_clauses(normalized))
 
 
-def _detect_by_rules(text: str, rules: tuple[SignalRule, ...]) -> list[RiskSignal]:
+def _detect_by_rules(
+    text: str, rules: tuple[SignalRule, ...], *, has_suspicious_link: bool = False
+) -> list[RiskSignal]:
     normalized = text.casefold()
     # 조건부 어휘는 **열린 절 안에서만** 찾는다. 요구가 어느 절에 있는지는 계속
     # 메시지 단위로 본다 - 사기 문자는 요구를 마지막 절에 몰아 쓰고 대상은 앞
@@ -734,9 +940,10 @@ def _detect_by_rules(text: str, rules: tuple[SignalRule, ...]) -> list[RiskSigna
     open_text = " ".join(open_clauses)
     has_demand = _has_reader_demand(open_clauses)
     has_money = _mentions_money(open_clauses)
-    detected = []
-    for rule in rules:
-        matched = (
+    has_investment = _mentions_investment(open_clauses)
+
+    def object_gated_match(rule: SignalRule) -> bool:
+        return (
             any(keyword.casefold() in normalized for keyword in rule.keywords)
             or (
                 has_demand
@@ -752,8 +959,48 @@ def _detect_by_rules(text: str, rules: tuple[SignalRule, ...]) -> list[RiskSigna
                     for keyword in rule.money_gated_keywords
                 )
             )
+            or (
+                has_investment
+                and any(
+                    keyword.casefold() in open_text
+                    for keyword in rule.investment_gated_keywords
+                )
+            )
         )
-        if matched and not _safe_context_suppresses(rule.code, normalized):
+
+    # v0.6. 두 번 돈다. 자칭 게이트의 조건이 **다른 신호가 켜졌는가**라서,
+    # 한 번에 돌면 규칙 순서가 판정을 바꾼다. 첫 번째 바퀴는 요구의 대상으로
+    # 켜지는 신호만 모으고, 두 번째 바퀴가 그 결과를 조건으로 쓴다.
+    object_gated = {
+        rule.code
+        for rule in rules
+        if object_gated_match(rule)
+        and not _safe_context_suppresses(rule.code, normalized)
+    }
+    has_sensitive_request = (
+        bool(object_gated & SENSITIVE_REQUEST_SIGNALS)
+        # 어휘적으로 의심스러운 링크는 그 자체가 민감 요구다. 진짜 기관은 단축
+        # URL 이나 IP 주소로 보내지 않는다. held-out v0.3 `fh-156`("국세청 환급금
+        # 조회 서비스입니다. bit.ly/... 에서 환급 계좌를 등록해 주세요")이 이것을
+        # 요구했다 - 요구의 대상은 '계좌 등록'이라 어느 규칙에도 걸리지 않지만,
+        # 링크가 이미 이 문자가 무엇인지 말하고 있다.
+        or has_suspicious_link
+        or _demands_something_sensitive(open_clauses)
+    )
+
+    detected = []
+    for rule in rules:
+        matched = rule.code in object_gated or (
+            has_sensitive_request
+            # 자칭은 메시지 전체에서 찾는다. 요구의 대상이 아니라 보내는
+            # 쪽의 정체라서, 절의 시제로 가릴 것이 아니다.
+            and any(
+                keyword.casefold() in normalized
+                for keyword in rule.request_gated_keywords
+            )
+            and not _safe_context_suppresses(rule.code, normalized)
+        )
+        if matched:
             detected.append(
                 RiskSignal(code=rule.code, label=rule.label, weight=rule.weight)
             )
@@ -913,10 +1160,18 @@ def detect_legacy_signals(text: str) -> list[RiskSignal]:
 def detect_canonical_signals(
     text: str, supplied_url: str | None = None
 ) -> list[RiskSignal]:
-    detected = _detect_by_rules(text, SIGNAL_RULES)
     url_candidates = _url_candidates(text, supplied_url)
+    # 링크 판정을 규칙 탐지보다 먼저 한다. 기관 자칭 게이트가 이 결과를 조건으로
+    # 쓰기 때문이다. 신호를 붙이는 자리는 그대로 뒤에 둔다 - 순서가 바뀌면
+    # 응답에 실리는 신호 목록의 순서가 바뀐다.
+    has_suspicious_link = any(
+        _is_lexically_suspicious_url(url) for url in url_candidates
+    )
+    detected = _detect_by_rules(
+        text, SIGNAL_RULES, has_suspicious_link=has_suspicious_link
+    )
 
-    if any(_is_lexically_suspicious_url(url) for url in url_candidates):
+    if has_suspicious_link:
         detected.append(
             RiskSignal(
                 code="suspicious_link",
