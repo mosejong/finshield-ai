@@ -144,6 +144,51 @@ def test_ordinary_confidentiality_is_not_an_isolation_demand(text: str) -> None:
     assert body["risk_level"] == "low"
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v0.3 `fh-138`. 어휘에 "넘겨" 가 없어 두 회차를 미탐으로 지났다.
+        "들어온 돈은 그대로 다른 계좌로 넘겨 주시면 됩니다.",
+        # held-out v0.6 `fh-446`. 어휘에는 "빼서 넣어" 가 **붙어** 있었는데 실제
+        # 문장은 그 사이에 목적지가 낀다. 붙여 적은 어휘는 아무것도 잡지 못한다.
+        "그 돈 빼서 다른 계좌로 넣어 주세요.",
+        # 개발셋 `fg-004`. 요구가 문장 다른 곳이 아니라 **동사에 붙어 있다.**
+        "조사 협조를 위해 자금을 지정 장소로 옮기세요.",
+    ],
+)
+def test_forwarding_money_is_caught_in_the_forms_that_actually_arrive(
+    text: str,
+) -> None:
+    body = analyze(text)
+
+    assert "money_mule" in [signal["code"] for signal in body["signals"]]
+    assert "money_mule_transfer" in body["fraud_types"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 화자가 제 계좌 사이에서 옮기는 이야기다. held-out v0.7 `fh-545` 가
+        # 동결 시점에 오탐이었고, 천장까지 함께 넘었다.
+        "월급 들어오면 적금 계좌로 옮겨 놓을게. 이번 달도 자동이체로 걸어 뒀어.",
+        "보증금 돌려받으면 대출 상환 계좌로 바로 넣을 예정이야.",
+        # 목적어는 돈이지만 시키는 말이 아니다.
+        "지난달 관리비 정산 내역입니다. 차액은 다음 달 고지서에 반영됩니다.",
+    ],
+)
+def test_moving_your_own_money_is_not_a_forwarding_demand(text: str) -> None:
+    """**재전달을 만드는 것은 동사도 목적어도 아니고 요구다.**
+
+    목적어만 보면 "자동이체" 의 "이체" 하나로 금액 조건이 차고, 제 적금 계좌로
+    옮기겠다는 말이 자금 재전달 요구가 된다. 이 어휘를 넓히는 회차에서 조건을
+    함께 걸지 않으면 넓힌 만큼 정상 문장을 데려온다.
+    """
+    body = analyze(text)
+
+    assert "money_mule" not in [signal["code"] for signal in body["signals"]]
+    assert body["fraud_types"] == []
+
+
 def test_investment_scheme_from_guarantee_and_private_channel() -> None:
     body = analyze("원금 보장 확정 수익 종목 드립니다. 무료 리딩방에 초대할게요.")
 
