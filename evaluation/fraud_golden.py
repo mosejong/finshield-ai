@@ -19,11 +19,19 @@ GOLDEN_SET_PATH = Path(__file__).with_name("data") / "fraud_golden_v0.1.jsonl"
 # 요구 조건 수정을 재면서 함께 소진되었다. v0.4 는 투자·지인 사칭 유형이
 # 구현되기 **전에** 얼린 셋이고, 그 유형을 재면서 소진되었다. v0.5 는 v0.4 가
 # 찾아낸 여덟 건의 결함을 **고치기 전에** 얼린 셋이다 - 그 결함을 하나라도 먼저
-# 고쳤다면 v0.4 는 성능이 아니라 기억을 재는 자가 된다.
+# 고쳤다면 v0.4 는 성능이 아니라 기억을 재는 자가 된다. v0.5 는 절 범위 수정을
+# 재면서 소진되었다. v0.6 은 그 뒤에 남은 세 결함을 고치기 전에 얼린 셋이다.
+#
+# v0.6 은 앞선 셋들과 방향이 반대다. v0.2~v0.5 가 잰 수정은 전부 **넓히는**
+# 것이었고, 넓히기의 값은 정상 문장에서 치러지므로 부정 사례로 재면 됐다.
+# 이번 세 수정 중 둘은 **좁히는** 것이다 - 기관 게이트에 민감 요구 조건을
+# 걸고, 공식 창구 안내 절을 요구에서 뺀다. 좁히기의 값은 **사기 쪽에서**
+# 치러진다. 그래서 이 셋은 좁히기가 끊을 수 있는 양성 사례를 함께 담는다.
 HOLDOUT_V0_2_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.2.jsonl"
 HOLDOUT_V0_3_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.3.jsonl"
 HOLDOUT_V0_4_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.4.jsonl"
 HOLDOUT_V0_5_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.5.jsonl"
+HOLDOUT_V0_6_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.6.jsonl"
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",

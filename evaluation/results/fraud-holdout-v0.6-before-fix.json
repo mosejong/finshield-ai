@@ -1,0 +1,210 @@
+{
+  "api_latency": {
+    "max_ms": 26.356,
+    "p50_ms": 1.998,
+    "p95_ms": 3.468,
+    "sample_count": 216,
+    "scope": "in_process_asgi_without_network_or_tls"
+  },
+  "dataset": {
+    "case_count": 72,
+    "held_out": true,
+    "id": "fraud_holdout_v0.6",
+    "negative_count": 36,
+    "normalized_sha256": "1e71098e7ac12cf43a0525b288bd1a7fc18dacd7307aaa953dd665a7915a6c72",
+    "persona_counts": {
+      "early_career": 28,
+      "small_business": 21,
+      "unknown": 23
+    },
+    "positive_count": 36,
+    "source_kind": "locally_authored_synthetic_reviewed",
+    "state_counts": {
+      "clicked_link": 4,
+      "installed_app": 3,
+      "received_only": 55,
+      "received_unknown_money": 3,
+      "shared_account_access": 2,
+      "shared_personal_info": 2,
+      "transferred_money": 3
+    }
+  },
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.10"
+  },
+  "hybrid_v0_1": {
+    "alternatives_considered": {
+      "reason": "모델 판정 결과가 없어 조합을 계산할 수 없다.",
+      "status": "not_run"
+    },
+    "binary": {
+      "accuracy": 0.777778,
+      "f1": 0.783784,
+      "false_negative": 7,
+      "false_positive": 9,
+      "false_positive_rate": 0.25,
+      "precision": 0.763158,
+      "recall": 0.805556,
+      "true_negative": 27,
+      "true_positive": 29
+    },
+    "detection_identical_to": "scenario_engine_v0_1",
+    "evidence_coverage": 1.0,
+    "explanation_layer": {
+      "fallback_model": "gemini-3.1-flash-lite",
+      "measured_in": "docs/34-llm-explanation-runtime.md",
+      "model": "gemini-3.6-flash",
+      "note": "설명 문장의 근거 이탈률과 안전 필터 차단율은 아직 측정하지 않았다. 여기 숫자는 탐지 성능이며 설명 품질이 아니다."
+    },
+    "required_action_coverage": 0.894309,
+    "scenario_policy_accuracy": 0.833333,
+    "scope": "deterministic engine decides; the model only rewrites that decision in plain Korean",
+    "status": "measured",
+    "why_identical": "explain_analysis 는 AnalyzeResponse 를 받아 str | None 을 돌려준다. 설명 계층은 위험 수준·유형·행동을 구조적으로 바꿀 수 없다 (app/services/llm/explanation.py)."
+  },
+  "legacy_rule_v0": {
+    "binary": {
+      "accuracy": 0.680556,
+      "f1": 0.566038,
+      "false_negative": 21,
+      "false_positive": 2,
+      "false_positive_rate": 0.055556,
+      "precision": 0.882353,
+      "recall": 0.416667,
+      "true_negative": 34,
+      "true_positive": 15
+    },
+    "errors": {
+      "false_negative_case_ids": [
+        "fh-401",
+        "fh-402",
+        "fh-403",
+        "fh-404",
+        "fh-405",
+        "fh-406",
+        "fh-414",
+        "fh-415",
+        "fh-417",
+        "fh-419",
+        "fh-420",
+        "fh-435",
+        "fh-438",
+        "fh-439",
+        "fh-441",
+        "fh-446",
+        "fh-448",
+        "fh-449",
+        "fh-452",
+        "fh-454",
+        "fh-456"
+      ],
+      "false_positive_case_ids": [
+        "fh-430",
+        "fh-431"
+      ]
+    },
+    "scope": "legacy five-keyword public compatibility baseline"
+  },
+  "llm_only": {
+    "reason": "판정 실행 결과 파일이 없다. `python -m scripts.run_llm_fraud_judge` 가 유료 호출로 만든다.",
+    "status": "not_run"
+  },
+  "report_version": "fraud_benchmark_v0.1",
+  "scenario_engine_v0_1": {
+    "binary": {
+      "accuracy": 0.777778,
+      "f1": 0.783784,
+      "false_negative": 7,
+      "false_positive": 9,
+      "false_positive_rate": 0.25,
+      "precision": 0.763158,
+      "recall": 0.805556,
+      "true_negative": 27,
+      "true_positive": 29
+    },
+    "errors": {
+      "false_negative_case_ids": [
+        "fh-401",
+        "fh-402",
+        "fh-404",
+        "fh-405",
+        "fh-435",
+        "fh-446",
+        "fh-454"
+      ],
+      "false_positive_case_ids": [
+        "fh-410",
+        "fh-422",
+        "fh-423",
+        "fh-430",
+        "fh-431",
+        "fh-432",
+        "fh-463",
+        "fh-464",
+        "fh-472"
+      ]
+    },
+    "evidence_coverage": 1.0,
+    "fraud_types": {
+      "account_access_request": {
+        "f1": 0.814815,
+        "precision": 0.733333,
+        "recall": 0.916667,
+        "support": 12
+      },
+      "acquaintance_impersonation": {
+        "f1": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 3
+      },
+      "advance_fee_demand": {
+        "f1": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 3
+      },
+      "authority_impersonation": {
+        "f1": 0.526316,
+        "precision": 0.555556,
+        "recall": 0.5,
+        "support": 10
+      },
+      "card_delivery_impersonation": {
+        "f1": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 2
+      },
+      "investment_scheme": {
+        "f1": 0.545454,
+        "precision": 0.75,
+        "recall": 0.428571,
+        "support": 7
+      },
+      "loan_policy_impersonation": {
+        "f1": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 2
+      },
+      "money_mule_transfer": {
+        "f1": 0.666667,
+        "precision": 1.0,
+        "recall": 0.5,
+        "support": 2
+      },
+      "smishing_malware": {
+        "f1": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 6
+      }
+    },
+    "required_action_coverage": 0.894309,
+    "required_signal_coverage": 0.824561,
+    "scenario_policy_accuracy": 0.833333,
+    "scope": "deterministic signals, taxonomy, state policy and evidence"
+  }
+}
