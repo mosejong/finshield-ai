@@ -86,6 +86,7 @@ export const FraudTypeSchema = z.enum([
   "money_mule_transfer",
   "smishing_malware",
   "card_delivery_impersonation",
+  "isolation_coercion",
 ]);
 export type FraudType = z.infer<typeof FraudTypeSchema>;
 

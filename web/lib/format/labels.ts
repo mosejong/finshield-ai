@@ -61,6 +61,7 @@ export const FRAUD_TYPE_LABEL: Record<FraudType, string> = {
   money_mule_transfer: "자금 수취·재전달 요구",
   smishing_malware: "스미싱·악성 앱 유도",
   card_delivery_impersonation: "카드 배송 사칭",
+  isolation_coercion: "고립·확인 차단 유도",
 };
 
 export function optionsOf<T extends string>(

@@ -77,11 +77,13 @@ FRAUD_TYPE_GLOSSARY: tuple[tuple[str, str], ...] = (
         "loan_policy_impersonation",
         "정부·정책자금, 저금리 대환 같은 대출 조건을 미끼로 접근한다",
     ),
-    # `advance_fee_demand`·`investment_scheme`·`acquaintance_impersonation` 은
-    # 여기 없다. 이 프롬프트를 고치면 sha256 이 바뀌고, 이미 돈을 주고 받아 둔
-    # 판정 결과가 어떤 프롬프트에서 나왔는지 알 수 없게 된다. 유형을 늘리려면
-    # 프롬프트를 버전으로 올리고 유료 재실행을 해야 한다. 그때까지 LLM 단독
-    # 판정은 6종 기준이고, 새 유형 세 개의 llm_only 지표는 0 이다.
+    # `advance_fee_demand`·`investment_scheme`·`acquaintance_impersonation`·
+    # `isolation_coercion` 은 여기 없다. 이 프롬프트를 고치면 sha256 이 바뀌고,
+    # 이미 돈을 주고 받아 둔 판정 결과가 어떤 프롬프트에서 나왔는지 알 수 없게
+    # 된다. 유형을 늘리려면 프롬프트를 버전으로 올리고 유료 재실행을 해야 한다.
+    # 그때까지 LLM 단독 판정은 6종 기준이고, 새 유형 **네 개**의 llm_only
+    # 지표는 0 이다. 규칙 엔진이 이기는 것처럼 보이는 자리가 넷이라는 뜻이므로,
+    # 이 숫자를 비교표에 쓸 때는 프롬프트 버전을 함께 적는다.
     (
         "account_access_request",
         "비밀번호·OTP·인증번호·통장·카드 등 인증정보나 금융 접근수단을 요구한다",

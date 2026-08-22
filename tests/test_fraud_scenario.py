@@ -93,6 +93,57 @@ def test_card_delivery_claim() -> None:
     assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
 
 
+def test_isolation_demand_now_has_a_name_instead_of_only_a_grade() -> None:
+    # `secrecy_isolation` 은 v0.1 부터 켜졌지만 유형 표에 자리가 없었다. 이진
+    # 판정이 `bool(fraud_types)` 라서 등급만 medium 으로 오르고 사용자에게는
+    # "정상" 이 나갔다 - held-out v0.6 `fh-454` 가 그렇게 미탐이었다.
+    body = analyze("수사 중인 사안이라 가족에게도 알리시면 안 됩니다. 통화를 끊지 마시고 지시대로 진행하세요.")
+
+    assert "isolation_coercion" in body["fraud_types"]
+    assert body["risk_level"] == "medium"
+    assert "STOP_CONTACT" in action_codes(body)
+    assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
+
+
+def test_isolation_stands_on_its_own_without_an_impersonated_institution() -> None:
+    # 기관 자칭도 송금 요구도 없는 고립 요구다. `authority_impersonation` 에
+    # 합치지 않은 이유가 이것이다 - 사칭이라고 적혀 있지 않은 문장에 사칭이라는
+    # 이름을 붙이면 그것이 지어낸 근거가 된다.
+    body = analyze("주변에는 알리지 마시고 저와만 연락하세요.")
+
+    assert body["fraud_types"] == ["isolation_coercion"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 회사 대외비. 화제를 집단 안에 두는 일이지 확인을 막는 일이 아니다.
+        "다음 주 인사 발령은 공지 전까지 대외 보안 유지 부탁드립니다.",
+        # 계약 NDA.
+        "계약 조건은 양사 간 비밀 유지 대상입니다.",
+        # 생일 파티. 금지의 대상이 한 사람이다.
+        "이번 생일 파티는 비밀로 하자. 당일까지 본인한테는 말하지 마.",
+        # 주어가 화자다. 같은 낱말이 주어에 따라 갈린다.
+        "이번 건은 제가 혼자 처리할 수 있을 것 같아요.",
+        # 통화가 끊기는 것이지 끊지 말라는 요구가 아니다.
+        "통화 중에 끊기면 다시 걸게. 지하철이라 신호가 약해.",
+    ],
+)
+def test_ordinary_confidentiality_is_not_an_isolation_demand(text: str) -> None:
+    """**비밀 유지는 정상이고, 확인 차단이 신호다.**
+
+    이 유형을 붙이기 전에는 위 문장들이 등급만 medium 으로 올랐다. 유형이
+    붙는 순간 같은 오탐이 **사기 판정**이 되므로, 어휘를 함께 바꾸지 않으면
+    회사 공지와 생일 파티 문자가 전부 사기가 된다. held-out v0.7 동결 시점
+    baseline 이 네 건(`fh-527`·`fh-528`·`fh-530`·`fh-531`)으로 그 값을 미리
+    보여 줬다.
+    """
+    body = analyze(text)
+
+    assert body["fraud_types"] == []
+    assert body["risk_level"] == "low"
+
+
 def test_investment_scheme_from_guarantee_and_private_channel() -> None:
     body = analyze("원금 보장 확정 수익 종목 드립니다. 무료 리딩방에 초대할게요.")
 
