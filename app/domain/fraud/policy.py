@@ -51,10 +51,17 @@ ACTION_POLICIES: dict[str, ActionPolicy] = {
     # 지인 사칭에는 확인할 "공식 대표번호"가 없다. 확인 수단은 기관 창구가 아니라
     # **이전부터 쓰던 연락처**이고, 그래서 위 액션과 다른 항목이어야 한다.
     # 같은 항목으로 묶으면 사용자에게 존재하지 않는 창구를 찾으라고 말하게 된다.
+    #
+    # v0.9. 이 항목은 지인 사칭 전용이 아니다. **이름을 대지 않은 상대** 전부가
+    # 여기로 온다 - 자칭이 없으면 공식 대표번호도 없기 때문이다. 그래서 설명을
+    # 지인 밖으로 넓혔다. 제목은 그대로 둔다: 이 문자열은 유료 판정 프롬프트에
+    # `{actions}` 로 끼워지는데, 기록된 프롬프트 sha 는 템플릿만 덮고 끼워지는
+    # 제목은 덮지 않는다. 지금 고치면 sha 를 움직이지 않은 채 모델이 본 것만
+    # 바뀐다. 제목 교체는 판정 프롬프트 v0.2 와 같이 간다.
     "VERIFY_BY_KNOWN_CONTACT": ActionPolicy(
         1,
         "원래 알던 연락처로 본인에게 직접 확인하세요",
-        "가족·지인을 자칭하며 새 번호나 다른 메신저로 접근한 경우, 지금 대화 중인 창이 아니라 이전부터 쓰던 번호로 직접 전화해야 본인인지 확인할 수 있습니다.",
+        "상대가 어느 기관인지 밝히지 않았다면 찾아갈 공식 대표번호가 없습니다. 가족·지인을 자칭하면 이전부터 쓰던 번호로 본인에게, 그 밖에는 카드 뒷면이나 기존 거래 창구처럼 이미 알고 있는 연락처로 확인하세요. 지금 대화 중인 창과 메시지에 적힌 번호는 확인 수단이 아닙니다.",
         ("police_1394",),
     ),
     "CONTACT_FINANCIAL_INSTITUTION": ActionPolicy(
@@ -89,13 +96,78 @@ ACTION_POLICIES: dict[str, ActionPolicy] = {
     ),
 }
 
+# v0.9. 확인 행동은 신호에 고정된 것이 아니라 **그 메시지에 확인할 창구가
+# 있는지**를 따른다.
+#
+# "공식 대표번호로 확인하세요" 는 확인할 기관이 있을 때만 실행할 수 있는
+# 조언이다. 창구가 없는 메시지에 같은 말을 하면 사용자는 존재하지 않는 창구를
+# 찾다가 결국 **메시지에 적힌 번호로 건다.** 틀린 행동은 없는 행동보다 나쁘다.
+#
+# 창구가 생기는 자리는 기관 자칭만이 아니다. 자칭하지 않아도 대출·정책자금,
+# 카드 발급·배송, 투자 권유는 취급 기관과 공식 조회 창구를 가리킨다 - 카드
+# 뒷면의 번호, 정책자금 취급 창구, 제도권 금융회사 조회. 반면 재촉, 고립 요구,
+# 인증정보·계좌권한 요구는 그 자체로는 아무 기관도 가리키지 않는다. **말하는
+# 사람만 있고 창구가 없다.**
+#
+# 고립 요구를 공식 창구 쪽에 넣지 않은 것은 판단이 아니라 이미 기록된
+# 결론이다. v0.7 `fh-523` "부모님께는 말씀드리지 않는 편이 좋습니다. 저와만
+# 연락하세요" 는 공식 창구를 요구했는데, 거의 같은 문장인 v0.8 `fh-627`
+# "부모님께는 말씀드리지 않는 게 좋겠습니다. 저와만 연락하세요" 는 아는 창구를
+# 요구하고 v0.8 이 그것을 엔진 결함으로 적어 두었다. 뒤에 적힌 판단을 따른다.
+VERIFY_CLAIMED_IDENTITY = "VERIFY_CLAIMED_IDENTITY"
+
+# 이 신호들이 켜지면 찾아갈 공식 창구가 실제로 존재한다.
+OFFICIAL_CHANNEL_SIGNALS: frozenset[str] = frozenset(
+    {
+        "authority_impersonation",
+        "loan_policy_offer",
+        "card_delivery_claim",
+        "guaranteed_return_offer",
+        "private_channel_invite",
+    }
+)
+
+# 자칭 지인에게는 대표번호가 없다. 확인 수단은 이전부터 쓰던 연락처다.
+KNOWN_CONTACT_SIGNALS: frozenset[str] = frozenset({"familiar_person_claim"})
+
+
+def resolve_verification_actions(signal_codes: set[str]) -> tuple[str, ...]:
+    """이 메시지에서 실제로 확인할 수 있는 창구만 낸다.
+
+    둘 다 해당하면 둘 다 낸다. 한쪽을 이기게 하면 문장에 실제로 적힌 확인
+    대상 하나를 빠뜨리게 된다. 이 갈래를 밟는 사례는 아직 어느 셋에도 없으므로
+    **재서 고른 규칙이 아니라 설계 판단이다.**
+
+    어느 쪽도 아니면 공식 창구가 아니라 아는 연락처로 보낸다. 틀렸을 때의 값이
+    한쪽으로 크게 기울기 때문이다 - 창구가 없는데 공식 창구로 보내면 사용자는
+    메시지 안의 번호로 돌아오지만, 창구가 있는데 아는 연락처로 보내면 카드
+    뒷면이나 기존 거래 창구가 그 자리를 메운다.
+    """
+    resolved: list[str] = []
+    if signal_codes & OFFICIAL_CHANNEL_SIGNALS:
+        resolved.append("VERIFY_OFFICIAL_CHANNEL")
+    if signal_codes & KNOWN_CONTACT_SIGNALS:
+        resolved.append("VERIFY_BY_KNOWN_CONTACT")
+    return tuple(resolved) or ("VERIFY_BY_KNOWN_CONTACT",)
+
+
 SIGNAL_ACTIONS: dict[str, tuple[str, ...]] = {
-    "urgency_pressure": ("STOP_CONTACT", "VERIFY_OFFICIAL_CHANNEL"),
-    "authority_impersonation": ("STOP_CONTACT", "VERIFY_OFFICIAL_CHANNEL"),
-    "secrecy_isolation": ("STOP_CONTACT", "VERIFY_OFFICIAL_CHANNEL"),
-    "loan_policy_offer": ("STOP_CONTACT", "VERIFY_OFFICIAL_CHANNEL"),
-    "credential_request": ("DO_NOT_SHARE_ACCESS", "STOP_CONTACT"),
-    "account_access_request": ("DO_NOT_SHARE_ACCESS", "STOP_CONTACT"),
+    "urgency_pressure": ("STOP_CONTACT", VERIFY_CLAIMED_IDENTITY),
+    "authority_impersonation": ("STOP_CONTACT", VERIFY_CLAIMED_IDENTITY),
+    "secrecy_isolation": ("STOP_CONTACT", VERIFY_CLAIMED_IDENTITY),
+    "loan_policy_offer": ("STOP_CONTACT", VERIFY_CLAIMED_IDENTITY),
+    # v0.9. 요구 신호에도 확인 수단을 붙인다. 넘기지 말라고만 하고 무엇으로
+    # 확인하라는 말이 없으면, 사용자는 확인할 방법을 그 대화창 안에서 찾는다.
+    "credential_request": (
+        "DO_NOT_SHARE_ACCESS",
+        "STOP_CONTACT",
+        VERIFY_CLAIMED_IDENTITY,
+    ),
+    "account_access_request": (
+        "DO_NOT_SHARE_ACCESS",
+        "STOP_CONTACT",
+        VERIFY_CLAIMED_IDENTITY,
+    ),
     "app_install_request": ("DO_NOT_INSTALL", "CONTACT_KISA_118"),
     "remote_control_request": ("DO_NOT_INSTALL", "CONTACT_KISA_118"),
     "money_transfer_request": ("STOP_CONTACT", "CONTACT_1394"),
@@ -107,13 +179,14 @@ SIGNAL_ACTIONS: dict[str, tuple[str, ...]] = {
     "suspicious_link": ("DO_NOT_CLICK", "CONTACT_KISA_118"),
     "card_delivery_claim": (
         "DO_NOT_SHARE_ACCESS",
-        "VERIFY_OFFICIAL_CHANNEL",
+        VERIFY_CLAIMED_IDENTITY,
     ),
-    # v0.4. 지인 사칭만 **다른 확인 수단**을 쓴다. 나머지 사칭은 기관을
-    # 자칭하므로 공식 대표번호가 존재하지만, 자칭 지인에게는 대표번호가 없다.
-    "familiar_person_claim": ("STOP_CONTACT", "VERIFY_BY_KNOWN_CONTACT"),
-    "guaranteed_return_offer": ("STOP_CONTACT", "VERIFY_OFFICIAL_CHANNEL"),
-    "private_channel_invite": ("STOP_CONTACT", "VERIFY_OFFICIAL_CHANNEL"),
+    # v0.4 는 여기만 다른 확인 수단을 박아 두었다. v0.9 에서 그 판단이 표
+    # 전체로 올라갔으므로 이 줄도 자리표시자를 쓴다 - 지인 자칭은
+    # `KNOWN_CONTACT_SIGNALS` 에 있으므로 결과는 그대로다.
+    "familiar_person_claim": ("STOP_CONTACT", VERIFY_CLAIMED_IDENTITY),
+    "guaranteed_return_offer": ("STOP_CONTACT", VERIFY_CLAIMED_IDENTITY),
+    "private_channel_invite": ("STOP_CONTACT", VERIFY_CLAIMED_IDENTITY),
 }
 
 # 상태는 진행 순서가 아니라 서로 독립적인 사실이다. 각 상태에 직접 정책을 연결한다.
@@ -287,9 +360,17 @@ def score_floor_for_level(level: str) -> int:
 
 
 def select_actions(signals: list[RiskSignal], state: UserState) -> list[Action]:
+    signal_codes = {signal.code for signal in signals}
     action_codes: set[str] = set(STATE_ACTIONS[state])
     for signal in signals:
         action_codes.update(SIGNAL_ACTIONS.get(signal.code, ()))
+
+    # 자리표시자는 정책표에 없다. 여기서 풀지 않으면 아래 조회가 터진다 -
+    # 조용히 빠지는 것보다 낫다. 정책표에 없다는 것은 판정 프롬프트에도
+    # 실리지 않는다는 뜻이기도 하다.
+    if VERIFY_CLAIMED_IDENTITY in action_codes:
+        action_codes.discard(VERIFY_CLAIMED_IDENTITY)
+        action_codes.update(resolve_verification_actions(signal_codes))
 
     ordered_codes = sorted(
         action_codes,

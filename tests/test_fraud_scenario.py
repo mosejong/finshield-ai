@@ -103,7 +103,11 @@ def test_isolation_demand_now_has_a_name_instead_of_only_a_grade() -> None:
     assert "isolation_coercion" in body["fraud_types"]
     assert body["risk_level"] == "medium"
     assert "STOP_CONTACT" in action_codes(body)
-    assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
+    # v0.9 에서 뒤집혔다. 이 문장에는 자칭한 기관도 상품도 없다 - 말하는
+    # 사람만 있고 찾아갈 창구가 없다. held-out v0.8 `fh-627` 이 거의 같은
+    # 문장에 아는 창구를 요구하며 이것을 결함으로 적어 두었다.
+    assert "VERIFY_BY_KNOWN_CONTACT" in action_codes(body)
+    assert "VERIFY_OFFICIAL_CHANNEL" not in action_codes(body)
 
 
 def test_isolation_stands_on_its_own_without_an_impersonated_institution() -> None:
@@ -223,6 +227,36 @@ def test_victim_self_report_mentioning_a_leading_room_does_not_fire_the_invite()
     assert "private_channel_invite" not in {
         signal["code"] for signal in body["signals"]
     }
+
+
+def test_a_demand_from_nobody_in_particular_does_not_send_the_user_to_a_desk() -> None:
+    """확인 행동은 그 메시지에 창구가 있을 때만 공식 창구를 가리킨다.
+
+    "공식 대표번호로 확인하세요" 를 이름 없는 상대에게 말하면 사용자는 찾을
+    수 없는 창구를 뒤지다가 결국 **메시지에 적힌 번호로 건다.** 틀린 행동은
+    없는 행동보다 나쁘다.
+    """
+    body = analyze("확인 절차입니다. 문자로 받으신 인증번호를 저에게 알려 주세요.")
+
+    assert "VERIFY_BY_KNOWN_CONTACT" in action_codes(body)
+    assert "VERIFY_OFFICIAL_CHANNEL" not in action_codes(body)
+
+
+def test_the_same_demand_with_a_named_institution_keeps_the_official_channel() -> None:
+    # 같은 요구, 같은 신호. 달라진 것은 자칭 하나뿐이고 확인 창구는 그것을
+    # 따라간다. 이 짝이 없으면 위 테스트는 확인 행동을 없애는 수정도 통과시킨다.
+    body = analyze("금융감독원 민원조사팀입니다. 계좌 안전 조치를 위해 인증번호를 불러 주십시오.")
+
+    assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
+    assert "VERIFY_BY_KNOWN_CONTACT" not in action_codes(body)
+
+
+def test_a_loan_offer_has_an_official_desk_even_without_a_named_lender() -> None:
+    # 기관을 자칭하지 않아도 대출·정책자금은 취급 창구를 가리킨다. 여기까지
+    # 아는 창구로 돌리면 확인할 수 있는 것을 확인하지 말라고 하는 셈이 된다.
+    body = analyze("정부지원 정책자금 대상자로 선정되셨습니다. 보증료 입금 후 실행됩니다.")
+
+    assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
 
 
 def test_acquaintance_impersonation_with_a_transfer_demand_is_high_risk() -> None:
