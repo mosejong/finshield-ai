@@ -1127,12 +1127,29 @@ MONEY_DESTINATION_TERMS = (
 )
 
 
-def _mentions_money(clauses: list[str]) -> bool:
+def _mentions_money(clauses: list[str], normalized: str) -> bool:
+    """이 절들이 돈 이야기인가.
+
+    돈을 가리키는 말이 열린 절에 있으면 그것으로 끝난다. 목적지 계좌는
+    **혼자서는 부족하다** - 메시지 어딘가에 돈을 가리키는 말이 있어야 한다.
+
+    v0.8. 목적지를 대안으로 들인 뒤 held-out v0.5 `fh-317`("계좌가 묶였어.
+    일단 안전계좌로 옮겨 놔")이 자금 재전달 요구가 됐다. 이 문장에는 받은
+    돈이 없다. 피해자 제 돈을 옮기라는 안전계좌 이체 요구이고, 이름이
+    `money_transfer_request` 에서 `money_mule` 로 바뀌면 사용자에게 나가는
+    행동도 "받은 돈을 보내지 마세요" 로 어긋난다.
+
+    목적지를 들인 이유는 fh-542 처럼 **돈을 가리키는 말이 완료 보고 절에
+    들어가 걸러진** 경우였다("거래처 대금이 착오 입금되었습니다 … 회수
+    계좌로 돌려보내 주셔야 합니다"). 그 절이 걸러졌을 뿐 메시지에는 남아
+    있다. 그래서 조건을 절이 아니라 메시지 전체에 건다 - 넓힌 자리는
+    그대로 두고, 목적지 하나로 돈 이야기를 **만들어 내는** 것만 막는다.
+    """
+    if any(term in clause for clause in clauses for term in MONEY_OBJECT_TERMS):
+        return True
     return any(
-        term in clause
-        for clause in clauses
-        for term in MONEY_OBJECT_TERMS + MONEY_DESTINATION_TERMS
-    )
+        term in clause for clause in clauses for term in MONEY_DESTINATION_TERMS
+    ) and any(term in normalized for term in MONEY_OBJECT_TERMS)
 
 
 def _mentions_investment(clauses: list[str]) -> bool:
@@ -1195,7 +1212,7 @@ def _detect_by_rules(
     open_clauses = _open_clauses(normalized)
     open_text = " ".join(open_clauses)
     has_demand = _has_reader_demand(open_clauses)
-    has_money = _mentions_money(open_clauses)
+    has_money = _mentions_money(open_clauses, normalized)
     has_investment = _mentions_investment(open_clauses)
 
     def object_gated_match(rule: SignalRule) -> bool:

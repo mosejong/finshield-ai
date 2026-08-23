@@ -813,3 +813,34 @@ def test_a_score_above_the_floor_is_left_alone() -> None:
 
     assert body["risk_level"] == "high"
     assert body["risk_score"] == 100
+
+
+# --- 목적지 계좌는 혼자서 돈 이야기를 만들지 않는다 (2026-08-23) --------------
+
+
+def test_a_destination_account_alone_does_not_make_it_a_forwarding_demand() -> None:
+    """안전계좌 이체 요구는 자금 재전달 요구가 아니다.
+
+    받은 돈이 없다. 피해자 제 돈을 옮기라는 요구이고, 이름이 `money_mule` 로
+    바뀌면 사용자에게 나가는 행동도 "받은 돈을 보내지 마세요" 로 어긋난다.
+    held-out v0.5 `fh-317` 이 목적지 어휘를 들인 뒤 그렇게 뒤집혔다.
+    """
+    body = analyze("검찰 수사 때문에 계좌가 묶였어. 일단 안전계좌로 옮겨 놔. 끝나면 돌려받는 거니까 걱정 안 해도 돼.")
+
+    codes = {signal["code"] for signal in body["signals"]}
+    assert "money_transfer_request" in codes
+    assert "money_mule" not in codes
+    assert "money_mule_transfer" not in body["fraud_types"]
+    assert body["risk_level"] == "high"
+
+
+def test_a_destination_still_counts_when_the_money_word_was_filtered_out() -> None:
+    """넓힌 자리는 그대로다. 좁힌 것은 **만들어 내는 것**뿐이다.
+
+    돈을 가리키는 말이 완료 보고 절에 들어가 걸러지면 열린 절에는 목적지만
+    남는다. 그 절이 걸러졌을 뿐 메시지에는 남아 있으므로 조건은 찬다.
+    """
+    body = analyze("거래처 대금이 착오 입금되었습니다. 회수 계좌로 돌려보내 주셔야 합니다.")
+
+    assert "money_mule" in {signal["code"] for signal in body["signals"]}
+    assert "money_mule_transfer" in body["fraud_types"]
