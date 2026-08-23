@@ -33,6 +33,7 @@ from evaluation.fraud_golden import (
     HOLDOUT_V0_6_PATH,
     HOLDOUT_V0_7_PATH,
     HOLDOUT_V0_8_PATH,
+    HOLDOUT_V0_9_PATH,
     SIGNAL_CODES,
     FraudGoldenCase,
     _validate_collection,
@@ -121,6 +122,9 @@ FRAUD_TYPES_AT_HOLDOUT_V0_4_TO_V0_6_FREEZE = (
     "card_delivery_impersonation",
 )
 
+OFFICIAL_CHANNEL = "VERIFY_OFFICIAL_CHANNEL"
+KNOWN_CONTACT = "VERIFY_BY_KNOWN_CONTACT"
+
 HOLDOUT_SIZES = {
     HOLDOUT_V0_2_PATH: 72,
     HOLDOUT_V0_3_PATH: 60,
@@ -129,6 +133,7 @@ HOLDOUT_SIZES = {
     HOLDOUT_V0_6_PATH: 72,
     HOLDOUT_V0_7_PATH: 72,
     HOLDOUT_V0_8_PATH: 72,
+    HOLDOUT_V0_9_PATH: 72,
 }
 
 
@@ -176,6 +181,13 @@ def test_holdout_set_is_labelled_and_separated_from_the_development_set(
         (HOLDOUT_V0_5_PATH, HOLDOUT_V0_8_PATH),
         (HOLDOUT_V0_6_PATH, HOLDOUT_V0_8_PATH),
         (HOLDOUT_V0_7_PATH, HOLDOUT_V0_8_PATH),
+        (HOLDOUT_V0_2_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_3_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_4_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_5_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_6_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_7_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_8_PATH, HOLDOUT_V0_9_PATH),
     ],
 )
 def test_holdout_versions_do_not_overlap_each_other(
@@ -455,6 +467,99 @@ def test_holdout_v0_7_prices_the_forwarding_vocabulary_with_own_account_moves() 
         "money_mule_transfer" in case.expected_fraud_types for case in positives
     ) >= 8
     assert sum(any(m in case.text for m in moves) for case in negatives) >= 6
+
+
+def test_holdout_v0_9_covers_the_taxonomy_and_keeps_the_ceiling_discipline() -> None:
+    cases = load_holdout_cases(HOLDOUT_V0_9_PATH)
+    negatives = [case for case in cases if not case.is_fraud]
+    positives = [case for case in cases if case.is_fraud]
+    covered = {t for case in cases for t in case.expected_fraud_types}
+
+    assert covered == set(FRAUD_TYPES)
+    assert len(negatives) == 31
+    assert all(case.expected_max_risk is not None for case in negatives)
+    assert all(case.expected_max_risk is None for case in positives)
+
+
+def test_holdout_v0_9_pairs_every_demand_with_and_without_a_named_institution() -> None:
+    """**확인 행동이 어디로 가리키는가**를 재려면 짝이 있어야 한다.
+
+    "공식 대표번호로 확인하세요" 는 확인할 기관이 지정됐을 때만 실행 가능한
+    조언이다. 이름을 대지 않은 상대에게 같은 말을 하면 사용자는 존재하지 않는
+    창구를 찾다가 결국 **메시지에 적힌 번호로 건다.** 그래서 같은 신호 위에
+    자칭이 있는 문장과 없는 문장을 짝지어 놓고, 각 사례가 내면 **안 되는**
+    행동을 함께 적는다.
+
+    값은 양쪽에서 치러진다. 이름 없는 쪽으로 너무 돌면 기관 사칭 열네 건이
+    공식 창구를 잃고, 자칭 쪽으로 너무 돌면 지인 사칭 네 건이 v0.4 회귀가
+    된다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V0_9_PATH)
+
+    def has(case, required: str, forbidden: str) -> bool:
+        return (
+            required in case.required_action_codes
+            and forbidden in case.forbidden_action_codes
+        )
+
+    nameless = [c for c in cases if has(c, KNOWN_CONTACT, OFFICIAL_CHANNEL)]
+    named = [c for c in cases if has(c, OFFICIAL_CHANNEL, KNOWN_CONTACT)]
+
+    assert len(nameless) >= 20
+    assert len(named) >= 14
+
+    # 지인 사칭은 v0.4 가 이미 맞게 내보내고 있다. 이 회차가 깨뜨릴 수 있는
+    # 자리이므로 넷 전부 아는 창구를 요구하고 공식 창구를 금지한다.
+    acquaintance = [
+        c for c in cases if "acquaintance_impersonation" in c.expected_fraud_types
+    ]
+    assert len(acquaintance) == 4
+    assert all(has(c, KNOWN_CONTACT, OFFICIAL_CHANNEL) for c in acquaintance)
+
+    # 정상 문장도 없는 창구를 가리키면 안 된다. 사기 쪽에서만 재면 수정이
+    # 정상 문장에 남긴 자국이 측정 밖으로 빠진다.
+    assert sum(
+        OFFICIAL_CHANNEL in c.forbidden_action_codes for c in cases if not c.is_fraud
+    ) >= 3
+
+
+def test_holdout_v0_9_prices_the_grade_raise_and_the_accusation_narrowing() -> None:
+    """등급 올리기와 유형 좁히기는 값을 치르는 자리가 서로 반대다.
+
+    올리기의 값은 천장에서 치러지므로 정상 31건이 전부 천장을 선언한다.
+    좁히기(`대포통장` 은 고발이지 요구가 아니다)의 값은 **사기 쪽에서**
+    치러진다 - 좁히기가 지나치면 통장·카드를 진짜로 요구하는 문장이
+    접근수단 요구라는 이름을 잃는다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V0_9_PATH)
+    positives = [case for case in cases if case.is_fraud]
+
+    # 위협 + 접근수단 요구인데 자칭이 없어 medium 에서 멈추는 자리.
+    threatened = [
+        c
+        for c in positives
+        if "urgency" in c.required_signal_codes
+        and {"credential", "account_access"} & set(c.required_signal_codes)
+        and c.expected_min_risk == "high"
+        and "authority_impersonation" not in c.required_signal_codes
+    ]
+    assert len(threatened) >= 5
+
+    # 고발 문구. 통장이 나오지만 요구 대상이 아니다.
+    accusation = [c for c in positives if "대포통장" in c.text or "통장이 범죄" in c.text]
+    assert len(accusation) >= 3
+    assert all(
+        "account_access_request" not in c.expected_fraud_types for c in accusation
+    )
+
+    # 같은 낱말을 쓰는 진짜 요구. 좁히기가 이쪽을 끊으면 값을 치른 것이다.
+    demanded = [
+        c
+        for c in positives
+        if ("통장" in c.text or "체크카드" in c.text)
+        and "account_access_request" in c.expected_fraud_types
+    ]
+    assert len(demanded) >= 6
 
 
 def test_holdout_v0_8_covers_the_taxonomy_and_keeps_the_ceiling_discipline() -> None:

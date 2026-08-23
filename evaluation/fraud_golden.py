@@ -47,6 +47,17 @@ GOLDEN_SET_PATH = Path(__file__).with_name("data") / "fraud_golden_v0.1.jsonl"
 # 예방 표지를 **좁히는** 수정 하나가 섞여 있다(`드리지 않`). 좁히기의 값은
 # 사기가 아니라 정상 쪽에서 치러진다 - 억제를 풀면 진짜 예방 안내문이
 # 사기로 올라간다. 그래서 정상 36건 중 여섯 건이 진짜 예방 안내문이다.
+#
+# v0.9 는 v0.8 이 남긴 결함을 고치기 전에 얼린 셋이고, 방향이 또 다르다.
+# v0.8 에서 이진 판정이 만점이 되면서 남은 변별력이 **이름·행동·등급**으로만
+# 옮겨 갔다. 사기/정상 사례를 더 넣는 것으로는 이 셋에서 아무것도 재지
+# 못한다. 그래서 이번 셋은 **확인 행동이 어디로 가리키는가**를 겨냥한다 -
+# 자칭을 한 메시지와 하지 않은 메시지를 같은 신호 위에 짝지어 놓고, 각
+# 사례가 내면 안 되는 행동을 `forbidden_action_codes` 로 함께 적는다.
+#
+# 넓히기도 좁히기도 올리기도 아닌 **갈아 끼우기**라서, 값은 양쪽에서
+# 치러진다. 자칭이 없는 쪽으로 너무 돌면 기관 사칭 열 건이 공식 창구를
+# 잃고, 자칭 쪽으로 너무 돌면 지인 사칭 네 건이 v0.4 회귀가 된다.
 HOLDOUT_V0_2_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.2.jsonl"
 HOLDOUT_V0_3_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.3.jsonl"
 HOLDOUT_V0_4_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.4.jsonl"
@@ -54,6 +65,7 @@ HOLDOUT_V0_5_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.5.jsonl
 HOLDOUT_V0_6_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.6.jsonl"
 HOLDOUT_V0_7_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.7.jsonl"
 HOLDOUT_V0_8_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.8.jsonl"
+HOLDOUT_V0_9_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.9.jsonl"
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",
