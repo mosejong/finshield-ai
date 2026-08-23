@@ -62,6 +62,7 @@ def evaluate_golden_set(
         "scenario_policy_accuracy": _scenario_policy_accuracy(cases, responses),
         "risk_ceiling_accuracy": _risk_ceiling_accuracy(cases, responses),
         "required_action_coverage": _required_action_coverage(cases, responses),
+        "forbidden_action_avoidance": _forbidden_action_avoidance(cases, responses),
         "evidence_coverage": _evidence_coverage(responses),
     }
 
@@ -166,6 +167,9 @@ def _llm_only_section(
         "fraud_types": _judged_fraud_type_metrics(cases, judgements),
         "scenario_policy_accuracy": _judged_scenario_policy_accuracy(cases, judgements),
         "required_action_coverage": _judged_action_coverage(cases, judgements),
+        "forbidden_action_avoidance": _judged_forbidden_action_avoidance(
+            cases, judgements
+        ),
         "evidence_coverage": 0.0,
         "evidence_note": (
             "0.0 은 측정 실패가 아니라 구조다. 이 경로에는 행동을 뒷받침하는 "
@@ -215,6 +219,7 @@ def _hybrid_section(
         "binary": engine["binary"],
         "scenario_policy_accuracy": engine["scenario_policy_accuracy"],
         "required_action_coverage": engine["required_action_coverage"],
+        "forbidden_action_avoidance": engine["forbidden_action_avoidance"],
         "evidence_coverage": engine["evidence_coverage"],
         "explanation_layer": {
             "model": "gemini-3.6-flash",
@@ -442,6 +447,34 @@ def _required_action_coverage(
     return _ratio(present, required)
 
 
+def _forbidden_action_avoidance(
+    cases: list[FraudGoldenCase], responses: list[AnalyzeResponse]
+) -> float | None:
+    """내면 안 되는 행동을 내지 않았는가. 금지를 선언한 사례에서만 잰다.
+
+    `required_action_coverage` 는 `required <= predicted` 만 본다. 그래서
+    행동을 **더 붙이는** 수정은 그 지표에서 점수를 잃을 수 없고, 열두 행동을
+    전부 붙이는 엔진이 만점을 받는다. 이 지표가 그 반대편이다 - 등급에
+    `risk_ceiling_accuracy` 가 하는 일을 행동에서 한다.
+
+    사례가 아니라 **라벨**을 센다. `required_action_coverage` 가 라벨을
+    세므로 짝이 맞아야 한 지표가 다른 지표의 손해를 가리지 않는다.
+
+    금지를 선언한 사례가 하나도 없으면 `None` 을 돌려준다. **1.0 이 아니다.**
+    v0.1~v0.8 은 이것을 재지 않았고, 재지 않은 것을 만점으로 적으면 그
+    셋들이 이번 수정을 통과한 것처럼 보인다.
+    """
+    forbidden = 0
+    avoided = 0
+    for case, response in zip(cases, responses, strict=True):
+        predicted = {action.code for action in response.actions}
+        forbidden += len(case.forbidden_action_codes)
+        avoided += len(set(case.forbidden_action_codes) - predicted)
+    if forbidden == 0:
+        return None
+    return _ratio(avoided, forbidden)
+
+
 def _evidence_coverage(responses: list[AnalyzeResponse]) -> float:
     with_actions = [response for response in responses if response.actions]
     covered = 0
@@ -494,6 +527,19 @@ def _judged_action_coverage(
     return _ratio(present, required)
 
 
+def _judged_forbidden_action_avoidance(
+    cases: list[FraudGoldenCase], judgements: list[LlmJudgement]
+) -> float | None:
+    forbidden = 0
+    avoided = 0
+    for case, judgement in zip(cases, judgements, strict=True):
+        forbidden += len(case.forbidden_action_codes)
+        avoided += len(set(case.forbidden_action_codes) - set(judgement.actions))
+    if forbidden == 0:
+        return None
+    return _ratio(avoided, forbidden)
+
+
 def _percentile(values: list[float], quantile: float) -> float:
     """`scripts.evaluate_fraud_engine.percentile` 과 같은 nearest-rank 다.
 
@@ -539,4 +585,7 @@ def _identity_excluded_fields(case: FraudGoldenCase) -> set[str]:
     excluded = {"held_out"}
     if case.expected_max_risk is None:
         excluded.add("expected_max_risk")
+    # v0.9 의 금지 행동도 같은 이유로 뺀다. 선언하지 않은 라벨은 라벨이 아니다.
+    if not case.forbidden_action_codes:
+        excluded.add("forbidden_action_codes")
     return excluded

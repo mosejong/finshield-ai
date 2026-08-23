@@ -5,18 +5,27 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.analysis import AnalyzeRequest, Persona, UserState
+from app.schemas.analysis import (
+    Action,
+    AnalyzeRequest,
+    AnalyzeResponse,
+    Persona,
+    UserState,
+)
 from app.services.fraud_analysis import analyze_fraud
 from app.services.llm.contract import LlmContractError
 from app.services.llm.provider import LlmProvider, LlmUnavailable
 from evaluation.fraud_benchmark import (
     FRAUD_TYPES,
+    _forbidden_action_avoidance,
+    _required_action_coverage,
     check_minimum_quality,
     evaluate_golden_set,
     normalized_dataset_sha256,
 )
 from app.domain.fraud.signals import CANONICAL_TO_LEGACY_PUBLIC, SIGNAL_RULES
 from evaluation.fraud_golden import (
+    ACTION_CODES,
     HOLDOUT_V0_2_PATH,
     HOLDOUT_V0_3_PATH,
     HOLDOUT_V0_4_PATH,
@@ -943,3 +952,99 @@ def test_one_dead_call_does_not_abandon_the_rest_of_the_batch() -> None:
 
     assert not judgement.ok
     assert judgement.failure == "stub returned HTTP 503"
+
+
+# ---------------------------------------------------------------------------
+# v0.9. 행동 쪽에도 천장이 없었다.
+# ---------------------------------------------------------------------------
+
+
+def _case_with(forbidden: list[str], required: list[str]) -> FraudGoldenCase:
+    return FraudGoldenCase(
+        case_id="fh-701",
+        text="이름을 대지 않은 사람이 계좌 조회 권한을 넘겨 달라고 한다.",
+        persona=Persona.EARLY_CAREER,
+        state=UserState.RECEIVED_ONLY,
+        is_fraud=True,
+        expected_fraud_types=["account_access_request"],
+        expected_min_risk="medium",
+        required_action_codes=required,
+        forbidden_action_codes=forbidden,
+        held_out=True,
+        annotation_note="지표가 무엇을 재는지 보이려고 만든 사례다.",
+    )
+
+
+def _response_with(action_codes: list[str]) -> AnalyzeResponse:
+    return AnalyzeResponse(
+        risk_score=50,
+        risk_level="medium",
+        signals=[],
+        scenario=UserState.RECEIVED_ONLY,
+        disclaimer="테스트",
+        fraud_types=["account_access_request"],
+        summary="테스트",
+        actions=[
+            Action(code=code, priority=1, title="제목", reason="이유", source_ids=[])
+            for code in action_codes
+        ],
+        official_sources=[],
+    )
+
+
+def test_coverage_alone_cannot_tell_the_right_advice_from_extra_advice() -> None:
+    """행동을 **더 붙이는** 수정은 `required_action_coverage` 에서 못 잃는다.
+
+    v0.7 이 등급에서 찾은 것과 같은 모양이다. 바닥만 보는 지표에서는 모든
+    문자를 high 로 찍는 엔진이 만점을 받았고, 지금 행동 쪽에서는 열두 행동을
+    전부 붙이는 엔진이 만점을 받는다.
+
+    그리고 행동은 등급보다 조용히 나쁘다. 이름을 대지 않은 상대에게
+    "공식 대표번호로 확인하세요" 라고 하면 사용자는 존재하지 않는 창구를
+    찾다가 결국 **메시지에 적힌 번호**로 건다.
+    """
+    case = _case_with(
+        forbidden=["VERIFY_OFFICIAL_CHANNEL"],
+        required=["DO_NOT_SHARE_ACCESS", "VERIFY_BY_KNOWN_CONTACT"],
+    )
+    right = _response_with(["DO_NOT_SHARE_ACCESS", "VERIFY_BY_KNOWN_CONTACT"])
+    everything = _response_with(sorted(ACTION_CODES))
+
+    assert _required_action_coverage([case], [right]) == 1.0
+    assert _required_action_coverage([case], [everything]) == 1.0
+
+    assert _forbidden_action_avoidance([case], [right]) == 1.0
+    assert _forbidden_action_avoidance([case], [everything]) == 0.0
+
+
+def test_the_forbidden_action_metric_reports_null_for_sets_that_never_declared_one() -> (
+    None
+):
+    """v0.1~v0.8 은 금지 행동을 선언한 적이 없다. 그 셋들은 통과가 아니라 미측정이다."""
+    without = evaluate_golden_set(load_holdout_cases(HOLDOUT_V0_8_PATH))
+
+    assert without["scenario_engine_v0_1"]["forbidden_action_avoidance"] is None  # type: ignore[index]
+
+
+def test_an_action_cannot_be_both_required_and_forbidden() -> None:
+    payload = load_holdout_cases(HOLDOUT_V0_8_PATH)[0].model_dump()
+    payload["required_action_codes"] = ["STOP_CONTACT"]
+    payload["forbidden_action_codes"] = ["STOP_CONTACT"]
+
+    with pytest.raises(ValueError, match="both required and forbidden"):
+        FraudGoldenCase.model_validate(payload)
+
+
+def test_adding_the_forbidden_label_does_not_move_any_earlier_dataset() -> None:
+    """선언하지 않은 라벨은 라벨이 아니다 - v0.7 에서 천장에 적용한 규칙 그대로.
+
+    선택 필드를 하나 더했다고 v0.1~v0.8 의 해시가 바뀌면, 이미 돈을 주고
+    받아 둔 판정 결과와 여덟 개 결과 파일의 출처 연결이 전부 끊어진다.
+    """
+    frozen = {
+        HOLDOUT_V0_7_PATH: "15286971f13f",
+        HOLDOUT_V0_8_PATH: "9f85da97ebd5",
+    }
+    for path, prefix in frozen.items():
+        cases = load_holdout_cases(path)
+        assert normalized_dataset_sha256(cases).startswith(prefix)

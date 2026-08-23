@@ -128,6 +128,20 @@ class FraudGoldenCase(BaseModel):
     # 않은 것을 만점으로 적으면 그것이 곧 지어낸 근거다.
     expected_max_risk: str | None = Field(default=None, pattern=r"^(low|medium|high)$")
     required_action_codes: list[str] = Field(default_factory=list)
+    # v0.9. **행동 쪽에도 천장이 없었다.**
+    #
+    # `required_action_coverage` 는 `required <= predicted` 만 센다. 그래서
+    # 행동을 **더 내보내는** 수정은 이 셋의 어떤 지표에서도 점수를 잃을 수
+    # 없다 - 모든 메시지에 열두 행동을 전부 붙이는 엔진이 coverage 1.0 을
+    # 받는다. v0.7 이 등급에서 발견한 것과 같은 모양이고, 이번 회차가
+    # 행동을 **갈아 끼우므로**(자칭에 따라 확인 수단이 달라진다) 여기서
+    # 닫는다.
+    #
+    # 행동이 하나 더 붙는 것은 등급이 한 칸 높은 것보다 조용히 나쁘다.
+    # 이름을 대지 않은 상대에게 "공식 대표번호로 확인하세요" 라고 하면
+    # 사용자는 **존재하지 않는 창구**를 찾다가 결국 메시지에 적힌 번호로
+    # 건다. 틀린 행동은 없는 행동보다 나쁘다.
+    forbidden_action_codes: list[str] = Field(default_factory=list)
     synthetic: bool = True
     held_out: bool = False
     annotation_note: str
@@ -144,6 +158,17 @@ class FraudGoldenCase(BaseModel):
         unknown_actions = set(self.required_action_codes) - ACTION_CODES
         if unknown_actions:
             raise ValueError(f"unknown action labels: {sorted(unknown_actions)}")
+        unknown_forbidden = set(self.forbidden_action_codes) - ACTION_CODES
+        if unknown_forbidden:
+            raise ValueError(f"unknown action labels: {sorted(unknown_forbidden)}")
+        contradictory = set(self.required_action_codes) & set(
+            self.forbidden_action_codes
+        )
+        if contradictory:
+            raise ValueError(
+                "an action cannot be both required and forbidden: "
+                f"{sorted(contradictory)}"
+            )
         unemittable = set(self.required_signal_codes) - SIGNAL_CODES
         if unemittable:
             raise ValueError(
@@ -163,6 +188,8 @@ class FraudGoldenCase(BaseModel):
             raise ValueError("required_signal_codes must not contain duplicates")
         if len(self.required_action_codes) != len(set(self.required_action_codes)):
             raise ValueError("required_action_codes must not contain duplicates")
+        if len(self.forbidden_action_codes) != len(set(self.forbidden_action_codes)):
+            raise ValueError("forbidden_action_codes must not contain duplicates")
         return self
 
     def request(self) -> AnalyzeRequest:
