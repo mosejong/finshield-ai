@@ -694,3 +694,42 @@ def test_a_place_name_in_the_news_is_not_a_self_claim() -> None:
         body = analyze(text)
         assert body["signals"] == [], text
         assert body["risk_level"] == "low", text
+
+
+# --- 높임 명령형 송금 요구 (2026-08-23) --------------------------------------
+
+
+def test_an_honorific_imperative_is_still_a_transfer_demand() -> None:
+    """어미 하나로 유형이 통째로 비었다.
+
+    held-out v0.7 `fh-562`("지급 전 수수료로 먼저 입금하셔야 합니다")는
+    선입금 표지를 다 갖췄는데도 유형이 서지 못했다. `advance_fee_demand` 는
+    `money_transfer_request` 를 전제로 하고, 그 어휘에는 `입금해` 만 있었다.
+    """
+    body = analyze("당첨을 축하드립니다. 지급 전 제세공과금 10%를 먼저 입금하셔야 절차가 진행됩니다.")
+    assert "money_transfer_request" in {s["code"] for s in body["signals"]}
+    assert body["fraud_types"] == ["advance_fee_demand"]
+
+    for text in (
+        "나머지 수익금을 출금하시려면 수수료를 먼저 송금하셔야 합니다.",
+        "열람 예치금을 먼저 이체하셔야 처리됩니다.",
+    ):
+        assert "advance_fee_demand" in analyze(text)["fraud_types"], text
+
+
+def test_a_legitimate_invoice_uses_the_same_ending_and_stays_below_high() -> None:
+    """넓히기의 값은 여기서 치러진다. 정상 청구도 계좌와 기한을 말한다.
+
+    등급이 medium 까지 오르는 것은 이 회차가 감수한 값이다 - 송금 요구는
+    실제로 있고, 그것이 사기라는 말은 아니다. 넘으면 안 되는 선은 high 와
+    사기 유형이다.
+    """
+    body = analyze(
+        "관리사무소입니다. 8월 관리비는 25일까지 아래 계좌로 입금하셔야 연체료가 발생하지 않습니다."
+    )
+    assert body["fraud_types"] == []
+    assert body["risk_level"] != "high"
+
+    # 과거형은 요구가 아니라 확인이다.
+    confirmation = analyze("어제 입금하셨는지 확인 부탁드립니다.")
+    assert "money_transfer_request" not in {s["code"] for s in confirmation["signals"]}
