@@ -264,6 +264,28 @@ def determine_risk_level(
     return max((signal_level, state_level), key=RISK_RANK.__getitem__)
 
 
+def score_floor_for_level(level: str) -> int:
+    """그 등급이 되려면 점수가 최소 얼마여야 하는가.
+
+    v0.8. `risk_score` 와 `risk_level` 이 서로 다른 것을 재고 있었다.
+    점수는 `LEGACY_RULES` 의 가중치만 더하고, 등급은 canonical 신호와
+    사용자 상태까지 본다. 그래서 **`risk_level: "high"` 인데
+    `risk_score: 0` 인 응답이 나간다** - 화면에 둘 다 보이면 서로를
+    부정하고, 읽는 사람은 어느 쪽을 믿어야 할지 알 수 없다.
+
+    등급을 점수에서 다시 계산하지 않는다. 그 방향은 canonical 신호와
+    상태 하한을 버리는 것이고, 이 프로젝트가 여섯 회차에 걸쳐 쌓은
+    판단이 전부 legacy 가중치 표로 되돌아간다. 대신 **점수를 등급이
+    함의하는 띠까지 올린다.** 점수는 등급의 근거가 아니라 등급을
+    거스르지 않는 표시값이 된다.
+    """
+    if level == "high":
+        return HIGH_RISK_SCORE_THRESHOLD
+    if level == "medium":
+        return MEDIUM_RISK_SCORE_THRESHOLD
+    return 0
+
+
 def select_actions(signals: list[RiskSignal], state: UserState) -> list[Action]:
     action_codes: set[str] = set(STATE_ACTIONS[state])
     for signal in signals:

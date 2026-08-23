@@ -3,6 +3,7 @@ import socket
 import pytest
 from fastapi.testclient import TestClient
 
+from app.domain.fraud.signals import baseline_score, detect_legacy_signals
 from app.domain.fraud.sources import load_official_sources
 from app.main import app
 
@@ -37,7 +38,7 @@ def action_codes(body: dict) -> set[str]:
 def test_authority_impersonation_and_transfer_is_high_risk() -> None:
     body = analyze("검찰 수사관입니다. 지금 바로 안전계좌로 송금해 주세요.")
 
-    assert body["risk_score"] == 12
+    assert body["risk_score"] == 70
     assert body["risk_level"] == "high"
     assert "authority_impersonation" in body["fraud_types"]
     assert {"STOP_CONTACT", "VERIFY_OFFICIAL_CHANNEL", "CONTACT_1394"} <= action_codes(
@@ -52,7 +53,7 @@ def test_low_interest_loan_and_check_card_request() -> None:
         "loan_policy_impersonation",
         "account_access_request",
     } <= set(body["fraud_types"])
-    assert body["risk_score"] == 35
+    assert body["risk_score"] == 70
     assert body["risk_level"] == "high"
     assert "DO_NOT_SHARE_ACCESS" in action_codes(body)
 
@@ -60,7 +61,7 @@ def test_low_interest_loan_and_check_card_request() -> None:
 def test_otp_request_alone_is_not_low_risk() -> None:
     body = analyze("확인을 위해 OTP를 알려 주세요.")
 
-    assert body["risk_score"] == 25
+    assert body["risk_score"] == 35
     assert body["risk_level"] == "medium"
     assert [signal["code"] for signal in body["signals"]] == ["credential"]
 
@@ -68,7 +69,7 @@ def test_otp_request_alone_is_not_low_risk() -> None:
 def test_app_install_and_remote_control() -> None:
     body = analyze("이 APK 앱 설치 후 원격제어를 허용해 주세요.")
 
-    assert body["risk_score"] == 30
+    assert body["risk_score"] == 70
     assert body["risk_level"] == "high"
     assert "smishing_malware" in body["fraud_types"]
     assert {"DO_NOT_INSTALL", "CONTACT_KISA_118"} <= action_codes(body)
@@ -77,7 +78,7 @@ def test_app_install_and_remote_control() -> None:
 def test_receive_and_forward_money() -> None:
     body = analyze("계좌로 입금받고 다른 곳으로 다시 보내 주세요.")
 
-    assert body["risk_score"] == 35
+    assert body["risk_score"] == 70
     assert body["risk_level"] == "high"
     assert "money_mule_transfer" in body["fraud_types"]
     assert [signal["code"] for signal in body["signals"]] == ["money_mule"]
@@ -87,7 +88,7 @@ def test_receive_and_forward_money() -> None:
 def test_card_delivery_claim() -> None:
     body = analyze("신청한 카드가 발급되어 오늘 카드 배송 예정입니다.")
 
-    assert body["risk_score"] == 0
+    assert body["risk_score"] == 35
     assert "card_delivery_impersonation" in body["fraud_types"]
     assert body["risk_level"] == "medium"
     assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
@@ -256,7 +257,10 @@ def test_same_text_changes_policy_by_explicit_user_state() -> None:
     received = analyze("안녕하세요.", "received_only")
     transferred = analyze("안녕하세요.", "transferred_money")
 
-    assert received["risk_score"] == transferred["risk_score"] == 0
+    # legacy 가중치는 양쪽 다 0 이다. 그래도 발표되는 점수는 다르다 - 등급을
+    # 올린 것이 사용자 상태이지 문장이 아니어도, 등급이 high 면 점수도 high 다.
+    assert received["risk_score"] == 0
+    assert transferred["risk_score"] == 70
     assert received["risk_level"] == "low"
     assert transferred["risk_level"] == "high"
     assert "CONTACT_FINANCIAL_INSTITUTION" in action_codes(transferred)
@@ -276,7 +280,7 @@ def test_urgent_state_guarantees_high_risk_action(
 ) -> None:
     body = analyze("짧은 안내입니다.", state)
 
-    assert body["risk_score"] == 0
+    assert body["risk_score"] == 70
     assert body["risk_level"] == "high"
     assert required_action in action_codes(body)
 
@@ -344,7 +348,7 @@ def test_normal_https_url_does_not_create_fraud_signal() -> None:
 def test_risky_lexical_url_features_are_detected_without_fetch(url: str) -> None:
     body = analyze("링크를 확인해 주세요.", url=url)
 
-    assert body["risk_score"] == 0
+    assert body["risk_score"] == 35
     assert body["risk_level"] == "medium"
     assert "suspicious_link" in {signal["code"] for signal in body["signals"]}
     assert "smishing_malware" in body["fraud_types"]
@@ -368,13 +372,18 @@ def test_risky_lexical_url_features_are_detected_without_fetch(url: str) -> None
 def test_legacy_baseline_exact_scores(
     text: str, expected_score: int, expected_code: str | None
 ) -> None:
-    body = analyze(text)
+    """v0.8 부터 **채점기를 직접** 부른다.
 
-    assert body["risk_score"] == expected_score
+    이 표가 못 박으려는 것은 `LEGACY_RULES` 의 가중치이지 응답에 실리는
+    숫자가 아니었다. 응답 쪽 점수는 이제 등급이 함의하는 띠까지 올라가므로
+    (`score_floor_for_level`) API 를 거치면 가중치를 잴 수 없다. 재려던
+    것을 그대로 재려면 거치지 않으면 된다.
+    """
+    signals = detect_legacy_signals(text)
+
+    assert baseline_score(signals) == expected_score
     if expected_code is not None:
-        matching = [
-            signal for signal in body["signals"] if signal["code"] == expected_code
-        ]
+        matching = [signal for signal in signals if signal.code == expected_code]
         assert len(matching) == 1
 
 
@@ -733,3 +742,74 @@ def test_a_legitimate_invoice_uses_the_same_ending_and_stays_below_high() -> Non
     # 과거형은 요구가 아니라 확인이다.
     confirmation = analyze("어제 입금하셨는지 확인 부탁드립니다.")
     assert "money_transfer_request" not in {s["code"] for s in confirmation["signals"]}
+
+
+# --- 점수와 등급이 같은 것을 가리킨다 (2026-08-23) ---------------------------
+
+
+def test_a_high_verdict_never_ships_with_a_zero_score() -> None:
+    """원래 결함이다.
+
+    점수는 `LEGACY_RULES` 의 가중치만 더하고, 등급은 canonical 신호와 사용자
+    상태까지 본다. 그래서 **화면에 "높음" 과 "0점" 이 나란히** 실렸다. 읽는
+    사람은 둘 중 어느 쪽을 믿어야 하는지 알 수 없고, 둘 다 못 믿게 된다.
+
+    등급을 점수에서 다시 계산하는 방향은 택하지 않았다. 그러면 여섯 회차에
+    걸쳐 쌓은 canonical 판단과 상태 하한이 전부 legacy 가중치 표로 되돌아간다.
+    """
+    body = analyze("짧은 안내입니다.", "transferred_money")
+
+    assert body["risk_level"] == "high"
+    assert body["risk_score"] >= 70
+
+
+def test_the_published_score_always_sits_in_the_band_its_level_names() -> None:
+    """불변식. 어느 쪽으로도 어긋나지 않는다.
+
+    `determine_risk_level` 은 점수 띠에서 출발해 **올리기만** 한다. 그래서
+    원래도 `점수 띠 <= 등급` 은 성립했다 - 어긋나는 방향은 한쪽뿐이었다.
+    바닥을 깔면 `등급 <= 점수 띠` 도 성립해서 둘이 정확히 같아진다.
+    """
+    corpus = [
+        ("내일 오전 10시에 회의실에서 만나요.", "received_only"),
+        ("오늘까지 처리해 주세요.", "received_only"),
+        ("확인을 위해 OTP를 알려 주세요.", "received_only"),
+        ("검찰 수사관입니다. 지금 바로 안전계좌로 송금해 주세요.", "received_only"),
+        ("신청한 카드가 발급되어 오늘 카드 배송 예정입니다.", "received_only"),
+        ("짧은 안내입니다.", "installed_app"),
+        (
+            "오늘까지 인증번호와 체크카드를 주고 앱 설치 후 입금받고 다시 보내 주세요.",
+            "shared_account_access",
+        ),
+    ]
+
+    def band(score: int) -> str:
+        if score >= 70:
+            return "high"
+        return "medium" if score >= 35 else "low"
+
+    for text, state in corpus:
+        body = analyze(text, state)
+        assert band(body["risk_score"]) == body["risk_level"], (text, state)
+
+
+def test_flooring_the_score_never_moves_the_level() -> None:
+    """바닥은 등급을 정한 **뒤에** 깔린다. 자기 자신을 근거로 삼지 않는다.
+
+    순서가 뒤집히면 점수 12 짜리 문장이 상태 때문에 high 가 되고, 올라간 70 이
+    다음 계산에서 다시 high 를 만드는 순환이 생긴다. 지금은 등급이 상태와
+    신호만으로 정해지므로 legacy 가중치가 0 이든 100 이든 같은 등급이 나온다.
+    """
+    quiet = analyze("짧은 안내입니다.", "transferred_money")
+    loud = analyze("검찰 수사관입니다. 지금 바로 안전계좌로 송금해 주세요.", "transferred_money")
+
+    assert quiet["risk_level"] == loud["risk_level"] == "high"
+    # legacy 가중치는 0 과 12 로 다르지만 둘 다 바닥 아래라 같은 70 이 된다.
+    assert quiet["risk_score"] == loud["risk_score"] == 70
+
+
+def test_a_score_above_the_floor_is_left_alone() -> None:
+    body = analyze("오늘까지 인증번호와 체크카드를 주고 앱 설치 후 입금받고 다시 보내 주세요.")
+
+    assert body["risk_level"] == "high"
+    assert body["risk_score"] == 100
