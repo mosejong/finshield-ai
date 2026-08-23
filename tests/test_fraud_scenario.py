@@ -103,7 +103,11 @@ def test_isolation_demand_now_has_a_name_instead_of_only_a_grade() -> None:
     assert "isolation_coercion" in body["fraud_types"]
     assert body["risk_level"] == "medium"
     assert "STOP_CONTACT" in action_codes(body)
-    assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
+    # v0.9 에서 뒤집혔다. 이 문장에는 자칭한 기관도 상품도 없다 - 말하는
+    # 사람만 있고 찾아갈 창구가 없다. held-out v0.8 `fh-627` 이 거의 같은
+    # 문장에 아는 창구를 요구하며 이것을 결함으로 적어 두었다.
+    assert "VERIFY_BY_KNOWN_CONTACT" in action_codes(body)
+    assert "VERIFY_OFFICIAL_CHANNEL" not in action_codes(body)
 
 
 def test_isolation_stands_on_its_own_without_an_impersonated_institution() -> None:
@@ -223,6 +227,87 @@ def test_victim_self_report_mentioning_a_leading_room_does_not_fire_the_invite()
     assert "private_channel_invite" not in {
         signal["code"] for signal in body["signals"]
     }
+
+
+def test_a_threat_followed_by_a_demand_is_high_without_any_self_claim() -> None:
+    """불이익을 예고해 놓고 접근수단을 달라고 하면 자칭이 없어도 high 다.
+
+    재촉은 점수만 올리고 등급 하한을 세우지 않는다. 그래서 요구가 세운
+    medium 하나만 남아 등급이 거기서 멈췄다 - 정작 거절하기 가장 어려운
+    조합이 그 모양이다.
+    """
+    body = analyze("즉시 확인하지 않으면 계좌가 압류됩니다. 인증번호를 알려 주셔야 취소됩니다.")
+
+    assert body["risk_level"] == "high"
+
+
+def test_an_urgent_normal_notice_naming_a_bankbook_stays_low() -> None:
+    # 올리기의 값은 천장에서 치러진다. 기한이 급한 정상 안내가 통장·카드를
+    # 입에 올리기만 해도 올라가면 이 수정은 손해다.
+    body = analyze("오늘까지 서류를 제출하지 않으시면 심사가 자동 취소됩니다. 제출은 홈페이지에서만 받습니다.")
+
+    assert body["fraud_types"] == []
+    assert body["risk_level"] == "low"
+
+
+def test_an_accusation_about_a_bankbook_is_not_a_demand_for_one() -> None:
+    """대포통장이 개설되었다는 통보는 통장을 달라는 말이 아니다.
+
+    요구 게이트는 메시지 안 아무 데나 요구가 있으면 열린다. 그래서 뒤에 붙은
+    "이체하셔야" 하나로 앞 절의 고발 문구가 요구 대상이 되어 계좌·접근수단
+    요구가 하나 더 붙었다. 겁을 주는 문장과 실제로 내놓으라는 문장은 사용자가
+    해야 할 일이 다르다 - 앞은 확인, 뒤는 거절이다.
+    """
+    body = analyze(
+        "서울중앙지검 수사관입니다. 귀하 명의로 대포통장이 개설되어 즉시 안전계좌로 이체하셔야 합니다."
+    )
+
+    assert "account_access_request" not in body["fraud_types"]
+    assert "authority_impersonation" in body["fraud_types"]
+    # 좁히기가 등급까지 깎으면 손해다. 고발은 여전히 사기의 표지다.
+    assert body["risk_level"] == "high"
+
+
+def test_a_real_bankbook_demand_from_the_same_sender_keeps_the_type() -> None:
+    # 같은 자칭, 같은 낱말. 달라진 것은 통장이 고발 대상인지 요구 대상인지뿐이다.
+    # 이 짝이 없으면 위 테스트는 계좌·접근수단 요구를 통째로 없애는 수정도
+    # 통과시킨다.
+    body = analyze(
+        "서울중앙지검 수사관입니다. 수사 협조를 위해 사용 중인 통장과 체크카드를 보내 주십시오."
+    )
+
+    assert "account_access_request" in body["fraud_types"]
+    assert body["risk_level"] == "high"
+
+
+def test_a_demand_from_nobody_in_particular_does_not_send_the_user_to_a_desk() -> None:
+    """확인 행동은 그 메시지에 창구가 있을 때만 공식 창구를 가리킨다.
+
+    "공식 대표번호로 확인하세요" 를 이름 없는 상대에게 말하면 사용자는 찾을
+    수 없는 창구를 뒤지다가 결국 **메시지에 적힌 번호로 건다.** 틀린 행동은
+    없는 행동보다 나쁘다.
+    """
+    body = analyze("확인 절차입니다. 문자로 받으신 인증번호를 저에게 알려 주세요.")
+
+    assert "VERIFY_BY_KNOWN_CONTACT" in action_codes(body)
+    assert "VERIFY_OFFICIAL_CHANNEL" not in action_codes(body)
+
+
+def test_the_same_demand_with_a_named_institution_keeps_the_official_channel() -> None:
+    # 같은 요구, 같은 신호. 달라진 것은 자칭 하나뿐이고 확인 창구는 그것을
+    # 따라간다. 이 짝이 없으면 위 테스트는 확인 행동을 없애는 수정도 통과시킨다.
+    body = analyze("금융감독원 민원조사팀입니다. 계좌 안전 조치를 위해 인증번호를 불러 주십시오.")
+
+    assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
+    assert "VERIFY_BY_KNOWN_CONTACT" not in action_codes(body)
+
+
+def test_a_loan_offer_has_an_official_desk_even_without_a_named_lender() -> None:
+    # 기관을 자칭하지 않아도 대출·정책자금은 취급 창구를 가리킨다. 여기까지
+    # 아는 창구로 돌리면 확인할 수 있는 것을 확인하지 말라고 하는 셈이 된다.
+    body = analyze("정부지원 정책자금 대상자로 선정되셨습니다. 보증료 입금 후 실행됩니다.")
+
+    assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
 
 
 def test_acquaintance_impersonation_with_a_transfer_demand_is_high_risk() -> None:

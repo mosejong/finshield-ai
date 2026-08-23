@@ -5,18 +5,27 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.analysis import AnalyzeRequest, Persona, UserState
+from app.schemas.analysis import (
+    Action,
+    AnalyzeRequest,
+    AnalyzeResponse,
+    Persona,
+    UserState,
+)
 from app.services.fraud_analysis import analyze_fraud
 from app.services.llm.contract import LlmContractError
 from app.services.llm.provider import LlmProvider, LlmUnavailable
 from evaluation.fraud_benchmark import (
     FRAUD_TYPES,
+    _forbidden_action_avoidance,
+    _required_action_coverage,
     check_minimum_quality,
     evaluate_golden_set,
     normalized_dataset_sha256,
 )
 from app.domain.fraud.signals import CANONICAL_TO_LEGACY_PUBLIC, SIGNAL_RULES
 from evaluation.fraud_golden import (
+    ACTION_CODES,
     HOLDOUT_V0_2_PATH,
     HOLDOUT_V0_3_PATH,
     HOLDOUT_V0_4_PATH,
@@ -24,6 +33,7 @@ from evaluation.fraud_golden import (
     HOLDOUT_V0_6_PATH,
     HOLDOUT_V0_7_PATH,
     HOLDOUT_V0_8_PATH,
+    HOLDOUT_V0_9_PATH,
     SIGNAL_CODES,
     FraudGoldenCase,
     _validate_collection,
@@ -112,6 +122,9 @@ FRAUD_TYPES_AT_HOLDOUT_V0_4_TO_V0_6_FREEZE = (
     "card_delivery_impersonation",
 )
 
+OFFICIAL_CHANNEL = "VERIFY_OFFICIAL_CHANNEL"
+KNOWN_CONTACT = "VERIFY_BY_KNOWN_CONTACT"
+
 HOLDOUT_SIZES = {
     HOLDOUT_V0_2_PATH: 72,
     HOLDOUT_V0_3_PATH: 60,
@@ -120,6 +133,7 @@ HOLDOUT_SIZES = {
     HOLDOUT_V0_6_PATH: 72,
     HOLDOUT_V0_7_PATH: 72,
     HOLDOUT_V0_8_PATH: 72,
+    HOLDOUT_V0_9_PATH: 72,
 }
 
 
@@ -167,6 +181,13 @@ def test_holdout_set_is_labelled_and_separated_from_the_development_set(
         (HOLDOUT_V0_5_PATH, HOLDOUT_V0_8_PATH),
         (HOLDOUT_V0_6_PATH, HOLDOUT_V0_8_PATH),
         (HOLDOUT_V0_7_PATH, HOLDOUT_V0_8_PATH),
+        (HOLDOUT_V0_2_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_3_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_4_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_5_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_6_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_7_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_8_PATH, HOLDOUT_V0_9_PATH),
     ],
 )
 def test_holdout_versions_do_not_overlap_each_other(
@@ -446,6 +467,99 @@ def test_holdout_v0_7_prices_the_forwarding_vocabulary_with_own_account_moves() 
         "money_mule_transfer" in case.expected_fraud_types for case in positives
     ) >= 8
     assert sum(any(m in case.text for m in moves) for case in negatives) >= 6
+
+
+def test_holdout_v0_9_covers_the_taxonomy_and_keeps_the_ceiling_discipline() -> None:
+    cases = load_holdout_cases(HOLDOUT_V0_9_PATH)
+    negatives = [case for case in cases if not case.is_fraud]
+    positives = [case for case in cases if case.is_fraud]
+    covered = {t for case in cases for t in case.expected_fraud_types}
+
+    assert covered == set(FRAUD_TYPES)
+    assert len(negatives) == 31
+    assert all(case.expected_max_risk is not None for case in negatives)
+    assert all(case.expected_max_risk is None for case in positives)
+
+
+def test_holdout_v0_9_pairs_every_demand_with_and_without_a_named_institution() -> None:
+    """**확인 행동이 어디로 가리키는가**를 재려면 짝이 있어야 한다.
+
+    "공식 대표번호로 확인하세요" 는 확인할 기관이 지정됐을 때만 실행 가능한
+    조언이다. 이름을 대지 않은 상대에게 같은 말을 하면 사용자는 존재하지 않는
+    창구를 찾다가 결국 **메시지에 적힌 번호로 건다.** 그래서 같은 신호 위에
+    자칭이 있는 문장과 없는 문장을 짝지어 놓고, 각 사례가 내면 **안 되는**
+    행동을 함께 적는다.
+
+    값은 양쪽에서 치러진다. 이름 없는 쪽으로 너무 돌면 기관 사칭 열네 건이
+    공식 창구를 잃고, 자칭 쪽으로 너무 돌면 지인 사칭 네 건이 v0.4 회귀가
+    된다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V0_9_PATH)
+
+    def has(case, required: str, forbidden: str) -> bool:
+        return (
+            required in case.required_action_codes
+            and forbidden in case.forbidden_action_codes
+        )
+
+    nameless = [c for c in cases if has(c, KNOWN_CONTACT, OFFICIAL_CHANNEL)]
+    named = [c for c in cases if has(c, OFFICIAL_CHANNEL, KNOWN_CONTACT)]
+
+    assert len(nameless) >= 20
+    assert len(named) >= 14
+
+    # 지인 사칭은 v0.4 가 이미 맞게 내보내고 있다. 이 회차가 깨뜨릴 수 있는
+    # 자리이므로 넷 전부 아는 창구를 요구하고 공식 창구를 금지한다.
+    acquaintance = [
+        c for c in cases if "acquaintance_impersonation" in c.expected_fraud_types
+    ]
+    assert len(acquaintance) == 4
+    assert all(has(c, KNOWN_CONTACT, OFFICIAL_CHANNEL) for c in acquaintance)
+
+    # 정상 문장도 없는 창구를 가리키면 안 된다. 사기 쪽에서만 재면 수정이
+    # 정상 문장에 남긴 자국이 측정 밖으로 빠진다.
+    assert sum(
+        OFFICIAL_CHANNEL in c.forbidden_action_codes for c in cases if not c.is_fraud
+    ) >= 3
+
+
+def test_holdout_v0_9_prices_the_grade_raise_and_the_accusation_narrowing() -> None:
+    """등급 올리기와 유형 좁히기는 값을 치르는 자리가 서로 반대다.
+
+    올리기의 값은 천장에서 치러지므로 정상 31건이 전부 천장을 선언한다.
+    좁히기(`대포통장` 은 고발이지 요구가 아니다)의 값은 **사기 쪽에서**
+    치러진다 - 좁히기가 지나치면 통장·카드를 진짜로 요구하는 문장이
+    접근수단 요구라는 이름을 잃는다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V0_9_PATH)
+    positives = [case for case in cases if case.is_fraud]
+
+    # 위협 + 접근수단 요구인데 자칭이 없어 medium 에서 멈추는 자리.
+    threatened = [
+        c
+        for c in positives
+        if "urgency" in c.required_signal_codes
+        and {"credential", "account_access"} & set(c.required_signal_codes)
+        and c.expected_min_risk == "high"
+        and "authority_impersonation" not in c.required_signal_codes
+    ]
+    assert len(threatened) >= 5
+
+    # 고발 문구. 통장이 나오지만 요구 대상이 아니다.
+    accusation = [c for c in positives if "대포통장" in c.text or "통장이 범죄" in c.text]
+    assert len(accusation) >= 3
+    assert all(
+        "account_access_request" not in c.expected_fraud_types for c in accusation
+    )
+
+    # 같은 낱말을 쓰는 진짜 요구. 좁히기가 이쪽을 끊으면 값을 치른 것이다.
+    demanded = [
+        c
+        for c in positives
+        if ("통장" in c.text or "체크카드" in c.text)
+        and "account_access_request" in c.expected_fraud_types
+    ]
+    assert len(demanded) >= 6
 
 
 def test_holdout_v0_8_covers_the_taxonomy_and_keeps_the_ceiling_discipline() -> None:
@@ -943,3 +1057,99 @@ def test_one_dead_call_does_not_abandon_the_rest_of_the_batch() -> None:
 
     assert not judgement.ok
     assert judgement.failure == "stub returned HTTP 503"
+
+
+# ---------------------------------------------------------------------------
+# v0.9. 행동 쪽에도 천장이 없었다.
+# ---------------------------------------------------------------------------
+
+
+def _case_with(forbidden: list[str], required: list[str]) -> FraudGoldenCase:
+    return FraudGoldenCase(
+        case_id="fh-701",
+        text="이름을 대지 않은 사람이 계좌 조회 권한을 넘겨 달라고 한다.",
+        persona=Persona.EARLY_CAREER,
+        state=UserState.RECEIVED_ONLY,
+        is_fraud=True,
+        expected_fraud_types=["account_access_request"],
+        expected_min_risk="medium",
+        required_action_codes=required,
+        forbidden_action_codes=forbidden,
+        held_out=True,
+        annotation_note="지표가 무엇을 재는지 보이려고 만든 사례다.",
+    )
+
+
+def _response_with(action_codes: list[str]) -> AnalyzeResponse:
+    return AnalyzeResponse(
+        risk_score=50,
+        risk_level="medium",
+        signals=[],
+        scenario=UserState.RECEIVED_ONLY,
+        disclaimer="테스트",
+        fraud_types=["account_access_request"],
+        summary="테스트",
+        actions=[
+            Action(code=code, priority=1, title="제목", reason="이유", source_ids=[])
+            for code in action_codes
+        ],
+        official_sources=[],
+    )
+
+
+def test_coverage_alone_cannot_tell_the_right_advice_from_extra_advice() -> None:
+    """행동을 **더 붙이는** 수정은 `required_action_coverage` 에서 못 잃는다.
+
+    v0.7 이 등급에서 찾은 것과 같은 모양이다. 바닥만 보는 지표에서는 모든
+    문자를 high 로 찍는 엔진이 만점을 받았고, 지금 행동 쪽에서는 열두 행동을
+    전부 붙이는 엔진이 만점을 받는다.
+
+    그리고 행동은 등급보다 조용히 나쁘다. 이름을 대지 않은 상대에게
+    "공식 대표번호로 확인하세요" 라고 하면 사용자는 존재하지 않는 창구를
+    찾다가 결국 **메시지에 적힌 번호**로 건다.
+    """
+    case = _case_with(
+        forbidden=["VERIFY_OFFICIAL_CHANNEL"],
+        required=["DO_NOT_SHARE_ACCESS", "VERIFY_BY_KNOWN_CONTACT"],
+    )
+    right = _response_with(["DO_NOT_SHARE_ACCESS", "VERIFY_BY_KNOWN_CONTACT"])
+    everything = _response_with(sorted(ACTION_CODES))
+
+    assert _required_action_coverage([case], [right]) == 1.0
+    assert _required_action_coverage([case], [everything]) == 1.0
+
+    assert _forbidden_action_avoidance([case], [right]) == 1.0
+    assert _forbidden_action_avoidance([case], [everything]) == 0.0
+
+
+def test_the_forbidden_action_metric_reports_null_for_sets_that_never_declared_one() -> (
+    None
+):
+    """v0.1~v0.8 은 금지 행동을 선언한 적이 없다. 그 셋들은 통과가 아니라 미측정이다."""
+    without = evaluate_golden_set(load_holdout_cases(HOLDOUT_V0_8_PATH))
+
+    assert without["scenario_engine_v0_1"]["forbidden_action_avoidance"] is None  # type: ignore[index]
+
+
+def test_an_action_cannot_be_both_required_and_forbidden() -> None:
+    payload = load_holdout_cases(HOLDOUT_V0_8_PATH)[0].model_dump()
+    payload["required_action_codes"] = ["STOP_CONTACT"]
+    payload["forbidden_action_codes"] = ["STOP_CONTACT"]
+
+    with pytest.raises(ValueError, match="both required and forbidden"):
+        FraudGoldenCase.model_validate(payload)
+
+
+def test_adding_the_forbidden_label_does_not_move_any_earlier_dataset() -> None:
+    """선언하지 않은 라벨은 라벨이 아니다 - v0.7 에서 천장에 적용한 규칙 그대로.
+
+    선택 필드를 하나 더했다고 v0.1~v0.8 의 해시가 바뀌면, 이미 돈을 주고
+    받아 둔 판정 결과와 여덟 개 결과 파일의 출처 연결이 전부 끊어진다.
+    """
+    frozen = {
+        HOLDOUT_V0_7_PATH: "15286971f13f",
+        HOLDOUT_V0_8_PATH: "9f85da97ebd5",
+    }
+    for path, prefix in frozen.items():
+        cases = load_holdout_cases(path)
+        assert normalized_dataset_sha256(cases).startswith(prefix)
