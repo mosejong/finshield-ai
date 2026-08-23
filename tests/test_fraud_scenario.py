@@ -611,3 +611,58 @@ def test_delegating_account_authority_is_a_real_product_and_stays_quiet() -> Non
         body = analyze(text)
         assert body["fraud_types"] == [], text
         assert body["risk_level"] == "low", text
+
+
+# --- 받은 돈을 다시 보내라는 요구 (2026-08-23) ------------------------------
+
+
+def test_forwarding_is_caught_when_the_money_word_sits_in_a_closed_clause() -> None:
+    """사기 문자는 받은 사실을 과거형으로 적고 요구만 현재형으로 남긴다.
+
+    held-out v0.7 `fh-542`("거래처 대금이 착오 입금되었습니다. … 회수 계좌로
+    돌려보내 주셔야 합니다")에서 돈을 가리키는 말은 전부 완료 보고 절에
+    있었다. 완료 보고 절은 요구도 요구의 대상도 공급하지 않으므로, 열린 절에
+    남은 단서는 **목적지로 지목된 계좌** 하나뿐이다.
+    """
+    for text in (
+        "거래처 대금이 착오 입금되었습니다. 회수 전용 계좌로 돌려보내 주셔야 처리가 완료됩니다.",
+        "저희 회사 정산금이 고객님 계좌로 잘못 입금되었습니다. 확인하시고 아래 지정 계좌로 옮겨 주세요.",
+        "받으신 금액 중 절반은 아래 계좌로 나눠 보내 주세요.",
+    ):
+        body = analyze(text, state="received_unknown_money")
+        assert "money_mule" in {s["code"] for s in body["signals"]}, text
+        assert body["fraud_types"] == ["money_mule_transfer"], text
+
+
+def test_the_destination_account_replaces_the_money_word_it_does_not_add_to_it() -> (
+    None
+):
+    # 목적지 계좌를 대안으로 둔 값이다. `계좌` 만 보면 "제 계좌가 바뀌었어요"
+    # 가 걸리므로 조사까지 함께 본다. 아래 두 문장에는 목적지 계좌도 있고
+    # 요구도 있지만 재전달 동사가 없다.
+    for text in (
+        "제 주거래 계좌가 바뀌었어요. 앞으로는 새 계좌로 보내 주세요.",
+        "정산금 지급일 안내입니다. 계좌 정보가 변경되신 분은 담당자에게 알려 주세요.",
+    ):
+        assert analyze(text)["fraud_types"] == [], text
+
+
+def test_a_verb_inside_a_prohibition_is_not_a_demand() -> None:
+    """같은 문장이 그 행동을 하지 말라고 하고 있다.
+
+    "나눠 보내" 를 어휘에 넣자 held-out v0.8 `fh-625` 가 자금 재전달 요구로
+    뒤집혔다. 어휘를 어미까지 붙여 좁히면 다음 어미로 다시 뚫린다. 금지형은
+    어휘의 문제가 아니라 자리의 문제다.
+    """
+    for text in (
+        "회비는 나눠 보내지 마시고 총무 계좌로 한 번에 보내 주세요.",
+        "돈은 절대 다른 계좌로 옮겨 주지 말고 은행에 먼저 문의하세요.",
+    ):
+        assert analyze(text)["fraud_types"] == [], text
+
+    # 금지형만 뺀다. 조건절 부정은 협박이고 요구의 다른 얼굴이라 살아 있어야 한다.
+    threat = analyze(
+        "입금된 금액을 오늘까지 아래 계좌로 옮겨 주지 않으면 형사 고발됩니다.",
+        state="received_unknown_money",
+    )
+    assert threat["risk_level"] == "high"

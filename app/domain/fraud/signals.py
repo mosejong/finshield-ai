@@ -489,6 +489,12 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "옮겨",
             "넘겨",
             "넘기",
+            # v0.8. held-out v0.7 `fh-542`·`fh-543` 이 요구했다. "돌려보내"
+            # 는 반환처럼 들리지만 지정한 곳은 원래 보낸 사람이 아니고,
+            # "나눠 보내" 는 인출책 모집에서 금액을 쪼갤 때 쓴다. 둘 다
+            # 목적어 조건은 그대로다.
+            "돌려보내",
+            "나눠 보내",
         ),
         money_gated_sequences=(
             ("빼서", "넣어"),
@@ -820,6 +826,11 @@ MONEY_OBJECT_TERMS = (
     "수익금",
     "수수료",
     "이체",
+    # v0.8. held-out v0.7 `fh-539`("저희 정산금이 … 지정 계좌로 옮겨
+    # 주세요")가 이 낱말 하나로 미탐이었다. 정산금은 관리비 고지서에도
+    # 쓰이지만, 이 목록은 **혼자서는 아무것도 켜지 않는다** - 재전달 동사와
+    # 요구가 같은 절에 함께 있어야 조건이 찬다.
+    "정산금",
 )
 
 # 매매 맥락. 방 이름을 신호로 승격시킬지 가르는 어휘다.
@@ -1027,6 +1038,42 @@ def _is_direct_imperative(text: str, keyword: str) -> bool:
     return any(folded + ending in text for ending in DIRECT_IMPERATIVE_ENDINGS)
 
 
+# 금지 명령의 어미다. `-지 마세요`·`-지 말고`.
+#
+# **부정문 전체가 아니라 금지형만이다.** `-지 않` 은 여기 없다. "보내지
+# 않으면 계좌가 정지됩니다" 는 협박이고 요구의 다른 얼굴이다. 반대로
+# 서술형 부정("저희는 보내지 않습니다")은 이미 `PREVENTION_STATEMENT_MARKERS`
+# 가 절 단위로 걷어 낸다. 여기서 걸러야 하는 것은 **읽는 사람에게 하지
+# 말라고 하는 말**뿐이다.
+PROHIBITION_ENDINGS = ("지 마", "지말", "지 말")
+
+
+def _is_prohibited(text: str, keyword: str) -> bool:
+    """그 동사가 금지 명령 안에 있으면 요구가 아니다.
+
+    v0.8. "나눠 보내" 를 어휘에 넣자 "회비는 나눠 보내지 마시고 총무 계좌로
+    한 번에 보내 주세요"(held-out v0.8 `fh-625`)가 자금 재전달 요구가 됐다.
+    같은 문장이 그 행동을 **하지 말라고** 하고 있다.
+
+    어휘를 좁혀서 피하지 않는다. "나눠 보내 주" 처럼 어미를 붙여 적으면 그
+    어휘는 그 어미만 잡고, 다음 회차에 다른 어미로 다시 뚫린다. 금지형은
+    어휘의 문제가 아니라 **자리의 문제**라서 자리에서 본다.
+    """
+    folded = keyword.casefold()
+    cursor = 0
+    saw_occurrence = False
+    while True:
+        found = text.find(folded, cursor)
+        if found < 0:
+            break
+        saw_occurrence = True
+        tail = text[found + len(folded) :]
+        if not any(tail.startswith(ending) for ending in PROHIBITION_ENDINGS):
+            return False
+        cursor = found + len(folded)
+    return saw_occurrence
+
+
 def _appears_in_order(text: str, sequence: tuple[str, ...]) -> bool:
     """어형이 낱말 하나에 담기지 않을 때, 순서만 지키면 받는다.
 
@@ -1042,8 +1089,30 @@ def _appears_in_order(text: str, sequence: tuple[str, ...]) -> bool:
     return True
 
 
+# 목적지로 지목된 계좌다. **돈을 가리키는 말의 대안이지 추가가 아니다.**
+#
+# held-out v0.7 `fh-542`("거래처 대금이 착오 입금되었습니다. … 회수 계좌로
+# 돌려보내 주셔야 합니다")에서 돈을 가리키는 말은 전부 완료 보고 절에
+# 들어 있었다. 열린 절에 남은 것은 목적지 계좌뿐이다. 사기 문자는 받은
+# 사실을 과거형으로 적고 요구만 현재형으로 남긴다.
+#
+# `계좌` 만으로는 안 된다 - "제 계좌가 바뀌었어요" 도 계좌를 말한다. 조사를
+# 함께 본다. 계좌가 **어디로 라는 자리**에 있을 때만 목적지다.
+MONEY_DESTINATION_TERMS = (
+    "계좌로",
+    "계좌에",
+    "통장으로",
+    "통장에",
+    "계좌번호로",
+)
+
+
 def _mentions_money(clauses: list[str]) -> bool:
-    return any(term in clause for clause in clauses for term in MONEY_OBJECT_TERMS)
+    return any(
+        term in clause
+        for clause in clauses
+        for term in MONEY_OBJECT_TERMS + MONEY_DESTINATION_TERMS
+    )
 
 
 def _mentions_investment(clauses: list[str]) -> bool:
@@ -1133,6 +1202,7 @@ def _detect_by_rules(
                 and (
                     any(
                         keyword.casefold() in open_text
+                        and not _is_prohibited(open_text, keyword)
                         and (
                             has_demand
                             or _is_direct_imperative(open_text, keyword)
