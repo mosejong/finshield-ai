@@ -11,6 +11,15 @@ FRAUD_TYPE_ORDER: tuple[str, ...] = (
     "money_mule_transfer",
     "smishing_malware",
     "card_delivery_impersonation",
+    # v0.7. `secrecy_isolation` 은 v0.1 부터 켜지고 있었지만 유형 표에
+    # 자리가 없었다. 이진 판정이 `bool(fraud_types)` 라서, **유형이 없는
+    # 신호는 등급만 올리고 판정은 정상으로 나간다** - held-out v0.6
+    # `fh-454`(수사 중이니 가족에게도 비밀로 하라)가 그렇게 미탐이었다.
+    #
+    # `authority_impersonation` 에 합치지 않은 이유가 있다. 고립 요구는
+    # 기관 자칭 없이도 온다(`fh-523`·`fh-526`). 사칭이라고 적혀 있지 않은
+    # 문장에 사칭이라는 이름을 붙이면 그것이 지어낸 근거다.
+    "isolation_coercion",
 )
 
 
@@ -69,6 +78,8 @@ def classify_fraud_types(signals: list[RiskSignal], text: str = "") -> list[str]
         matched.add("smishing_malware")
     if "card_delivery_claim" in codes:
         matched.add("card_delivery_impersonation")
+    if "secrecy_isolation" in codes:
+        matched.add("isolation_coercion")
     # v0.3. `money_transfer_request` 는 등급을 올리면서도 유형 표에 자리가 없었다.
     # 그래서 held-out v0.2 에 등급이 high 인데 유형이 빈 사례가 남았다.
     if "money_transfer_request" in codes and any(

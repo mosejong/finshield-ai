@@ -1,4 +1,5 @@
 import asyncio
+import json
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,7 @@ from evaluation.fraud_golden import (
     HOLDOUT_V0_4_PATH,
     HOLDOUT_V0_5_PATH,
     HOLDOUT_V0_6_PATH,
+    HOLDOUT_V0_7_PATH,
     SIGNAL_CODES,
     FraudGoldenCase,
     _validate_collection,
@@ -93,12 +95,29 @@ FRAUD_TYPES_AT_HOLDOUT_V0_3_FREEZE = (
     "card_delivery_impersonation",
 )
 
+# v0.4~v0.6 을 얼릴 때의 분류 표. `isolation_coercion` 은 v0.7 에서 선언했다.
+# 세 셋이 같은 표를 공유하는 이유는 그 사이 회차들이 유형을 늘리지 않았기
+# 때문이고, 여기 적어 두는 이유는 v0.2·v0.3 과 같다 - 표가 자랄 때마다 이미
+# 얼어붙은 파일이 빨개지면 고칠 수 있는 것이 동결된 셋뿐이 된다.
+FRAUD_TYPES_AT_HOLDOUT_V0_4_TO_V0_6_FREEZE = (
+    "authority_impersonation",
+    "acquaintance_impersonation",
+    "loan_policy_impersonation",
+    "investment_scheme",
+    "advance_fee_demand",
+    "account_access_request",
+    "money_mule_transfer",
+    "smishing_malware",
+    "card_delivery_impersonation",
+)
+
 HOLDOUT_SIZES = {
     HOLDOUT_V0_2_PATH: 72,
     HOLDOUT_V0_3_PATH: 60,
     HOLDOUT_V0_4_PATH: 60,
     HOLDOUT_V0_5_PATH: 72,
     HOLDOUT_V0_6_PATH: 72,
+    HOLDOUT_V0_7_PATH: 72,
 }
 
 
@@ -135,6 +154,11 @@ def test_holdout_set_is_labelled_and_separated_from_the_development_set(
         (HOLDOUT_V0_3_PATH, HOLDOUT_V0_6_PATH),
         (HOLDOUT_V0_4_PATH, HOLDOUT_V0_6_PATH),
         (HOLDOUT_V0_5_PATH, HOLDOUT_V0_6_PATH),
+        (HOLDOUT_V0_2_PATH, HOLDOUT_V0_7_PATH),
+        (HOLDOUT_V0_3_PATH, HOLDOUT_V0_7_PATH),
+        (HOLDOUT_V0_4_PATH, HOLDOUT_V0_7_PATH),
+        (HOLDOUT_V0_5_PATH, HOLDOUT_V0_7_PATH),
+        (HOLDOUT_V0_6_PATH, HOLDOUT_V0_7_PATH),
     ],
 )
 def test_holdout_versions_do_not_overlap_each_other(
@@ -184,13 +208,15 @@ def test_holdout_v0_3_covers_the_taxonomy_it_was_frozen_against() -> None:
 
 
 def test_holdout_v0_4_covers_the_taxonomy_it_was_frozen_against() -> None:
-    # v0.4 는 투자·지인 사칭 유형이 선언된 뒤에 얼렸으므로 현재 표 전체를 덮는다.
+    # v0.4 는 투자·지인 사칭 유형이 선언된 뒤에 얼렸다. `isolation_coercion`
+    # 은 v0.7 에서 선언했으므로 이 셋이 덮을 의무가 없다.
     covered = {
         t for case in load_holdout_cases(HOLDOUT_V0_4_PATH)
         for t in case.expected_fraud_types
     }
 
-    assert covered == set(FRAUD_TYPES)
+    assert covered == set(FRAUD_TYPES_AT_HOLDOUT_V0_4_TO_V0_6_FREEZE)
+    assert covered < set(FRAUD_TYPES)
 
 
 def test_holdout_v0_4_prices_the_new_vocabulary_against_normal_sentences() -> None:
@@ -207,13 +233,13 @@ def test_holdout_v0_4_prices_the_new_vocabulary_against_normal_sentences() -> No
 
 
 def test_holdout_v0_5_covers_the_taxonomy_it_was_frozen_against() -> None:
-    # v0.5 는 유형을 늘리지 않은 회차에서 얼렸다. 동결 시점 표 = 현재 표다.
+    # v0.5 도 유형을 늘리지 않은 회차에서 얼렸다. v0.4 와 같은 표다.
     covered = {
         t for case in load_holdout_cases(HOLDOUT_V0_5_PATH)
         for t in case.expected_fraud_types
     }
 
-    assert covered == set(FRAUD_TYPES)
+    assert covered == set(FRAUD_TYPES_AT_HOLDOUT_V0_4_TO_V0_6_FREEZE)
 
 
 def test_holdout_v0_5_prices_each_planned_fix_against_normal_sentences() -> None:
@@ -253,12 +279,14 @@ def test_holdout_v0_5_keeps_the_prevention_marker_widening_honest() -> None:
 
 
 def test_holdout_v0_6_covers_the_taxonomy_it_was_frozen_against() -> None:
+    # v0.6 이 `fh-454` 로 찾아낸 것이 바로 `isolation_coercion` 의 부재인데,
+    # 그 유형은 v0.7 에서야 선언됐다. 셋은 자기가 태어난 시점의 표를 덮는다.
     covered = {
         t for case in load_holdout_cases(HOLDOUT_V0_6_PATH)
         for t in case.expected_fraud_types
     }
 
-    assert covered == set(FRAUD_TYPES)
+    assert covered == set(FRAUD_TYPES_AT_HOLDOUT_V0_4_TO_V0_6_FREEZE)
 
 
 def test_holdout_v0_6_prices_two_narrowings_with_fraud_not_with_normal_text() -> None:
@@ -291,6 +319,184 @@ def test_holdout_v0_6_prices_two_narrowings_with_fraud_not_with_normal_text() ->
     assert counting(negatives, *institutions) >= 8
     # 유일하게 넓히는 수정(폐쇄 채널 초대의 맥락 조건)은 여전히 정상 문장으로 잰다.
     assert counting(negatives, "단톡방", "오픈채팅방", "초대") >= 5
+
+
+def test_holdout_v0_7_covers_the_taxonomy_it_was_frozen_against() -> None:
+    # v0.7 은 `isolation_coercion` 을 **선언한 뒤** 얼렸다. 엔진은 아직 이 유형을
+    # 내지 못하고, 그래서 동결 시점 baseline 에서 이 유형의 f1 은 0.0 이다.
+    covered = {
+        t for case in load_holdout_cases(HOLDOUT_V0_7_PATH)
+        for t in case.expected_fraud_types
+    }
+
+    assert covered == set(FRAUD_TYPES)
+    assert "isolation_coercion" in covered
+
+
+def test_holdout_v0_7_puts_a_ceiling_on_every_normal_sentence() -> None:
+    """**재는 자에 천장이 없었다.**
+
+    `expected_min_risk` 는 바닥만 정한다(`>=`). 그래서 등급을 올리는 수정은 이
+    프로젝트의 어떤 지표에서도 점수를 잃을 수 없었고, 모든 문자를 high 로 찍는
+    엔진이 상태 정책 정확도 1.0 을 받는다. 이번 회차의 세 수정 중 하나가 바로
+    등급을 올리는 것(`HIGH_RISK_SIGNAL_COMBINATIONS` 확장)이므로 여기서 닫는다.
+
+    천장은 **정상 문장에만** 건다. 사기를 필요 이상으로 높게 매기는 것은 결함이
+    아니라 신중함이고, 거기에 상한을 걸면 신중함을 감점하게 된다. 넘치면 안 되는
+    자리는 정상 문장이고, 정상 문장의 정답 등급은 상태 하한 **그대로**다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V0_7_PATH)
+    negatives = [case for case in cases if not case.is_fraud]
+    positives = [case for case in cases if case.is_fraud]
+
+    assert len(negatives) >= 30
+    assert all(case.expected_max_risk is not None for case in negatives)
+    assert all(
+        case.expected_max_risk == case.expected_min_risk for case in negatives
+    )
+    assert all(case.expected_max_risk is None for case in positives)
+
+
+def test_holdout_v0_7_prices_the_grade_raising_fix_where_it_can_overshoot() -> None:
+    """등급을 올리는 수정의 값은 **기관 이름을 쓰는 정상 안내문**이 치른다.
+
+    `authority_impersonation` + 넘겨주기 신호를 고위험으로 올리면, 같은 낱말을
+    쓰는 정상 안내문이 함께 올라갈 수 있다. 값을 치를 문장이 셋에 없으면 이
+    수정은 상태 정책 정확도만 올리고 대가를 감춘다.
+
+    양성 쪽 조건도 함께 못을 박는다 - 올릴 자리가 `received_only` 여야 한다.
+    상태 하한이 이미 high 면 등급이 올라간 이유가 정책인지 상태인지 갈리지 않는다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V0_7_PATH)
+    positives = [case for case in cases if case.is_fraud]
+    negatives = [case for case in cases if not case.is_fraud]
+
+    institutions = (
+        "은행", "뱅크", "공단", "국세청", "세무서", "카드사", "우체국",
+        "농협", "토스", "금융감독원", "지검", "장학재단",
+    )
+
+    def counting(pool, *terms: str) -> int:
+        return sum(any(term in case.text for term in terms) for case in pool)
+
+    # 올릴 자리: 기관 자칭 + 넘겨주기 요구, 상태 하한이 등급을 대신 올리지 않는 것.
+    liftable = [
+        case
+        for case in positives
+        if case.expected_min_risk == "high"
+        and case.state.value == "received_only"
+        and "authority_impersonation" in case.required_signal_codes
+    ]
+    assert len(liftable) >= 10
+
+    # 값을 치를 자리: 같은 낱말을 쓰는 정상 안내문.
+    assert counting(negatives, *institutions) >= 10
+
+
+def test_holdout_v0_7_prices_the_new_type_against_ordinary_confidentiality() -> None:
+    """`secrecy_isolation` 에 유형을 붙이는 순간, 그 신호의 오탐이 곧 사기 판정이 된다.
+
+    지금까지 이 신호는 등급만 올렸다. 유형이 붙으면 `bool(fraud_types)` 가
+    참이 되므로 **판정 자체가 뒤집힌다.** 그런데 현재 어휘는 "비밀로"·"보안
+    유지" 같은 맨 낱말이라, 회사 대외비 공지와 생일 파티 문자가 전부 사기가 된다.
+
+    그래서 새 유형의 값은 **평범한 비밀 유지 문장**으로 잰다. 이것이 없으면
+    유형 추가는 회복률만 올리고 그 대가를 측정 밖에 둔다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V0_7_PATH)
+    positives = [case for case in cases if case.is_fraud]
+    negatives = [case for case in cases if not case.is_fraud]
+
+    secrecy_words = ("비밀", "보안 유지", "혼자 처리", "말하지", "말씀하지", "끊지", "알리지")
+
+    isolation_cases = [
+        case for case in positives if "isolation_coercion" in case.expected_fraud_types
+    ]
+    collisions = [
+        case
+        for case in negatives
+        if any(word in case.text for word in secrecy_words)
+    ]
+
+    assert len(isolation_cases) >= 8
+    # 고립 요구는 사칭이나 송금 없이 단독으로도 와야 한다. 다른 신호에 업혀
+    # 가면 이 유형이 스스로 판정을 만드는지 알 수 없다.
+    assert sum(case.required_signal_codes == ["secrecy_isolation"] for case in isolation_cases) >= 6
+    assert len(collisions) >= 8
+
+
+def test_holdout_v0_7_prices_the_forwarding_vocabulary_with_own_account_moves() -> None:
+    # `receive_and_forward_money` 어휘를 넓히면 "월급 들어오면 적금으로 옮길게"
+    # 가 걸린다. 목적지가 남의 계좌인지 내 계좌인지가 유일한 차이다.
+    cases = load_holdout_cases(HOLDOUT_V0_7_PATH)
+    positives = [case for case in cases if case.is_fraud]
+    negatives = [case for case in cases if not case.is_fraud]
+
+    moves = ("넘겨", "옮겨", "빼서", "빼 줘", "돌려보내", "나눠 보내", "이체", "보낼", "보냈")
+
+    assert sum(
+        "money_mule_transfer" in case.expected_fraud_types for case in positives
+    ) >= 8
+    assert sum(any(m in case.text for m in moves) for case in negatives) >= 6
+
+
+def test_the_ceiling_metric_reports_null_for_sets_that_never_declared_one() -> None:
+    """재지 않은 것을 만점으로 적으면 그것이 곧 지어낸 근거다.
+
+    v0.1~v0.6 은 천장을 선언하지 않았다. 그 셋들의 `risk_ceiling_accuracy` 가
+    1.0 으로 나가면, 이번 수정이 여섯 개 셋을 통과한 것처럼 보인다. 통과한 것이
+    아니라 **재지 않은** 것이다.
+    """
+    without = evaluate_golden_set(load_holdout_cases(HOLDOUT_V0_6_PATH))
+    with_ceiling = evaluate_golden_set(load_holdout_cases(HOLDOUT_V0_7_PATH))
+
+    assert without["scenario_engine_v0_1"]["risk_ceiling_accuracy"] is None  # type: ignore[index]
+    measured = with_ceiling["scenario_engine_v0_1"]["risk_ceiling_accuracy"]  # type: ignore[index]
+    assert isinstance(measured, float)
+    assert 0.0 <= measured <= 1.0
+
+
+def test_a_ceiling_below_the_floor_is_a_typo_not_a_label() -> None:
+    payload = load_holdout_cases(HOLDOUT_V0_7_PATH)[0].model_dump()
+    payload["expected_min_risk"] = "high"
+    payload["expected_max_risk"] = "low"
+
+    with pytest.raises(ValueError, match="expected_max_risk"):
+        FraudGoldenCase.model_validate(payload)
+
+
+def test_an_undeclared_label_does_not_restate_what_an_old_measurement_measured() -> None:
+    """v0.7 이 라벨에 등급 천장을 더했다. 그 앞의 셋들은 하나도 안 움직여야 한다.
+
+    `normalized_dataset_sha256` 은 **어떤 사례와 라벨로 쟀는지**를 식별한다.
+    선택 필드를 하나 더했다고 옛 셋의 신원이 바뀌면, 이미 돈을 주고 받아 둔
+    판정 결과와 v0.1~v0.6 결과 파일의 출처 연결이 전부 끊어진다 - 문장도
+    라벨도 그대로인데. 그래서 **선언하지 않은 천장은 신원에 들어가지 않는다.**
+
+    아래 두 값은 v0.6 회차(`7688dad`)에 커밋된 결과 파일이 적고 있는 해시다.
+    손으로 옮겨 적은 상수가 아니라 그 파일에서 읽는다.
+    """
+    committed = json.loads(
+        Path("evaluation/results/fraud-holdout-v0.6.json").read_text(encoding="utf-8")
+    )
+
+    assert normalized_dataset_sha256(
+        load_holdout_cases(HOLDOUT_V0_6_PATH)
+    ) == committed["dataset"]["normalized_sha256"]
+
+
+def test_declaring_a_ceiling_does_change_the_identity_of_the_set_that_declares_it() -> None:
+    # 앞 테스트의 반대편이다. 천장을 선언한 셋에서까지 해시가 안 바뀌면, 그것은
+    # 라벨을 신원에서 통째로 빼 버린 것이고 v0.7 의 출처 연결이 거짓이 된다.
+    cases = load_holdout_cases(HOLDOUT_V0_7_PATH)
+    stripped = [
+        FraudGoldenCase.model_validate(
+            {**case.model_dump(), "expected_max_risk": None}
+        )
+        for case in cases
+    ]
+
+    assert normalized_dataset_sha256(cases) != normalized_dataset_sha256(stripped)
 
 
 def test_a_required_signal_must_be_one_the_response_can_actually_carry() -> None:

@@ -19,6 +19,12 @@ class SignalRule:
     # 동사만으로는 신호가 되지 않는 어휘다. "전달해"·"다시 보내"는 계약서에도
     # 쓴다. 목적어가 돈일 때만 자금 재전달이다.
     money_gated_keywords: tuple[str, ...] = ()
+    # 낱말 하나에 담기지 않는 어형이다. "돈을 빼서 다른 계좌로 넣어" 는
+    # "빼서" 와 "넣어" 사이에 목적지가 낀다. 붙여 적으면 그 어휘는 **어떤
+    # 실제 문장도 잡지 못한다** - v0.5 가 "빼서 넣어" 를 그렇게 적어 뒀고
+    # v0.6 `fh-446` 이 그대로 미탐이었다. 순서만 지키면 사이에 무엇이 오든
+    # 받는다. 켜지는 조건은 `money_gated_keywords` 와 같다. v0.7.
+    money_gated_sequences: tuple[tuple[str, ...], ...] = ()
     # 방 이름만으로는 신호가 되지 않는 어휘다. 단톡방·오픈채팅방·텔레그램은
     # 학부모 공지에도 워크샵 안내에도 쓴다. 같은 메시지 안에 **매매 맥락**이
     # 있어야 켠다. v0.6.
@@ -122,9 +128,49 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
     ),
     SignalRule(
         "secrecy_isolation",
-        ("아무에게도 말하지", "비밀로", "혼자 처리", "보안 유지", "통화를 끊지"),
+        # **비밀 유지는 정상이고, 확인 차단이 신호다.**
+        #
+        # 전 어휘는 `비밀로`·`보안 유지`·`혼자 처리` 같은 맨 낱말이었다.
+        # 회사 대외비 공지, 계약 NDA, 생일 파티 문자가 매일 쓰는 말이고,
+        # v0.7 동결 시점에 실제로 네 건(`fh-527`·`fh-528`·`fh-530`·
+        # `fh-531`)이 이 어휘로 켜져 있었다. 그동안은 등급만 올렸으니
+        # 눈에 안 띄었는데, 이 신호에 사기 유형을 붙이는 순간 네 건이
+        # 전부 **사기 판정**이 된다.
+        #
+        # 기밀 유지는 화제를 어떤 집단 안에 두는 일이다. 사기가 요구하는
+        # 것은 그것이 아니라 **제3자 확인의 봉쇄**이고, 그 어형은 둘 중
+        # 하나로 나타난다 - 금지의 대상이 전칭이거나(아무에게도·누구에게도·
+        # 주변에·가족에게도), 연락 창구를 보내는 쪽 하나로 좁히거나
+        # (통화를 끊지 마·저와만 연락). 어느 쪽도 정상 문장이 쓸 일이 없다.
+        #
+        # `혼자 처리` 는 **읽는 사람에게 시키는 형태**만 남긴다. 화자가
+        # 자기를 두고 하는 말(`혼자 처리할 수 있을 것 같아요`)은 요구가
+        # 아니다. 같은 낱말이 주어에 따라 갈린다.
+        (
+            "아무에게도 말하지",
+            "아무에게도 알리지",
+            "누구에게도 말",
+            "누구에게도 알리",
+            "누구에게도 보여",
+            "주변에 말하지",
+            "주변에는 알리지",
+            "주변에 알리지",
+            "가족에게도 알리",
+            "가족에게도 말",
+            "가족에게도 비밀",
+            "통화를 끊지",
+            "통화 끊지",
+            "전화 끊지",
+            "전화를 끊지",
+            "혼자 처리하셔",
+            "혼자 처리하세",
+            "혼자 조용히",
+            "저와만 연락",
+            "저에게만 연락",
+            "제게만 연락",
+        ),
         18,
-        "주변 확인을 막는 비밀 유지 요구",
+        "주변 확인을 막는 고립 요구",
     ),
     SignalRule(
         "familiar_person_claim",
@@ -384,13 +430,36 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         # 옮기나요" 같은 문장이 걸리지 않게 했다.
         # v0.5. "빼서 넣어"·"빼서 보내"는 재전달의 구어형이다. 금액 조건은
         # 그대로라 목적어가 돈일 때만 켜진다.
+        #
+        # v0.7. 세 가지를 바꿨다.
+        #
+        # 첫째, "넘겨"·"넘기" 가 통째로 없었다. held-out v0.3 `fh-138`
+        # ("들어온 돈은 그대로 다른 계좌로 넘겨 주시면 됩니다")이 그 구멍으로
+        # 미탐이었고 두 회차를 그대로 지나왔다.
+        #
+        # 둘째, "빼서 넣어"·"빼서 보내" 를 `money_gated_sequences` 로 옮겼다.
+        # 실제 문장은 그 사이에 목적지가 낀다(v0.6 `fh-446`). 붙여 적은 두
+        # 어휘는 두 회차 동안 **한 번도 켜진 적이 없다.**
+        #
+        # 셋째, **조건에 요구를 더했다.** 목적어만 보면 "자동이체로 걸어
+        # 뒀어" 의 "이체" 가 금액 조건을 채우고, "월급 들어오면 적금 계좌로
+        # 옮겨 놓을게" 가 자금 재전달 요구가 된다. 목적어는 이 문장이 돈
+        # 이야기라는 것만 말해 줄 뿐 **읽는 사람에게 시키는 말인지**는 말해
+        # 주지 않는다. 화자가 제 계좌 사이에서 옮기겠다는 것은 요구가 아니다.
+        # 맨 명사를 요구에 걸었던 것과 같은 이유이고, 위 두 확장이 어휘를
+        # 넓히는 만큼 이 조건 없이는 정상 문장을 함께 데려온다.
         money_gated_keywords=(
             "다시 보내",
             "전달해",
             "옮기",
             "옮겨",
-            "빼서 넣어",
-            "빼서 보내",
+            "넘겨",
+            "넘기",
+        ),
+        money_gated_sequences=(
+            ("빼서", "넣어"),
+            ("빼서", "보내"),
+            ("빼서", "이체"),
         ),
     ),
     SignalRule(
@@ -879,6 +948,38 @@ def _has_reader_demand(clauses: list[str]) -> bool:
     return False
 
 
+# 어휘에 바로 붙는 지시 어미. **전역 요구 목록에는 넣을 수 없는 것들이다** -
+# "확인하세요"·"참고하세요"가 전부 요구가 되어 버린다. 게이트가 이미 어휘를
+# 좁혀 둔 자리에서만 본다. v0.7.
+DIRECT_IMPERATIVE_ENDINGS = ("세요", "십시오", "시오", "시길", "시기 바랍")
+
+
+def _is_direct_imperative(text: str, keyword: str) -> bool:
+    """동사가 그 자리에서 명령형이면, 요구가 문장 다른 곳에 또 있을 필요가 없다.
+
+    개발셋 `fg-004`("자금을 지정 장소로 옮기세요")가 이것을 요구했다.
+    "옮기세요" 는 존댓말 부탁 목록에도 반말 목록에도 없고, 위험 행동 어근
+    목록에도 없다. 요구가 없는 것이 아니라 **요구가 동사에 붙어 있다.**
+    """
+    folded = keyword.casefold()
+    return any(folded + ending in text for ending in DIRECT_IMPERATIVE_ENDINGS)
+
+
+def _appears_in_order(text: str, sequence: tuple[str, ...]) -> bool:
+    """어형이 낱말 하나에 담기지 않을 때, 순서만 지키면 받는다.
+
+    사이에 무엇이 오는지는 묻지 않는다 - 거기 오는 것은 목적지이고,
+    목적지의 이름을 어휘로 적기 시작하면 끝이 없다.
+    """
+    cursor = 0
+    for part in sequence:
+        found = text.find(part.casefold(), cursor)
+        if found < 0:
+            return False
+        cursor = found + len(part)
+    return True
+
+
 def _mentions_money(clauses: list[str]) -> bool:
     return any(term in clause for clause in clauses for term in MONEY_OBJECT_TERMS)
 
@@ -953,10 +1054,26 @@ def _detect_by_rules(
                 )
             )
             or (
+                # v0.7. 목적어 **와** 요구를 함께 본다. 목적어만 보면
+                # 화자가 제 계좌 사이에서 옮기겠다는 말이 재전달 요구가
+                # 된다 - "자동이체" 의 "이체" 하나로 금액 조건이 찬다.
                 has_money
-                and any(
-                    keyword.casefold() in open_text
-                    for keyword in rule.money_gated_keywords
+                and (
+                    any(
+                        keyword.casefold() in open_text
+                        and (
+                            has_demand
+                            or _is_direct_imperative(open_text, keyword)
+                        )
+                        for keyword in rule.money_gated_keywords
+                    )
+                    or (
+                        has_demand
+                        and any(
+                            _appears_in_order(open_text, sequence)
+                            for sequence in rule.money_gated_sequences
+                        )
+                    )
                 )
             )
             or (

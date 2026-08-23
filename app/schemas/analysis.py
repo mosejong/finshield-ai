@@ -80,6 +80,7 @@ class AnalyzeResponse(BaseModel):
             "money_mule_transfer",
             "smishing_malware",
             "card_delivery_impersonation",
+            "isolation_coercion",
         ]
     ]
     summary: str

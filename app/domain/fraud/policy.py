@@ -203,6 +203,35 @@ HIGH_RISK_SIGNAL_COMBINATIONS: tuple[frozenset[str], ...] = (
     frozenset({"familiar_person_claim", "account_access_request"}),
     frozenset({"guaranteed_return_offer", "money_transfer_request"}),
     frozenset({"private_channel_invite", "money_transfer_request"}),
+    # v0.7. **기관은 자칭과 같은 메시지에서 넘겨 달라고 하지 않는다.**
+    #
+    # 자칭도 medium 을 세우고 민감 요구도 medium 을 세우는데, 둘이 함께
+    # 켜져도 medium 에서 멈춘다 - `max` 는 두 medium 을 high 로 만들지
+    # 않는다. 그래서 소진된 held-out 다섯 회차에 이 모양의 하한 미달이
+    # 15건 남아 있었다(v0.2 `fh-003`·`fh-005`·`fh-006`·`fh-008`·`fh-012`·
+    # `fh-014`, v0.3 `fh-102`~`fh-105`·`fh-110`, v0.4 `fh-237`,
+    # v0.6 `fh-415`·`fh-416`·`fh-418`~`fh-421`).
+    #
+    # 사례에서 짝을 세지 않았다. 짝은 `SENSITIVE_REQUEST_SIGNALS` 를 그대로
+    # 따른다 - 그 목록이 이미 '기관이 문자로 시키지 않는 요구'의 정의다.
+    # 어휘로 뽑은 링크도 같은 자리에 둔다. 진짜 기관은 단축 URL 로 보내지
+    # 않으므로 그것 자체가 요구다(`_detect_by_rules` 가 이미 그렇게 쓴다).
+    frozenset({"authority_impersonation", "credential_request"}),
+    frozenset({"authority_impersonation", "account_access_request"}),
+    frozenset({"authority_impersonation", "app_install_request"}),
+    frozenset({"authority_impersonation", "remote_control_request"}),
+    frozenset({"authority_impersonation", "receive_and_forward_money"}),
+    frozenset({"authority_impersonation", "card_delivery_claim"}),
+    frozenset({"authority_impersonation", "suspicious_link"}),
+    # 고립 요구도 기관이 하지 않는 요구다. v0.7 의 어휘 정리로 이 신호는
+    # 전칭 금지와 창구 봉쇄만 남았고, 둘 다 정상 안내가 쓸 일이 없다.
+    # v0.2 `fh-008`(수사 보안상 통화를 끊지 말고 가족에게도 비밀로 하라).
+    frozenset({"authority_impersonation", "secrecy_isolation"}),
+    # 자칭 조합과 같은 모양이 대출에도 하나 비어 있었다. `account_access_request`
+    # 짝만 있고 선입금 짝이 없다 - 대출 빙자 보증료 선입금은 이 목록이
+    # 처음부터 노린 것인데 v0.2 `fh-016`·`fh-019`, v0.3 `fh-139` 가 그대로
+    # 지나갔다.
+    frozenset({"loan_policy_offer", "money_transfer_request"}),
 )
 
 # 사용자에게 보이는 등급을 직접 결정하는 임계값이다.

@@ -13,6 +13,7 @@ from app.domain.fraud.policy import (
     STATE_MINIMUM_RISK,
     determine_risk_level,
 )
+from app.domain.fraud.signals import SENSITIVE_REQUEST_SIGNALS
 from app.schemas.analysis import RiskSignal, UserState
 
 
@@ -68,6 +69,37 @@ def test_high_risk_combinations_force_high(combination: frozenset[str]) -> None:
     """조합 규칙은 점수가 0이어도 high 로 올린다."""
     signals = [signal(code) for code in sorted(combination)]
     assert determine_risk_level(0, signals, UserState.RECEIVED_ONLY) == "high"
+
+
+@pytest.mark.parametrize("request_code", sorted(SENSITIVE_REQUEST_SIGNALS))
+def test_a_self_claimed_institution_plus_any_handover_demand_is_high(
+    request_code: str,
+) -> None:
+    """**기관은 자칭과 같은 메시지에서 넘겨 달라고 하지 않는다.**
+
+    조합 표를 사례에서 뽑지 않고 `SENSITIVE_REQUEST_SIGNALS` 에서 뽑았다는
+    사실을 이 테스트가 지킨다. 저 목록에 민감 요구를 새로 추가하면서 조합
+    표를 함께 손대지 않으면 여기서 깨진다 - 목록과 정책이 갈라지는 순간
+    "기관이 하지 않는 요구"라는 정의가 두 벌이 된다.
+    """
+    signals = [signal("authority_impersonation"), signal(request_code)]
+
+    assert determine_risk_level(0, signals, UserState.RECEIVED_ONLY) == "high"
+
+
+def test_a_self_claimed_institution_alone_is_still_only_medium() -> None:
+    """넓힌 것은 조합이지 자칭이 아니다.
+
+    자칭 하나만으로 high 로 올리면 기관 이름이 들어간 정상 안내가 전부
+    올라간다. held-out v0.7 의 정상 10건(`fh-511`~`fh-518` 계열)이 그것을
+    재고 있고, 천장은 그 자리에 있다.
+    """
+    assert (
+        determine_risk_level(
+            0, [signal("authority_impersonation")], UserState.RECEIVED_ONLY
+        )
+        == "medium"
+    )
 
 
 def test_partial_combination_does_not_force_high() -> None:

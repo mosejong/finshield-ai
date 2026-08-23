@@ -21,6 +21,10 @@ FRAUD_TYPES = (
     "money_mule_transfer",
     "smishing_malware",
     "card_delivery_impersonation",
+    # v0.7 동결 시점에는 엔진이 내지 못하는 유형이다. 그래도 여기 적는다 -
+    # 빠져 있으면 per-type 표에서 통째로 사라져, 동결 시점 f1 이 0.0 이라는
+    # 사실 자체가 기록되지 않는다. 출발점이 없으면 수정의 값도 없다.
+    "isolation_coercion",
 )
 
 
@@ -56,6 +60,7 @@ def evaluate_golden_set(
         "fraud_types": _fraud_type_metrics(cases, responses),
         "required_signal_coverage": _required_signal_coverage(cases, responses),
         "scenario_policy_accuracy": _scenario_policy_accuracy(cases, responses),
+        "risk_ceiling_accuracy": _risk_ceiling_accuracy(cases, responses),
         "required_action_coverage": _required_action_coverage(cases, responses),
         "evidence_coverage": _evidence_coverage(responses),
     }
@@ -398,6 +403,33 @@ def _scenario_policy_accuracy(
     return _ratio(correct, len(cases))
 
 
+def _risk_ceiling_accuracy(
+    cases: list[FraudGoldenCase], responses: list[AnalyzeResponse]
+) -> float | None:
+    """등급이 천장을 넘지 않았는가. 천장을 선언한 사례에서만 잰다.
+
+    `scenario_policy_accuracy` 는 바닥만 본다(`>=`). 그래서 등급을 올리는
+    수정은 그 지표에서 점수를 잃을 수 없고, 모든 문자를 high 로 찍는 엔진이
+    만점을 받는다. 이 지표가 그 반대편이다.
+
+    천장을 선언한 사례가 하나도 없으면 `None` 을 돌려준다. **1.0 이 아니다.**
+    재지 않은 것을 만점으로 적으면 v0.1~v0.6 결과 파일이 이 수정을 통과한
+    것처럼 보이는데, 그 셋들은 애초에 이것을 재지 않았다.
+    """
+    graded = [
+        (case, response)
+        for case, response in zip(cases, responses, strict=True)
+        if case.expected_max_risk is not None
+    ]
+    if not graded:
+        return None
+    correct = sum(
+        RISK_RANK[response.risk_level] <= RISK_RANK[case.expected_max_risk]
+        for case, response in graded
+    )
+    return _ratio(correct, len(graded))
+
+
 def _required_action_coverage(
     cases: list[FraudGoldenCase], responses: list[AnalyzeResponse]
 ) -> float:
@@ -486,9 +518,25 @@ def normalized_dataset_sha256(cases: list[FraudGoldenCase]) -> str:
     보낸 적도 채점에 쓴 적도 없다. 넣으면 이 필드를 추가한 것만으로 이미
     돈을 주고 받아 둔 판정 결과가 `stale` 이 된다 - 문장도 라벨도 그대로인데.
     파일이 섞이지 않는다는 보장은 `_validate_collection` 이 따로 한다.
+
+    **선언하지 않은 `expected_max_risk` 도 같은 이유로 뺀다.** v0.7 에서
+    등급 천장을 라벨에 더했는데, 그것만으로 v0.1~v0.6 과 개발셋의 해시가
+    전부 바뀌었다. 그 셋들의 문장도 라벨도 하나 안 움직였고 천장을 선언한
+    적도 없다 - 없는 라벨은 라벨이 아니므로 신원에 들어가지 않는다.
+    천장을 **선언한** 셋은 해시가 달라지는 것이 맞고, 그래야 그 셋의 출처
+    연결이 진짜다.
     """
     normalized = "\n".join(
-        case.model_dump_json(exclude_none=False, exclude={"held_out"})
+        case.model_dump_json(
+            exclude_none=False, exclude=_identity_excluded_fields(case)
+        )
         for case in cases
     ).encode("utf-8")
     return sha256(normalized).hexdigest()
+
+
+def _identity_excluded_fields(case: FraudGoldenCase) -> set[str]:
+    excluded = {"held_out"}
+    if case.expected_max_risk is None:
+        excluded.add("expected_max_risk")
+    return excluded
