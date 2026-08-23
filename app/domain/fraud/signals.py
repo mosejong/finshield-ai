@@ -16,6 +16,11 @@ class SignalRule:
     # 정상 문자에 매일 등장한다. 같은 메시지 안에 **읽는 사람을 향한 요구**가
     # 있어야 켠다. held-out v0.2 의 오탐 6건이 전부 이 구분을 안 해서 났다.
     demand_gated_keywords: tuple[str, ...] = ()
+    # 낱말 하나에 담기지 않는 **요구**다. 조건은 `demand_gated_keywords` 와
+    # 같고, 어휘의 모양만 다르다 - "계좌 조회 권한을 담당자에게 위임해" 는
+    # 세 조각이 사이에 다른 말을 끼고 순서대로 온다. 붙여 적으면 어떤 실제
+    # 문장도 잡지 못한다. v0.8.
+    demand_gated_sequences: tuple[tuple[str, ...], ...] = ()
     # 동사만으로는 신호가 되지 않는 어휘다. "전달해"·"다시 보내"는 계약서에도
     # 쓴다. 목적어가 돈일 때만 자금 재전달이다.
     money_gated_keywords: tuple[str, ...] = ()
@@ -36,6 +41,34 @@ class SignalRule:
     # 그래서 어휘는 **메시지 전체에서** 찾고(자칭은 끝난 일을 말하는 절에도
     # 들어간다), 조건은 다른 민감 요구 신호가 함께 켜졌는지로 본다. v0.6.
     request_gated_keywords: tuple[str, ...] = ()
+
+
+# 계좌 권한을 **사람에게 넘기라**는 요구다. held-out v0.7 `fh-508`
+# ("세무서 … 계좌 접근 권한을 담당자에게 위임해 주셔야 합니다")은 신호가
+# **하나도** 켜지지 않았다. `세무서` 는 다른 민감 요구가 있어야 켜지는
+# 조건부 자칭 어휘이고, `계좌 접근 권한` 은 어느 어휘에도 없었다. 두 게이트가
+# 서로를 기다린 것이다.
+#
+# 권한 위임 자체는 정상 제도다. 법인 계좌를 세무 대리인에게 맡기고, 부모
+# 계좌를 자녀가 대리 조회한다. 신호는 위임이 아니라 그 권한을 **누구에게**
+# 넘기라는 요구이고, 그래서 수령자 표현을 어휘에 함께 넣는다. "영업점에서
+# 위임장을 제출하셔야 합니다" 에는 수령자가 없다.
+#
+# 손으로 열다섯 줄을 적지 않고 곱한다. 손으로 적으면 조합 하나가 조용히
+# 빠지고, 빠진 것을 알아차릴 방법이 없다.
+_ACCOUNT_AUTHORITY_TERMS = ("계좌", "뱅킹", "통장")
+_AUTHORITY_HANDOVER_TERMS = (
+    "에게 위임",
+    "쪽으로 위임",
+    "에게 양도",
+    "넘겨",
+    "넘기",
+)
+ACCOUNT_AUTHORITY_SEQUENCES: tuple[tuple[str, ...], ...] = tuple(
+    (account, "권한", handover)
+    for account in _ACCOUNT_AUTHORITY_TERMS
+    for handover in _AUTHORITY_HANDOVER_TERMS
+)
 
 
 SIGNAL_RULES: tuple[SignalRule, ...] = (
@@ -350,6 +383,7 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         # "계좌번호" 는 v0.3 에서 새로 넣었다 - held-out v0.2 의 `fh-005` 가
         # 계좌번호를 요구하는데 어휘에 없어 통째로 빠졌다.
         demand_gated_keywords=("체크카드", "통장", "계좌번호"),
+        demand_gated_sequences=ACCOUNT_AUTHORITY_SEQUENCES,
     ),
     SignalRule(
         "app_install_request",
@@ -1080,9 +1114,15 @@ def _detect_by_rules(
             any(keyword.casefold() in normalized for keyword in rule.keywords)
             or (
                 has_demand
-                and any(
-                    keyword.casefold() in open_text
-                    for keyword in rule.demand_gated_keywords
+                and (
+                    any(
+                        keyword.casefold() in open_text
+                        for keyword in rule.demand_gated_keywords
+                    )
+                    or any(
+                        _appears_in_order(open_text, sequence)
+                        for sequence in rule.demand_gated_sequences
+                    )
                 )
             )
             or (

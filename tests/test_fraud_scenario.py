@@ -565,3 +565,49 @@ def test_a_real_prevention_notice_using_the_auxiliary_verb_stays_suppressed() ->
         body = analyze(text)
         assert body["fraud_types"] == [], text
         assert body["risk_level"] == "low", text
+
+
+# --- 계좌 권한을 넘기라는 요구 (2026-08-23) ---------------------------------
+
+
+def test_handing_account_authority_to_a_person_is_an_access_demand() -> None:
+    """두 게이트가 서로를 기다리면 신호는 하나도 켜지지 않는다.
+
+    held-out v0.7 `fh-508` 은 `세무서` 자칭과 계좌 권한 요구가 함께 있는데도
+    빈 응답이었다. 자칭 어휘는 **다른 민감 요구가 있어야** 켜지는 조건부이고,
+    계좌 권한 요구는 어느 어휘에도 없었다. 조건부 어휘를 무조건 켜는 쪽으로
+    옮기는 것이 아니라, 빠져 있던 요구를 어휘에 넣는 것이 답이다.
+    """
+    delegated = analyze(
+        "세무서 조사과입니다. 소명 자료 확인을 위해 계좌 접근 권한을 담당자에게 위임해 주셔야 합니다."
+    )
+    codes = {signal["code"] for signal in delegated["signals"]}
+    assert {"authority_impersonation", "account_access"} <= codes
+    assert delegated["risk_level"] == "high"
+
+    # 수령자 표현은 하나가 아니다.
+    for text in (
+        "인터넷뱅킹 이용 권한을 저희 쪽으로 위임해 주세요.",
+        "법인 계좌 조회 권한을 잠시 저에게 양도해 주시면 제가 정리하겠습니다.",
+        "계좌 접근 권한을 조사관에게 넘겨 주셔야 합니다.",
+    ):
+        assert "account_access" in {
+            signal["code"] for signal in analyze(text)["signals"]
+        }, text
+
+
+def test_delegating_account_authority_is_a_real_product_and_stays_quiet() -> None:
+    """넓히기의 값은 여기서 치러진다. 위임은 실재하는 제도다.
+
+    갈리는 자리는 위임이라는 낱말이 아니라 **수령자를 지목한 요구**다. 아래
+    문장에는 계좌도 권한도 위임도 다 있고, 넘겨받을 사람만 없다.
+    """
+    for text in (
+        "국민은행 안내입니다. 계좌 접근 권한 위임은 문자로 처리되지 않으며 반드시 영업점에서 위임장을 제출하셔야 합니다.",
+        "법인 계좌 조회 권한을 세무 대리인에게 위임하는 절차는 홈택스에서 직접 진행하실 수 있습니다.",
+        "이체 한도 변경 권한은 본인만 설정하실 수 있으며 타인에게 위임되지 않습니다.",
+        "그룹웨어 관리자 권한은 김 대리에게 위임해 두었습니다. 휴가 동안 결재 부탁드려요.",
+    ):
+        body = analyze(text)
+        assert body["fraud_types"] == [], text
+        assert body["risk_level"] == "low", text
