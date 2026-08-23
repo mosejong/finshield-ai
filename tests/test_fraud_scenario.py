@@ -527,3 +527,41 @@ def test_official_verification_notice_is_not_treated_as_impersonation() -> None:
         signal["code"] for signal in disguised["signals"]
     }
     assert disguised["risk_level"] != "low"
+
+
+# --- 예방 안내문 표지의 자리 (2026-08-23) -----------------------------------
+
+
+def test_the_auxiliary_verb_marker_does_not_cover_a_whole_word_that_contains_it() -> (
+    None
+):
+    """맨 `드리지 않` 은 보조용언 자리를 넘어가 문장 전체를 눌렀다.
+
+    이 표지가 있으면 그 절은 요구를 공급하지 못하고, 다른 표지가 없으면 메시지
+    전체가 예방 안내문으로 억제된다. 그런데 `말씀드리다`·`건드리다` 는 보조용언
+    구성이 아니라 한 낱말이다. **읽는 사람에게** 말하지 말라는 요구가 보내는
+    쪽의 서술로 읽혔다 - held-out v0.7 `fh-523` 이 그렇게 미탐이었고, held-out
+    v0.6 `fh-455`(사기)도 `건드리지 않` 하나로 같은 억제를 받고 있었다.
+    """
+    hidden_demand = analyze("부모님께는 말씀드리지 않는 게 좋겠습니다. 저와만 연락하세요.")
+    assert "secrecy_isolation" in {s["code"] for s in hidden_demand["signals"]}
+    assert hidden_demand["fraud_types"] == ["isolation_coercion"]
+
+    untouched = analyze("계약 조건은 건드리지 않고 그대로 갱신됩니다.")
+    assert untouched["fraud_types"] == []
+
+
+def test_a_real_prevention_notice_using_the_auxiliary_verb_stays_suppressed() -> None:
+    """좁히기의 값은 이쪽에서 치러진다.
+
+    억제를 풀면 진짜 예방 안내문이 사기로 올라간다. `입력해 드리지 않습니다` 는
+    보조용언 구성이고, 그 절에 `입력` 이라는 요구 표지가 들어 있어서 억제가
+    풀리는 순간 기관 사칭 + 인증정보 요구로 판정된다.
+    """
+    for text in (
+        "국민은행입니다. 저희 직원은 어떤 경우에도 OTP를 대신 입력해 드리지 않습니다.",
+        "저희는 고객님 계좌에서 먼저 출금해 드리지 않습니다.",
+    ):
+        body = analyze(text)
+        assert body["fraud_types"] == [], text
+        assert body["risk_level"] == "low", text

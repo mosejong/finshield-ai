@@ -614,13 +614,35 @@ PREVENTION_STATEMENT_MARKERS = (
     # 않는다.** 맨 형태를 넣으면 "소명하지 않으면 계좌가 동결됩니다"·"인증을
     # 완료하지 않으면 카드가 정지됩니다" 같은 협박문이 통째로 예방 안내문이
     # 된다. 협박은 부정형을 조건절로 쓰고, 안내문은 종결형으로 쓴다.
-    "드리지 않",
+    # v0.8. 맨 "드리지 않" 은 여기서 빠지고 아래
+    # `PREVENTION_STATEMENT_PATTERNS` 로 내려간다. 이유는 그 목록에 적었다.
     "안내하지 않",
     "추천하지 않",
     "권유하지 않",
     "운영하지 않",
     "보장하지 않",
     "발송하지 않",
+)
+
+# v0.8. 맨 "드리지 않" 은 **보조용언 자리를 넘어간다.**
+#
+# `말씀드리지 않는 게 좋겠습니다`(held-out v0.7 `fh-523`, 고립 요구)와
+# `건드리지 않`(held-out v0.6 `fh-455`, 사기 사례)이 그 낱말 하나로 예방
+# 안내문이 됐다. 앞의 것은 **읽는 사람에게** 말하지 말라는 요구이지 보내는
+# 쪽이 무엇을 안 한다는 서술이 아니다.
+#
+# 보조용언 `드리다` 는 앞말과 띄어 쓰거나 연결어미(-아/-어/-해/-려/-워)
+# 뒤에 붙는다. `말씀드리다`·`건드리다` 는 보조용언 구성이 아니라 한 낱말이다.
+# 그 자리를 정규식으로 못 박는다 - 목록의 원칙("어간이 붙은 서술형만")과
+# 같은 이야기이고, 다만 어간이 아니라 **앞자리**를 본다.
+#
+# 완벽한 구분은 아니다. `안내드리지 않으며`·`전화드리지 않으며` 는 이 패턴에
+# 걸리지 않는다. 둘 다 정상 안내문에 나오지만 그런 문장은 `묻지 않`·`요구하지
+# 않` 같은 표지를 함께 달고 있고, 표지는 하나만 맞으면 된다. 놓치는 쪽이
+# 억제를 **덜** 하는 방향이라 안전한 실패다.
+PREVENTION_STATEMENT_PATTERNS = (
+    re.compile(r"(?:^|[\s,·\"'()\[\]])드리지\s*않"),
+    re.compile(r"(?:해|려|어|아|워)\s*드리지\s*않"),
 )
 
 # 이미 일어난 일을 말하는 절이다. **요구도 아니고 요구의 대상도 아니다.**
@@ -901,6 +923,12 @@ def _demanding_clauses(normalized: str) -> list[str]:
         clause
         for clause in _clauses(normalized)
         if not any(marker in clause for marker in PREVENTION_STATEMENT_MARKERS)
+        # v0.8. 정규식 표지도 같은 자격이다. 목록에서만 빼고 여기서 빼지 않으면
+        # 예방 서술 절이 요구를 공급하게 되고, 그 순간 진짜 예방 안내문이
+        # 사기로 올라간다 - held-out v0.8 `fh-632` 가 정확히 그렇게 깨졌다.
+        and not any(
+            pattern.search(clause) for pattern in PREVENTION_STATEMENT_PATTERNS
+        )
     ]
 
 
@@ -1021,9 +1049,13 @@ def _is_prevention_notice(normalized: str) -> bool:
     갖췄지만 그 절은 창구 안내라 애초에 세지 않는다. 두 수정은 함께여야
     한다 - 하나만 넣으면 정상 예방 문자가 무너진다.
     """
-    has_marker = any(
-        phrase in normalized for phrase in OFFICIAL_VERIFICATION_PHRASES
-    ) or any(marker in normalized for marker in PREVENTION_STATEMENT_MARKERS)
+    has_marker = (
+        any(phrase in normalized for phrase in OFFICIAL_VERIFICATION_PHRASES)
+        or any(marker in normalized for marker in PREVENTION_STATEMENT_MARKERS)
+        or any(
+            pattern.search(normalized) for pattern in PREVENTION_STATEMENT_PATTERNS
+        )
+    )
     if not has_marker:
         return False
     return not _has_reader_demand(_open_clauses(normalized))
