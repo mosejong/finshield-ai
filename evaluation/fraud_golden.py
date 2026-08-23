@@ -35,12 +35,25 @@ GOLDEN_SET_PATH = Path(__file__).with_name("data") / "fraud_golden_v0.1.jsonl"
 # 보므로 모든 문자를 high 로 찍는 엔진이 만점을 받는다. v0.7 이 천장을
 # 들고 온 이유이고, 천장은 **정상 문장에만** 선언한다. 사기를 필요 이상으로
 # 높게 매기는 것은 결함이 아니라 신중함이다.
+#
+# v0.8 은 v0.7 이 남긴 일곱 건의 미탐을 고치기 전에 얼린 셋이고, 방향이
+# v0.6·v0.7 과 또 다르다. 이번 여섯 수정은 **거의 전부 넓히기**다 - 권한
+# 위임 요구, 재전달 어형, 예방 표지 축소, 지검 자칭, 높임 어미 송금. 넓히기의
+# 값은 정상 문장에서 치러지므로, 이 셋의 안전장치는 부정 사례를 **넓히기가
+# 깨질 바로 그 자리에** 놓는 것이다. 권한 위임은 실재하는 제도이고("위임장을
+# 지참하고 지점에 방문하셔야"), 정산금은 관리비 고지서의 낱말이며, 지검은
+# 지명이 붙은 고유명사라 일상 대화에 그대로 나온다.
+#
+# 예방 표지를 **좁히는** 수정 하나가 섞여 있다(`드리지 않`). 좁히기의 값은
+# 사기가 아니라 정상 쪽에서 치러진다 - 억제를 풀면 진짜 예방 안내문이
+# 사기로 올라간다. 그래서 정상 36건 중 여섯 건이 진짜 예방 안내문이다.
 HOLDOUT_V0_2_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.2.jsonl"
 HOLDOUT_V0_3_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.3.jsonl"
 HOLDOUT_V0_4_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.4.jsonl"
 HOLDOUT_V0_5_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.5.jsonl"
 HOLDOUT_V0_6_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.6.jsonl"
 HOLDOUT_V0_7_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.7.jsonl"
+HOLDOUT_V0_8_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.8.jsonl"
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",

@@ -16,6 +16,11 @@ class SignalRule:
     # 정상 문자에 매일 등장한다. 같은 메시지 안에 **읽는 사람을 향한 요구**가
     # 있어야 켠다. held-out v0.2 의 오탐 6건이 전부 이 구분을 안 해서 났다.
     demand_gated_keywords: tuple[str, ...] = ()
+    # 낱말 하나에 담기지 않는 **요구**다. 조건은 `demand_gated_keywords` 와
+    # 같고, 어휘의 모양만 다르다 - "계좌 조회 권한을 담당자에게 위임해" 는
+    # 세 조각이 사이에 다른 말을 끼고 순서대로 온다. 붙여 적으면 어떤 실제
+    # 문장도 잡지 못한다. v0.8.
+    demand_gated_sequences: tuple[tuple[str, ...], ...] = ()
     # 동사만으로는 신호가 되지 않는 어휘다. "전달해"·"다시 보내"는 계약서에도
     # 쓴다. 목적어가 돈일 때만 자금 재전달이다.
     money_gated_keywords: tuple[str, ...] = ()
@@ -36,6 +41,34 @@ class SignalRule:
     # 그래서 어휘는 **메시지 전체에서** 찾고(자칭은 끝난 일을 말하는 절에도
     # 들어간다), 조건은 다른 민감 요구 신호가 함께 켜졌는지로 본다. v0.6.
     request_gated_keywords: tuple[str, ...] = ()
+
+
+# 계좌 권한을 **사람에게 넘기라**는 요구다. held-out v0.7 `fh-508`
+# ("세무서 … 계좌 접근 권한을 담당자에게 위임해 주셔야 합니다")은 신호가
+# **하나도** 켜지지 않았다. `세무서` 는 다른 민감 요구가 있어야 켜지는
+# 조건부 자칭 어휘이고, `계좌 접근 권한` 은 어느 어휘에도 없었다. 두 게이트가
+# 서로를 기다린 것이다.
+#
+# 권한 위임 자체는 정상 제도다. 법인 계좌를 세무 대리인에게 맡기고, 부모
+# 계좌를 자녀가 대리 조회한다. 신호는 위임이 아니라 그 권한을 **누구에게**
+# 넘기라는 요구이고, 그래서 수령자 표현을 어휘에 함께 넣는다. "영업점에서
+# 위임장을 제출하셔야 합니다" 에는 수령자가 없다.
+#
+# 손으로 열다섯 줄을 적지 않고 곱한다. 손으로 적으면 조합 하나가 조용히
+# 빠지고, 빠진 것을 알아차릴 방법이 없다.
+_ACCOUNT_AUTHORITY_TERMS = ("계좌", "뱅킹", "통장")
+_AUTHORITY_HANDOVER_TERMS = (
+    "에게 위임",
+    "쪽으로 위임",
+    "에게 양도",
+    "넘겨",
+    "넘기",
+)
+ACCOUNT_AUTHORITY_SEQUENCES: tuple[tuple[str, ...], ...] = tuple(
+    (account, "권한", handover)
+    for account in _ACCOUNT_AUTHORITY_TERMS
+    for handover in _AUTHORITY_HANDOVER_TERMS
+)
 
 
 SIGNAL_RULES: tuple[SignalRule, ...] = (
@@ -124,6 +157,15 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "세무서",
             "신용정보원",
             "금융결제원",
+            # v0.8. held-out v0.7 `fh-561`("서울중앙지검입니다 …")이 이
+            # 낱말 하나로 미탐이었다. 위쪽 무조건 켜는 목록에 `검찰` 이
+            # 있지만 `지검` 은 그 부분 문자열이 아니다.
+            #
+            # 무조건 켜는 층이 아니라 **이쪽**에 넣는다. `검찰` 은 자칭에
+            # 거의 전용으로 쓰이는 반면 `지검` 은 지명이 붙은 고유명사라
+            # 일상 대화에 그대로 나온다 - "서울중앙지검에서 수사 결과
+            # 발표했대". 민감한 요구가 함께 있을 때만 자칭이다.
+            "지검",
         ),
     ),
     SignalRule(
@@ -350,6 +392,7 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         # "계좌번호" 는 v0.3 에서 새로 넣었다 - held-out v0.2 의 `fh-005` 가
         # 계좌번호를 요구하는데 어휘에 없어 통째로 빠졌다.
         demand_gated_keywords=("체크카드", "통장", "계좌번호"),
+        demand_gated_sequences=ACCOUNT_AUTHORITY_SEQUENCES,
     ),
     SignalRule(
         "app_install_request",
@@ -403,6 +446,17 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "이체해",
             "이체 바랍니다",
             "이체를 진행",
+            # v0.8. 어미 하나로 유형이 통째로 비었다. held-out v0.7 `fh-562`
+            # ("수수료로 먼저 입금하셔야 합니다")는 선입금 표지를 다 갖췄는데
+            # `advance_fee_demand` 가 `money_transfer_request` 를 전제로 해서
+            # 유형이 서지 못했다. 어휘에는 `입금해` 만 있었고 실제 사기 문자는
+            # 높임 명령형을 쓴다.
+            #
+            # 여기서도 지시형만이다. `입금하셨` 같은 과거형은 넣지 않는다 -
+            # 그것은 요구가 아니라 확인이다.
+            "입금하셔",
+            "송금하셔",
+            "이체하셔",
         ),
         35,
         "송금 요구",
@@ -455,6 +509,12 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "옮겨",
             "넘겨",
             "넘기",
+            # v0.8. held-out v0.7 `fh-542`·`fh-543` 이 요구했다. "돌려보내"
+            # 는 반환처럼 들리지만 지정한 곳은 원래 보낸 사람이 아니고,
+            # "나눠 보내" 는 인출책 모집에서 금액을 쪼갤 때 쓴다. 둘 다
+            # 목적어 조건은 그대로다.
+            "돌려보내",
+            "나눠 보내",
         ),
         money_gated_sequences=(
             ("빼서", "넣어"),
@@ -614,13 +674,35 @@ PREVENTION_STATEMENT_MARKERS = (
     # 않는다.** 맨 형태를 넣으면 "소명하지 않으면 계좌가 동결됩니다"·"인증을
     # 완료하지 않으면 카드가 정지됩니다" 같은 협박문이 통째로 예방 안내문이
     # 된다. 협박은 부정형을 조건절로 쓰고, 안내문은 종결형으로 쓴다.
-    "드리지 않",
+    # v0.8. 맨 "드리지 않" 은 여기서 빠지고 아래
+    # `PREVENTION_STATEMENT_PATTERNS` 로 내려간다. 이유는 그 목록에 적었다.
     "안내하지 않",
     "추천하지 않",
     "권유하지 않",
     "운영하지 않",
     "보장하지 않",
     "발송하지 않",
+)
+
+# v0.8. 맨 "드리지 않" 은 **보조용언 자리를 넘어간다.**
+#
+# `말씀드리지 않는 게 좋겠습니다`(held-out v0.7 `fh-523`, 고립 요구)와
+# `건드리지 않`(held-out v0.6 `fh-455`, 사기 사례)이 그 낱말 하나로 예방
+# 안내문이 됐다. 앞의 것은 **읽는 사람에게** 말하지 말라는 요구이지 보내는
+# 쪽이 무엇을 안 한다는 서술이 아니다.
+#
+# 보조용언 `드리다` 는 앞말과 띄어 쓰거나 연결어미(-아/-어/-해/-려/-워)
+# 뒤에 붙는다. `말씀드리다`·`건드리다` 는 보조용언 구성이 아니라 한 낱말이다.
+# 그 자리를 정규식으로 못 박는다 - 목록의 원칙("어간이 붙은 서술형만")과
+# 같은 이야기이고, 다만 어간이 아니라 **앞자리**를 본다.
+#
+# 완벽한 구분은 아니다. `안내드리지 않으며`·`전화드리지 않으며` 는 이 패턴에
+# 걸리지 않는다. 둘 다 정상 안내문에 나오지만 그런 문장은 `묻지 않`·`요구하지
+# 않` 같은 표지를 함께 달고 있고, 표지는 하나만 맞으면 된다. 놓치는 쪽이
+# 억제를 **덜** 하는 방향이라 안전한 실패다.
+PREVENTION_STATEMENT_PATTERNS = (
+    re.compile(r"(?:^|[\s,·\"'()\[\]])드리지\s*않"),
+    re.compile(r"(?:해|려|어|아|워)\s*드리지\s*않"),
 )
 
 # 이미 일어난 일을 말하는 절이다. **요구도 아니고 요구의 대상도 아니다.**
@@ -764,6 +846,11 @@ MONEY_OBJECT_TERMS = (
     "수익금",
     "수수료",
     "이체",
+    # v0.8. held-out v0.7 `fh-539`("저희 정산금이 … 지정 계좌로 옮겨
+    # 주세요")가 이 낱말 하나로 미탐이었다. 정산금은 관리비 고지서에도
+    # 쓰이지만, 이 목록은 **혼자서는 아무것도 켜지 않는다** - 재전달 동사와
+    # 요구가 같은 절에 함께 있어야 조건이 찬다.
+    "정산금",
 )
 
 # 매매 맥락. 방 이름을 신호로 승격시킬지 가르는 어휘다.
@@ -901,6 +988,12 @@ def _demanding_clauses(normalized: str) -> list[str]:
         clause
         for clause in _clauses(normalized)
         if not any(marker in clause for marker in PREVENTION_STATEMENT_MARKERS)
+        # v0.8. 정규식 표지도 같은 자격이다. 목록에서만 빼고 여기서 빼지 않으면
+        # 예방 서술 절이 요구를 공급하게 되고, 그 순간 진짜 예방 안내문이
+        # 사기로 올라간다 - held-out v0.8 `fh-632` 가 정확히 그렇게 깨졌다.
+        and not any(
+            pattern.search(clause) for pattern in PREVENTION_STATEMENT_PATTERNS
+        )
     ]
 
 
@@ -965,6 +1058,42 @@ def _is_direct_imperative(text: str, keyword: str) -> bool:
     return any(folded + ending in text for ending in DIRECT_IMPERATIVE_ENDINGS)
 
 
+# 금지 명령의 어미다. `-지 마세요`·`-지 말고`.
+#
+# **부정문 전체가 아니라 금지형만이다.** `-지 않` 은 여기 없다. "보내지
+# 않으면 계좌가 정지됩니다" 는 협박이고 요구의 다른 얼굴이다. 반대로
+# 서술형 부정("저희는 보내지 않습니다")은 이미 `PREVENTION_STATEMENT_MARKERS`
+# 가 절 단위로 걷어 낸다. 여기서 걸러야 하는 것은 **읽는 사람에게 하지
+# 말라고 하는 말**뿐이다.
+PROHIBITION_ENDINGS = ("지 마", "지말", "지 말")
+
+
+def _is_prohibited(text: str, keyword: str) -> bool:
+    """그 동사가 금지 명령 안에 있으면 요구가 아니다.
+
+    v0.8. "나눠 보내" 를 어휘에 넣자 "회비는 나눠 보내지 마시고 총무 계좌로
+    한 번에 보내 주세요"(held-out v0.8 `fh-625`)가 자금 재전달 요구가 됐다.
+    같은 문장이 그 행동을 **하지 말라고** 하고 있다.
+
+    어휘를 좁혀서 피하지 않는다. "나눠 보내 주" 처럼 어미를 붙여 적으면 그
+    어휘는 그 어미만 잡고, 다음 회차에 다른 어미로 다시 뚫린다. 금지형은
+    어휘의 문제가 아니라 **자리의 문제**라서 자리에서 본다.
+    """
+    folded = keyword.casefold()
+    cursor = 0
+    saw_occurrence = False
+    while True:
+        found = text.find(folded, cursor)
+        if found < 0:
+            break
+        saw_occurrence = True
+        tail = text[found + len(folded) :]
+        if not any(tail.startswith(ending) for ending in PROHIBITION_ENDINGS):
+            return False
+        cursor = found + len(folded)
+    return saw_occurrence
+
+
 def _appears_in_order(text: str, sequence: tuple[str, ...]) -> bool:
     """어형이 낱말 하나에 담기지 않을 때, 순서만 지키면 받는다.
 
@@ -980,8 +1109,47 @@ def _appears_in_order(text: str, sequence: tuple[str, ...]) -> bool:
     return True
 
 
-def _mentions_money(clauses: list[str]) -> bool:
-    return any(term in clause for clause in clauses for term in MONEY_OBJECT_TERMS)
+# 목적지로 지목된 계좌다. **돈을 가리키는 말의 대안이지 추가가 아니다.**
+#
+# held-out v0.7 `fh-542`("거래처 대금이 착오 입금되었습니다. … 회수 계좌로
+# 돌려보내 주셔야 합니다")에서 돈을 가리키는 말은 전부 완료 보고 절에
+# 들어 있었다. 열린 절에 남은 것은 목적지 계좌뿐이다. 사기 문자는 받은
+# 사실을 과거형으로 적고 요구만 현재형으로 남긴다.
+#
+# `계좌` 만으로는 안 된다 - "제 계좌가 바뀌었어요" 도 계좌를 말한다. 조사를
+# 함께 본다. 계좌가 **어디로 라는 자리**에 있을 때만 목적지다.
+MONEY_DESTINATION_TERMS = (
+    "계좌로",
+    "계좌에",
+    "통장으로",
+    "통장에",
+    "계좌번호로",
+)
+
+
+def _mentions_money(clauses: list[str], normalized: str) -> bool:
+    """이 절들이 돈 이야기인가.
+
+    돈을 가리키는 말이 열린 절에 있으면 그것으로 끝난다. 목적지 계좌는
+    **혼자서는 부족하다** - 메시지 어딘가에 돈을 가리키는 말이 있어야 한다.
+
+    v0.8. 목적지를 대안으로 들인 뒤 held-out v0.5 `fh-317`("계좌가 묶였어.
+    일단 안전계좌로 옮겨 놔")이 자금 재전달 요구가 됐다. 이 문장에는 받은
+    돈이 없다. 피해자 제 돈을 옮기라는 안전계좌 이체 요구이고, 이름이
+    `money_transfer_request` 에서 `money_mule` 로 바뀌면 사용자에게 나가는
+    행동도 "받은 돈을 보내지 마세요" 로 어긋난다.
+
+    목적지를 들인 이유는 fh-542 처럼 **돈을 가리키는 말이 완료 보고 절에
+    들어가 걸러진** 경우였다("거래처 대금이 착오 입금되었습니다 … 회수
+    계좌로 돌려보내 주셔야 합니다"). 그 절이 걸러졌을 뿐 메시지에는 남아
+    있다. 그래서 조건을 절이 아니라 메시지 전체에 건다 - 넓힌 자리는
+    그대로 두고, 목적지 하나로 돈 이야기를 **만들어 내는** 것만 막는다.
+    """
+    if any(term in clause for clause in clauses for term in MONEY_OBJECT_TERMS):
+        return True
+    return any(
+        term in clause for clause in clauses for term in MONEY_DESTINATION_TERMS
+    ) and any(term in normalized for term in MONEY_OBJECT_TERMS)
 
 
 def _mentions_investment(clauses: list[str]) -> bool:
@@ -1021,9 +1189,13 @@ def _is_prevention_notice(normalized: str) -> bool:
     갖췄지만 그 절은 창구 안내라 애초에 세지 않는다. 두 수정은 함께여야
     한다 - 하나만 넣으면 정상 예방 문자가 무너진다.
     """
-    has_marker = any(
-        phrase in normalized for phrase in OFFICIAL_VERIFICATION_PHRASES
-    ) or any(marker in normalized for marker in PREVENTION_STATEMENT_MARKERS)
+    has_marker = (
+        any(phrase in normalized for phrase in OFFICIAL_VERIFICATION_PHRASES)
+        or any(marker in normalized for marker in PREVENTION_STATEMENT_MARKERS)
+        or any(
+            pattern.search(normalized) for pattern in PREVENTION_STATEMENT_PATTERNS
+        )
+    )
     if not has_marker:
         return False
     return not _has_reader_demand(_open_clauses(normalized))
@@ -1040,7 +1212,7 @@ def _detect_by_rules(
     open_clauses = _open_clauses(normalized)
     open_text = " ".join(open_clauses)
     has_demand = _has_reader_demand(open_clauses)
-    has_money = _mentions_money(open_clauses)
+    has_money = _mentions_money(open_clauses, normalized)
     has_investment = _mentions_investment(open_clauses)
 
     def object_gated_match(rule: SignalRule) -> bool:
@@ -1048,9 +1220,15 @@ def _detect_by_rules(
             any(keyword.casefold() in normalized for keyword in rule.keywords)
             or (
                 has_demand
-                and any(
-                    keyword.casefold() in open_text
-                    for keyword in rule.demand_gated_keywords
+                and (
+                    any(
+                        keyword.casefold() in open_text
+                        for keyword in rule.demand_gated_keywords
+                    )
+                    or any(
+                        _appears_in_order(open_text, sequence)
+                        for sequence in rule.demand_gated_sequences
+                    )
                 )
             )
             or (
@@ -1061,6 +1239,7 @@ def _detect_by_rules(
                 and (
                     any(
                         keyword.casefold() in open_text
+                        and not _is_prohibited(open_text, keyword)
                         and (
                             has_demand
                             or _is_direct_imperative(open_text, keyword)

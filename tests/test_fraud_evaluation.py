@@ -23,6 +23,7 @@ from evaluation.fraud_golden import (
     HOLDOUT_V0_5_PATH,
     HOLDOUT_V0_6_PATH,
     HOLDOUT_V0_7_PATH,
+    HOLDOUT_V0_8_PATH,
     SIGNAL_CODES,
     FraudGoldenCase,
     _validate_collection,
@@ -118,6 +119,7 @@ HOLDOUT_SIZES = {
     HOLDOUT_V0_5_PATH: 72,
     HOLDOUT_V0_6_PATH: 72,
     HOLDOUT_V0_7_PATH: 72,
+    HOLDOUT_V0_8_PATH: 72,
 }
 
 
@@ -159,6 +161,12 @@ def test_holdout_set_is_labelled_and_separated_from_the_development_set(
         (HOLDOUT_V0_4_PATH, HOLDOUT_V0_7_PATH),
         (HOLDOUT_V0_5_PATH, HOLDOUT_V0_7_PATH),
         (HOLDOUT_V0_6_PATH, HOLDOUT_V0_7_PATH),
+        (HOLDOUT_V0_2_PATH, HOLDOUT_V0_8_PATH),
+        (HOLDOUT_V0_3_PATH, HOLDOUT_V0_8_PATH),
+        (HOLDOUT_V0_4_PATH, HOLDOUT_V0_8_PATH),
+        (HOLDOUT_V0_5_PATH, HOLDOUT_V0_8_PATH),
+        (HOLDOUT_V0_6_PATH, HOLDOUT_V0_8_PATH),
+        (HOLDOUT_V0_7_PATH, HOLDOUT_V0_8_PATH),
     ],
 )
 def test_holdout_versions_do_not_overlap_each_other(
@@ -438,6 +446,84 @@ def test_holdout_v0_7_prices_the_forwarding_vocabulary_with_own_account_moves() 
         "money_mule_transfer" in case.expected_fraud_types for case in positives
     ) >= 8
     assert sum(any(m in case.text for m in moves) for case in negatives) >= 6
+
+
+def test_holdout_v0_8_covers_the_taxonomy_and_keeps_the_ceiling_discipline() -> None:
+    cases = load_holdout_cases(HOLDOUT_V0_8_PATH)
+    negatives = [case for case in cases if not case.is_fraud]
+    positives = [case for case in cases if case.is_fraud]
+    covered = {t for case in cases for t in case.expected_fraud_types}
+
+    assert covered == set(FRAUD_TYPES)
+    assert len(negatives) == 36
+    # 천장은 정상 문장에만. 사기를 필요 이상으로 높게 매기는 것은 결함이 아니다.
+    assert all(case.expected_max_risk is not None for case in negatives)
+    assert all(case.expected_max_risk is None for case in positives)
+
+
+def test_holdout_v0_8_prices_five_widenings_where_each_one_can_break() -> None:
+    """**넓히는 수정의 값은 정상 문장이 치른다. 아무 정상 문장이 아니라 그 자리의 것이다.**
+
+    이번 회차 여섯 수정 중 다섯이 넓히기다. 부정 사례를 72건 아무거나 모아
+    두면 오탐률은 0 으로 나오고 대가는 측정 밖에 남는다. 값을 치를 문장은
+    **넓힌 어휘를 정상적으로 쓰는 문장**이어야 한다.
+
+    - 권한 위임: 계좌 권한 위임은 실재하는 제도다(위임장·대리인·영업점).
+    - 재전달: '정산금' 은 관리비 고지서의 낱말이고 '돌려보내' 는 환불의 낱말이다.
+    - 지검 자칭: '지검' 은 지명이 붙은 고유명사라 일상 대화에 그대로 나온다.
+    - 높임 어미 송금: 정상적인 청구도 "계좌로 입금하셔야" 라고 쓴다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V0_8_PATH)
+    positives = [case for case in cases if case.is_fraud]
+    negatives = [case for case in cases if not case.is_fraud]
+
+    def counting(pool, *terms: str) -> int:
+        return sum(any(term in case.text for term in terms) for case in pool)
+
+    # 1) 권한 위임 요구. 수령자 표현이 있는 쪽과 없는 쪽.
+    assert counting(positives, "위임", "양도", "넘겨") >= 5
+    assert counting(negatives, "위임", "양도", "넘겨") >= 5
+
+    # 2) 재전달 어형과 돈 목적어 확장.
+    assert counting(positives, "정산금", "돌려보내", "나눠 보내", "옮겨") >= 5
+    assert counting(negatives, "정산금", "돌려보내", "나눠 보내", "옮겨") >= 5
+
+    # 3) 지검 자칭. 무조건 켜는 층에 넣으면 정상 대화가 걸린다.
+    assert counting(positives, "지검") >= 3
+    assert counting(negatives, "지검") >= 1
+
+    # 4) 높임 어미 송금 요구. 정상 청구도 같은 어미를 쓴다.
+    assert counting(positives, "입금하셔", "송금하셔", "이체하셔") >= 3
+    assert counting(negatives, "입금하셔", "입금해") >= 2
+
+
+def test_holdout_v0_8_prices_the_prevention_marker_narrowing_on_both_sides() -> None:
+    """예방 표지를 좁히는 수정은 **양쪽에서** 값을 치른다.
+
+    `드리지 않` 이라는 맨 표지가 '말씀드리지 않'·'건드리지 않' 까지 덮는다.
+    좁히면 고립 요구가 살아나지만(양성), 좁히기가 지나치면 진짜 예방
+    안내문이 사기로 올라간다(음성). 두 자리를 같은 셋에 넣어야 수정이
+    어느 쪽으로 미끄러졌는지 보인다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V0_8_PATH)
+    positives = [case for case in cases if case.is_fraud]
+    negatives = [case for case in cases if not case.is_fraud]
+
+    # 억제에 눌려 있는 고립 요구.
+    isolation = [
+        case for case in positives if "isolation_coercion" in case.expected_fraud_types
+    ]
+    assert len(isolation) >= 5
+    assert sum("드리지" in case.text for case in isolation) >= 2
+
+    # 억제가 계속 살아 있어야 하는 진짜 예방 안내문.
+    prevention = [
+        case
+        for case in negatives
+        if any(m in case.text for m in ("않습니다", "않으며", "없습니다", "일은 없"))
+    ]
+    assert len(prevention) >= 8
+    assert sum("드리지" in case.text for case in negatives) >= 2
 
 
 def test_the_ceiling_metric_reports_null_for_sets_that_never_declared_one() -> None:

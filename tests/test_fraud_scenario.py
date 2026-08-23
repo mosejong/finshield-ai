@@ -3,6 +3,7 @@ import socket
 import pytest
 from fastapi.testclient import TestClient
 
+from app.domain.fraud.signals import baseline_score, detect_legacy_signals
 from app.domain.fraud.sources import load_official_sources
 from app.main import app
 
@@ -37,7 +38,7 @@ def action_codes(body: dict) -> set[str]:
 def test_authority_impersonation_and_transfer_is_high_risk() -> None:
     body = analyze("검찰 수사관입니다. 지금 바로 안전계좌로 송금해 주세요.")
 
-    assert body["risk_score"] == 12
+    assert body["risk_score"] == 70
     assert body["risk_level"] == "high"
     assert "authority_impersonation" in body["fraud_types"]
     assert {"STOP_CONTACT", "VERIFY_OFFICIAL_CHANNEL", "CONTACT_1394"} <= action_codes(
@@ -52,7 +53,7 @@ def test_low_interest_loan_and_check_card_request() -> None:
         "loan_policy_impersonation",
         "account_access_request",
     } <= set(body["fraud_types"])
-    assert body["risk_score"] == 35
+    assert body["risk_score"] == 70
     assert body["risk_level"] == "high"
     assert "DO_NOT_SHARE_ACCESS" in action_codes(body)
 
@@ -60,7 +61,7 @@ def test_low_interest_loan_and_check_card_request() -> None:
 def test_otp_request_alone_is_not_low_risk() -> None:
     body = analyze("확인을 위해 OTP를 알려 주세요.")
 
-    assert body["risk_score"] == 25
+    assert body["risk_score"] == 35
     assert body["risk_level"] == "medium"
     assert [signal["code"] for signal in body["signals"]] == ["credential"]
 
@@ -68,7 +69,7 @@ def test_otp_request_alone_is_not_low_risk() -> None:
 def test_app_install_and_remote_control() -> None:
     body = analyze("이 APK 앱 설치 후 원격제어를 허용해 주세요.")
 
-    assert body["risk_score"] == 30
+    assert body["risk_score"] == 70
     assert body["risk_level"] == "high"
     assert "smishing_malware" in body["fraud_types"]
     assert {"DO_NOT_INSTALL", "CONTACT_KISA_118"} <= action_codes(body)
@@ -77,7 +78,7 @@ def test_app_install_and_remote_control() -> None:
 def test_receive_and_forward_money() -> None:
     body = analyze("계좌로 입금받고 다른 곳으로 다시 보내 주세요.")
 
-    assert body["risk_score"] == 35
+    assert body["risk_score"] == 70
     assert body["risk_level"] == "high"
     assert "money_mule_transfer" in body["fraud_types"]
     assert [signal["code"] for signal in body["signals"]] == ["money_mule"]
@@ -87,7 +88,7 @@ def test_receive_and_forward_money() -> None:
 def test_card_delivery_claim() -> None:
     body = analyze("신청한 카드가 발급되어 오늘 카드 배송 예정입니다.")
 
-    assert body["risk_score"] == 0
+    assert body["risk_score"] == 35
     assert "card_delivery_impersonation" in body["fraud_types"]
     assert body["risk_level"] == "medium"
     assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
@@ -256,7 +257,10 @@ def test_same_text_changes_policy_by_explicit_user_state() -> None:
     received = analyze("안녕하세요.", "received_only")
     transferred = analyze("안녕하세요.", "transferred_money")
 
-    assert received["risk_score"] == transferred["risk_score"] == 0
+    # legacy 가중치는 양쪽 다 0 이다. 그래도 발표되는 점수는 다르다 - 등급을
+    # 올린 것이 사용자 상태이지 문장이 아니어도, 등급이 high 면 점수도 high 다.
+    assert received["risk_score"] == 0
+    assert transferred["risk_score"] == 70
     assert received["risk_level"] == "low"
     assert transferred["risk_level"] == "high"
     assert "CONTACT_FINANCIAL_INSTITUTION" in action_codes(transferred)
@@ -276,7 +280,7 @@ def test_urgent_state_guarantees_high_risk_action(
 ) -> None:
     body = analyze("짧은 안내입니다.", state)
 
-    assert body["risk_score"] == 0
+    assert body["risk_score"] == 70
     assert body["risk_level"] == "high"
     assert required_action in action_codes(body)
 
@@ -344,7 +348,7 @@ def test_normal_https_url_does_not_create_fraud_signal() -> None:
 def test_risky_lexical_url_features_are_detected_without_fetch(url: str) -> None:
     body = analyze("링크를 확인해 주세요.", url=url)
 
-    assert body["risk_score"] == 0
+    assert body["risk_score"] == 35
     assert body["risk_level"] == "medium"
     assert "suspicious_link" in {signal["code"] for signal in body["signals"]}
     assert "smishing_malware" in body["fraud_types"]
@@ -368,13 +372,18 @@ def test_risky_lexical_url_features_are_detected_without_fetch(url: str) -> None
 def test_legacy_baseline_exact_scores(
     text: str, expected_score: int, expected_code: str | None
 ) -> None:
-    body = analyze(text)
+    """v0.8 부터 **채점기를 직접** 부른다.
 
-    assert body["risk_score"] == expected_score
+    이 표가 못 박으려는 것은 `LEGACY_RULES` 의 가중치이지 응답에 실리는
+    숫자가 아니었다. 응답 쪽 점수는 이제 등급이 함의하는 띠까지 올라가므로
+    (`score_floor_for_level`) API 를 거치면 가중치를 잴 수 없다. 재려던
+    것을 그대로 재려면 거치지 않으면 된다.
+    """
+    signals = detect_legacy_signals(text)
+
+    assert baseline_score(signals) == expected_score
     if expected_code is not None:
-        matching = [
-            signal for signal in body["signals"] if signal["code"] == expected_code
-        ]
+        matching = [signal for signal in signals if signal.code == expected_code]
         assert len(matching) == 1
 
 
@@ -527,3 +536,311 @@ def test_official_verification_notice_is_not_treated_as_impersonation() -> None:
         signal["code"] for signal in disguised["signals"]
     }
     assert disguised["risk_level"] != "low"
+
+
+# --- 예방 안내문 표지의 자리 (2026-08-23) -----------------------------------
+
+
+def test_the_auxiliary_verb_marker_does_not_cover_a_whole_word_that_contains_it() -> (
+    None
+):
+    """맨 `드리지 않` 은 보조용언 자리를 넘어가 문장 전체를 눌렀다.
+
+    이 표지가 있으면 그 절은 요구를 공급하지 못하고, 다른 표지가 없으면 메시지
+    전체가 예방 안내문으로 억제된다. 그런데 `말씀드리다`·`건드리다` 는 보조용언
+    구성이 아니라 한 낱말이다. **읽는 사람에게** 말하지 말라는 요구가 보내는
+    쪽의 서술로 읽혔다 - held-out v0.7 `fh-523` 이 그렇게 미탐이었고, held-out
+    v0.6 `fh-455`(사기)도 `건드리지 않` 하나로 같은 억제를 받고 있었다.
+    """
+    hidden_demand = analyze("부모님께는 말씀드리지 않는 게 좋겠습니다. 저와만 연락하세요.")
+    assert "secrecy_isolation" in {s["code"] for s in hidden_demand["signals"]}
+    assert hidden_demand["fraud_types"] == ["isolation_coercion"]
+
+    untouched = analyze("계약 조건은 건드리지 않고 그대로 갱신됩니다.")
+    assert untouched["fraud_types"] == []
+
+
+def test_a_real_prevention_notice_using_the_auxiliary_verb_stays_suppressed() -> None:
+    """좁히기의 값은 이쪽에서 치러진다.
+
+    억제를 풀면 진짜 예방 안내문이 사기로 올라간다. `입력해 드리지 않습니다` 는
+    보조용언 구성이고, 그 절에 `입력` 이라는 요구 표지가 들어 있어서 억제가
+    풀리는 순간 기관 사칭 + 인증정보 요구로 판정된다.
+    """
+    for text in (
+        "국민은행입니다. 저희 직원은 어떤 경우에도 OTP를 대신 입력해 드리지 않습니다.",
+        "저희는 고객님 계좌에서 먼저 출금해 드리지 않습니다.",
+    ):
+        body = analyze(text)
+        assert body["fraud_types"] == [], text
+        assert body["risk_level"] == "low", text
+
+
+# --- 계좌 권한을 넘기라는 요구 (2026-08-23) ---------------------------------
+
+
+def test_handing_account_authority_to_a_person_is_an_access_demand() -> None:
+    """두 게이트가 서로를 기다리면 신호는 하나도 켜지지 않는다.
+
+    held-out v0.7 `fh-508` 은 `세무서` 자칭과 계좌 권한 요구가 함께 있는데도
+    빈 응답이었다. 자칭 어휘는 **다른 민감 요구가 있어야** 켜지는 조건부이고,
+    계좌 권한 요구는 어느 어휘에도 없었다. 조건부 어휘를 무조건 켜는 쪽으로
+    옮기는 것이 아니라, 빠져 있던 요구를 어휘에 넣는 것이 답이다.
+    """
+    delegated = analyze(
+        "세무서 조사과입니다. 소명 자료 확인을 위해 계좌 접근 권한을 담당자에게 위임해 주셔야 합니다."
+    )
+    codes = {signal["code"] for signal in delegated["signals"]}
+    assert {"authority_impersonation", "account_access"} <= codes
+    assert delegated["risk_level"] == "high"
+
+    # 수령자 표현은 하나가 아니다.
+    for text in (
+        "인터넷뱅킹 이용 권한을 저희 쪽으로 위임해 주세요.",
+        "법인 계좌 조회 권한을 잠시 저에게 양도해 주시면 제가 정리하겠습니다.",
+        "계좌 접근 권한을 조사관에게 넘겨 주셔야 합니다.",
+    ):
+        assert "account_access" in {
+            signal["code"] for signal in analyze(text)["signals"]
+        }, text
+
+
+def test_delegating_account_authority_is_a_real_product_and_stays_quiet() -> None:
+    """넓히기의 값은 여기서 치러진다. 위임은 실재하는 제도다.
+
+    갈리는 자리는 위임이라는 낱말이 아니라 **수령자를 지목한 요구**다. 아래
+    문장에는 계좌도 권한도 위임도 다 있고, 넘겨받을 사람만 없다.
+    """
+    for text in (
+        "국민은행 안내입니다. 계좌 접근 권한 위임은 문자로 처리되지 않으며 반드시 영업점에서 위임장을 제출하셔야 합니다.",
+        "법인 계좌 조회 권한을 세무 대리인에게 위임하는 절차는 홈택스에서 직접 진행하실 수 있습니다.",
+        "이체 한도 변경 권한은 본인만 설정하실 수 있으며 타인에게 위임되지 않습니다.",
+        "그룹웨어 관리자 권한은 김 대리에게 위임해 두었습니다. 휴가 동안 결재 부탁드려요.",
+    ):
+        body = analyze(text)
+        assert body["fraud_types"] == [], text
+        assert body["risk_level"] == "low", text
+
+
+# --- 받은 돈을 다시 보내라는 요구 (2026-08-23) ------------------------------
+
+
+def test_forwarding_is_caught_when_the_money_word_sits_in_a_closed_clause() -> None:
+    """사기 문자는 받은 사실을 과거형으로 적고 요구만 현재형으로 남긴다.
+
+    held-out v0.7 `fh-542`("거래처 대금이 착오 입금되었습니다. … 회수 계좌로
+    돌려보내 주셔야 합니다")에서 돈을 가리키는 말은 전부 완료 보고 절에
+    있었다. 완료 보고 절은 요구도 요구의 대상도 공급하지 않으므로, 열린 절에
+    남은 단서는 **목적지로 지목된 계좌** 하나뿐이다.
+    """
+    for text in (
+        "거래처 대금이 착오 입금되었습니다. 회수 전용 계좌로 돌려보내 주셔야 처리가 완료됩니다.",
+        "저희 회사 정산금이 고객님 계좌로 잘못 입금되었습니다. 확인하시고 아래 지정 계좌로 옮겨 주세요.",
+        "받으신 금액 중 절반은 아래 계좌로 나눠 보내 주세요.",
+    ):
+        body = analyze(text, state="received_unknown_money")
+        assert "money_mule" in {s["code"] for s in body["signals"]}, text
+        assert body["fraud_types"] == ["money_mule_transfer"], text
+
+
+def test_the_destination_account_replaces_the_money_word_it_does_not_add_to_it() -> (
+    None
+):
+    # 목적지 계좌를 대안으로 둔 값이다. `계좌` 만 보면 "제 계좌가 바뀌었어요"
+    # 가 걸리므로 조사까지 함께 본다. 아래 두 문장에는 목적지 계좌도 있고
+    # 요구도 있지만 재전달 동사가 없다.
+    for text in (
+        "제 주거래 계좌가 바뀌었어요. 앞으로는 새 계좌로 보내 주세요.",
+        "정산금 지급일 안내입니다. 계좌 정보가 변경되신 분은 담당자에게 알려 주세요.",
+    ):
+        assert analyze(text)["fraud_types"] == [], text
+
+
+def test_a_verb_inside_a_prohibition_is_not_a_demand() -> None:
+    """같은 문장이 그 행동을 하지 말라고 하고 있다.
+
+    "나눠 보내" 를 어휘에 넣자 held-out v0.8 `fh-625` 가 자금 재전달 요구로
+    뒤집혔다. 어휘를 어미까지 붙여 좁히면 다음 어미로 다시 뚫린다. 금지형은
+    어휘의 문제가 아니라 자리의 문제다.
+    """
+    for text in (
+        "회비는 나눠 보내지 마시고 총무 계좌로 한 번에 보내 주세요.",
+        "돈은 절대 다른 계좌로 옮겨 주지 말고 은행에 먼저 문의하세요.",
+    ):
+        assert analyze(text)["fraud_types"] == [], text
+
+    # 금지형만 뺀다. 조건절 부정은 협박이고 요구의 다른 얼굴이라 살아 있어야 한다.
+    threat = analyze(
+        "입금된 금액을 오늘까지 아래 계좌로 옮겨 주지 않으면 형사 고발됩니다.",
+        state="received_unknown_money",
+    )
+    assert threat["risk_level"] == "high"
+
+
+# --- 지검 자칭 (2026-08-23) --------------------------------------------------
+
+
+def test_a_district_prosecutors_office_can_be_impersonated_too() -> None:
+    # held-out v0.7 `fh-561`("서울중앙지검입니다 …")이 낱말 하나로 미탐이었다.
+    # 무조건 켜는 목록에 `검찰` 이 있지만 `지검` 은 그 부분 문자열이 아니다.
+    body = analyze(
+        "서울남부지검 수사팀입니다. 귀하 명의 계좌가 대포통장으로 등록되어 안전계좌로 자금을 이체하셔야 합니다."
+    )
+    assert "authority_impersonation" in {s["code"] for s in body["signals"]}
+    assert body["risk_level"] == "high"
+
+
+def test_a_place_name_in_the_news_is_not_a_self_claim() -> None:
+    """`지검` 을 무조건 켜는 층에 넣지 않은 이유다.
+
+    `검찰` 은 자칭에 거의 전용으로 쓰이지만 `지검` 은 지명이 붙은 고유명사라
+    일상 대화에 그대로 나온다. 민감한 요구가 함께 있을 때만 자칭이다.
+    """
+    for text in (
+        "뉴스 봤어? 서울중앙지검에서 그 사건 수사 결과 발표했대.",
+        "지검 앞에서 만나기로 했어. 2시까지 갈게.",
+    ):
+        body = analyze(text)
+        assert body["signals"] == [], text
+        assert body["risk_level"] == "low", text
+
+
+# --- 높임 명령형 송금 요구 (2026-08-23) --------------------------------------
+
+
+def test_an_honorific_imperative_is_still_a_transfer_demand() -> None:
+    """어미 하나로 유형이 통째로 비었다.
+
+    held-out v0.7 `fh-562`("지급 전 수수료로 먼저 입금하셔야 합니다")는
+    선입금 표지를 다 갖췄는데도 유형이 서지 못했다. `advance_fee_demand` 는
+    `money_transfer_request` 를 전제로 하고, 그 어휘에는 `입금해` 만 있었다.
+    """
+    body = analyze("당첨을 축하드립니다. 지급 전 제세공과금 10%를 먼저 입금하셔야 절차가 진행됩니다.")
+    assert "money_transfer_request" in {s["code"] for s in body["signals"]}
+    assert body["fraud_types"] == ["advance_fee_demand"]
+
+    for text in (
+        "나머지 수익금을 출금하시려면 수수료를 먼저 송금하셔야 합니다.",
+        "열람 예치금을 먼저 이체하셔야 처리됩니다.",
+    ):
+        assert "advance_fee_demand" in analyze(text)["fraud_types"], text
+
+
+def test_a_legitimate_invoice_uses_the_same_ending_and_stays_below_high() -> None:
+    """넓히기의 값은 여기서 치러진다. 정상 청구도 계좌와 기한을 말한다.
+
+    등급이 medium 까지 오르는 것은 이 회차가 감수한 값이다 - 송금 요구는
+    실제로 있고, 그것이 사기라는 말은 아니다. 넘으면 안 되는 선은 high 와
+    사기 유형이다.
+    """
+    body = analyze(
+        "관리사무소입니다. 8월 관리비는 25일까지 아래 계좌로 입금하셔야 연체료가 발생하지 않습니다."
+    )
+    assert body["fraud_types"] == []
+    assert body["risk_level"] != "high"
+
+    # 과거형은 요구가 아니라 확인이다.
+    confirmation = analyze("어제 입금하셨는지 확인 부탁드립니다.")
+    assert "money_transfer_request" not in {s["code"] for s in confirmation["signals"]}
+
+
+# --- 점수와 등급이 같은 것을 가리킨다 (2026-08-23) ---------------------------
+
+
+def test_a_high_verdict_never_ships_with_a_zero_score() -> None:
+    """원래 결함이다.
+
+    점수는 `LEGACY_RULES` 의 가중치만 더하고, 등급은 canonical 신호와 사용자
+    상태까지 본다. 그래서 **화면에 "높음" 과 "0점" 이 나란히** 실렸다. 읽는
+    사람은 둘 중 어느 쪽을 믿어야 하는지 알 수 없고, 둘 다 못 믿게 된다.
+
+    등급을 점수에서 다시 계산하는 방향은 택하지 않았다. 그러면 여섯 회차에
+    걸쳐 쌓은 canonical 판단과 상태 하한이 전부 legacy 가중치 표로 되돌아간다.
+    """
+    body = analyze("짧은 안내입니다.", "transferred_money")
+
+    assert body["risk_level"] == "high"
+    assert body["risk_score"] >= 70
+
+
+def test_the_published_score_always_sits_in_the_band_its_level_names() -> None:
+    """불변식. 어느 쪽으로도 어긋나지 않는다.
+
+    `determine_risk_level` 은 점수 띠에서 출발해 **올리기만** 한다. 그래서
+    원래도 `점수 띠 <= 등급` 은 성립했다 - 어긋나는 방향은 한쪽뿐이었다.
+    바닥을 깔면 `등급 <= 점수 띠` 도 성립해서 둘이 정확히 같아진다.
+    """
+    corpus = [
+        ("내일 오전 10시에 회의실에서 만나요.", "received_only"),
+        ("오늘까지 처리해 주세요.", "received_only"),
+        ("확인을 위해 OTP를 알려 주세요.", "received_only"),
+        ("검찰 수사관입니다. 지금 바로 안전계좌로 송금해 주세요.", "received_only"),
+        ("신청한 카드가 발급되어 오늘 카드 배송 예정입니다.", "received_only"),
+        ("짧은 안내입니다.", "installed_app"),
+        (
+            "오늘까지 인증번호와 체크카드를 주고 앱 설치 후 입금받고 다시 보내 주세요.",
+            "shared_account_access",
+        ),
+    ]
+
+    def band(score: int) -> str:
+        if score >= 70:
+            return "high"
+        return "medium" if score >= 35 else "low"
+
+    for text, state in corpus:
+        body = analyze(text, state)
+        assert band(body["risk_score"]) == body["risk_level"], (text, state)
+
+
+def test_flooring_the_score_never_moves_the_level() -> None:
+    """바닥은 등급을 정한 **뒤에** 깔린다. 자기 자신을 근거로 삼지 않는다.
+
+    순서가 뒤집히면 점수 12 짜리 문장이 상태 때문에 high 가 되고, 올라간 70 이
+    다음 계산에서 다시 high 를 만드는 순환이 생긴다. 지금은 등급이 상태와
+    신호만으로 정해지므로 legacy 가중치가 0 이든 100 이든 같은 등급이 나온다.
+    """
+    quiet = analyze("짧은 안내입니다.", "transferred_money")
+    loud = analyze("검찰 수사관입니다. 지금 바로 안전계좌로 송금해 주세요.", "transferred_money")
+
+    assert quiet["risk_level"] == loud["risk_level"] == "high"
+    # legacy 가중치는 0 과 12 로 다르지만 둘 다 바닥 아래라 같은 70 이 된다.
+    assert quiet["risk_score"] == loud["risk_score"] == 70
+
+
+def test_a_score_above_the_floor_is_left_alone() -> None:
+    body = analyze("오늘까지 인증번호와 체크카드를 주고 앱 설치 후 입금받고 다시 보내 주세요.")
+
+    assert body["risk_level"] == "high"
+    assert body["risk_score"] == 100
+
+
+# --- 목적지 계좌는 혼자서 돈 이야기를 만들지 않는다 (2026-08-23) --------------
+
+
+def test_a_destination_account_alone_does_not_make_it_a_forwarding_demand() -> None:
+    """안전계좌 이체 요구는 자금 재전달 요구가 아니다.
+
+    받은 돈이 없다. 피해자 제 돈을 옮기라는 요구이고, 이름이 `money_mule` 로
+    바뀌면 사용자에게 나가는 행동도 "받은 돈을 보내지 마세요" 로 어긋난다.
+    held-out v0.5 `fh-317` 이 목적지 어휘를 들인 뒤 그렇게 뒤집혔다.
+    """
+    body = analyze("검찰 수사 때문에 계좌가 묶였어. 일단 안전계좌로 옮겨 놔. 끝나면 돌려받는 거니까 걱정 안 해도 돼.")
+
+    codes = {signal["code"] for signal in body["signals"]}
+    assert "money_transfer_request" in codes
+    assert "money_mule" not in codes
+    assert "money_mule_transfer" not in body["fraud_types"]
+    assert body["risk_level"] == "high"
+
+
+def test_a_destination_still_counts_when_the_money_word_was_filtered_out() -> None:
+    """넓힌 자리는 그대로다. 좁힌 것은 **만들어 내는 것**뿐이다.
+
+    돈을 가리키는 말이 완료 보고 절에 들어가 걸러지면 열린 절에는 목적지만
+    남는다. 그 절이 걸러졌을 뿐 메시지에는 남아 있으므로 조건은 찬다.
+    """
+    body = analyze("거래처 대금이 착오 입금되었습니다. 회수 계좌로 돌려보내 주셔야 합니다.")
+
+    assert "money_mule" in {signal["code"] for signal in body["signals"]}
+    assert "money_mule_transfer" in body["fraud_types"]
