@@ -666,3 +666,31 @@ def test_a_verb_inside_a_prohibition_is_not_a_demand() -> None:
         state="received_unknown_money",
     )
     assert threat["risk_level"] == "high"
+
+
+# --- 지검 자칭 (2026-08-23) --------------------------------------------------
+
+
+def test_a_district_prosecutors_office_can_be_impersonated_too() -> None:
+    # held-out v0.7 `fh-561`("서울중앙지검입니다 …")이 낱말 하나로 미탐이었다.
+    # 무조건 켜는 목록에 `검찰` 이 있지만 `지검` 은 그 부분 문자열이 아니다.
+    body = analyze(
+        "서울남부지검 수사팀입니다. 귀하 명의 계좌가 대포통장으로 등록되어 안전계좌로 자금을 이체하셔야 합니다."
+    )
+    assert "authority_impersonation" in {s["code"] for s in body["signals"]}
+    assert body["risk_level"] == "high"
+
+
+def test_a_place_name_in_the_news_is_not_a_self_claim() -> None:
+    """`지검` 을 무조건 켜는 층에 넣지 않은 이유다.
+
+    `검찰` 은 자칭에 거의 전용으로 쓰이지만 `지검` 은 지명이 붙은 고유명사라
+    일상 대화에 그대로 나온다. 민감한 요구가 함께 있을 때만 자칭이다.
+    """
+    for text in (
+        "뉴스 봤어? 서울중앙지검에서 그 사건 수사 결과 발표했대.",
+        "지검 앞에서 만나기로 했어. 2시까지 갈게.",
+    ):
+        body = analyze(text)
+        assert body["signals"] == [], text
+        assert body["risk_level"] == "low", text
