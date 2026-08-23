@@ -34,6 +34,14 @@ class SignalRule:
     # 학부모 공지에도 워크샵 안내에도 쓴다. 같은 메시지 안에 **매매 맥락**이
     # 있어야 켠다. v0.6.
     investment_gated_keywords: tuple[str, ...] = ()
+    # **그 낱말이 요구의 대상이 아니라 고발의 대상으로 나오는 자리다.**
+    #
+    # "귀하 명의로 대포통장이 개설되었습니다" 는 통장을 달라는 말이 아니라
+    # 이미 벌어진 일로 겁을 주는 말이다. 요구 게이트는 메시지 안 아무 데나
+    # 요구가 있으면 열리므로, 뒤에 붙은 "안전계좌로 이체하셔야" 하나로 앞
+    # 절의 고발 문구가 요구 대상이 되어 버린다. 그 자리를 지운 본문에서
+    # 대상을 찾는다 - 진짜 요구는 고발 문구 밖에 따로 적혀 있다. v0.9.
+    accusation_contexts: tuple[str, ...] = ()
     # **요구의 대상이 아니라 보내는 쪽의 정체를 가리키는 어휘다.**
     #
     # 위 세 게이트와 조건의 모양이 다르다. 저쪽은 '이 명사가 요구의 대상인가'를
@@ -393,6 +401,17 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         # 계좌번호를 요구하는데 어휘에 없어 통째로 빠졌다.
         demand_gated_keywords=("체크카드", "통장", "계좌번호"),
         demand_gated_sequences=ACCOUNT_AUTHORITY_SEQUENCES,
+        # 기관 사칭 문자는 "귀하 명의로 대포통장이 개설되어" 로 겁을 준 다음
+        # 돈을 요구한다. 통장은 그 문장에서 요구 대상이 아니라 고발 대상이다.
+        # 계좌·접근수단 요구로 세면 유형이 하나 더 붙고, `urgency_pressure`
+        # 짝(v0.9)까지 걸려 고발문이 요구문과 같은 등급으로 올라간다.
+        accusation_contexts=(
+            "대포통장",
+            "대포 통장",
+            "통장이 범죄",
+            "계좌가 범죄",
+            "통장이 대포",
+        ),
     ),
     SignalRule(
         "app_install_request",
@@ -1216,17 +1235,24 @@ def _detect_by_rules(
     has_investment = _mentions_investment(open_clauses)
 
     def object_gated_match(rule: SignalRule) -> bool:
+        # 고발 문구는 대상 탐색에서만 지운다. 요구가 있었다는 사실
+        # (`has_demand`)도, 다른 신호가 이 문장을 보는 눈도 그대로다 -
+        # 고발이 사기의 표지가 아니라는 말이 아니라, 고발당한 통장이
+        # **달라고 한 통장은 아니라는** 말이다.
+        object_text = open_text
+        for phrase in rule.accusation_contexts:
+            object_text = object_text.replace(phrase, " ")
         return (
             any(keyword.casefold() in normalized for keyword in rule.keywords)
             or (
                 has_demand
                 and (
                     any(
-                        keyword.casefold() in open_text
+                        keyword.casefold() in object_text
                         for keyword in rule.demand_gated_keywords
                     )
                     or any(
-                        _appears_in_order(open_text, sequence)
+                        _appears_in_order(object_text, sequence)
                         for sequence in rule.demand_gated_sequences
                     )
                 )

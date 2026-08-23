@@ -250,6 +250,36 @@ def test_an_urgent_normal_notice_naming_a_bankbook_stays_low() -> None:
     assert body["risk_level"] == "low"
 
 
+def test_an_accusation_about_a_bankbook_is_not_a_demand_for_one() -> None:
+    """대포통장이 개설되었다는 통보는 통장을 달라는 말이 아니다.
+
+    요구 게이트는 메시지 안 아무 데나 요구가 있으면 열린다. 그래서 뒤에 붙은
+    "이체하셔야" 하나로 앞 절의 고발 문구가 요구 대상이 되어 계좌·접근수단
+    요구가 하나 더 붙었다. 겁을 주는 문장과 실제로 내놓으라는 문장은 사용자가
+    해야 할 일이 다르다 - 앞은 확인, 뒤는 거절이다.
+    """
+    body = analyze(
+        "서울중앙지검 수사관입니다. 귀하 명의로 대포통장이 개설되어 즉시 안전계좌로 이체하셔야 합니다."
+    )
+
+    assert "account_access_request" not in body["fraud_types"]
+    assert "authority_impersonation" in body["fraud_types"]
+    # 좁히기가 등급까지 깎으면 손해다. 고발은 여전히 사기의 표지다.
+    assert body["risk_level"] == "high"
+
+
+def test_a_real_bankbook_demand_from_the_same_sender_keeps_the_type() -> None:
+    # 같은 자칭, 같은 낱말. 달라진 것은 통장이 고발 대상인지 요구 대상인지뿐이다.
+    # 이 짝이 없으면 위 테스트는 계좌·접근수단 요구를 통째로 없애는 수정도
+    # 통과시킨다.
+    body = analyze(
+        "서울중앙지검 수사관입니다. 수사 협조를 위해 사용 중인 통장과 체크카드를 보내 주십시오."
+    )
+
+    assert "account_access_request" in body["fraud_types"]
+    assert body["risk_level"] == "high"
+
+
 def test_a_demand_from_nobody_in_particular_does_not_send_the_user_to_a_desk() -> None:
     """확인 행동은 그 메시지에 창구가 있을 때만 공식 창구를 가리킨다.
 
