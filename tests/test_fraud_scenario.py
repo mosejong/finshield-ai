@@ -229,6 +229,27 @@ def test_victim_self_report_mentioning_a_leading_room_does_not_fire_the_invite()
     }
 
 
+def test_a_threat_followed_by_a_demand_is_high_without_any_self_claim() -> None:
+    """불이익을 예고해 놓고 접근수단을 달라고 하면 자칭이 없어도 high 다.
+
+    재촉은 점수만 올리고 등급 하한을 세우지 않는다. 그래서 요구가 세운
+    medium 하나만 남아 등급이 거기서 멈췄다 - 정작 거절하기 가장 어려운
+    조합이 그 모양이다.
+    """
+    body = analyze("즉시 확인하지 않으면 계좌가 압류됩니다. 인증번호를 알려 주셔야 취소됩니다.")
+
+    assert body["risk_level"] == "high"
+
+
+def test_an_urgent_normal_notice_naming_a_bankbook_stays_low() -> None:
+    # 올리기의 값은 천장에서 치러진다. 기한이 급한 정상 안내가 통장·카드를
+    # 입에 올리기만 해도 올라가면 이 수정은 손해다.
+    body = analyze("오늘까지 서류를 제출하지 않으시면 심사가 자동 취소됩니다. 제출은 홈페이지에서만 받습니다.")
+
+    assert body["fraud_types"] == []
+    assert body["risk_level"] == "low"
+
+
 def test_a_demand_from_nobody_in_particular_does_not_send_the_user_to_a_desk() -> None:
     """확인 행동은 그 메시지에 창구가 있을 때만 공식 창구를 가리킨다.
 

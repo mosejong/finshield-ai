@@ -305,6 +305,17 @@ HIGH_RISK_SIGNAL_COMBINATIONS: tuple[frozenset[str], ...] = (
     # 처음부터 노린 것인데 v0.2 `fh-016`·`fh-019`, v0.3 `fh-139` 가 그대로
     # 지나갔다.
     frozenset({"loan_policy_offer", "money_transfer_request"}),
+    # v0.9. **불이익을 예고해 놓고 접근수단을 달라고 하면 자칭이 없어도
+    # high 다.** 재촉은 점수만 12 올리고 등급 하한을 세우지 않으므로, 요구가
+    # 세운 medium 하나만 남아 등급이 거기서 멈춘다 - 정지·압류·회수를
+    # 앞세워 인증번호나 통장을 받아 내는 문장이 이 모양이고, 그것이 요구를
+    # 거절하기 가장 어렵게 만드는 조합이다.
+    #
+    # 위 조합들과 달리 이 짝에는 자칭이 없다. 그래서 값은 천장에서 치러진다:
+    # 기한이 급한 정상 안내가 통장·카드를 입에 올리기만 해도 high 로 올라가면
+    # 이 수정은 손해다. v0.9 정상 31건이 전부 천장을 선언하고 있다.
+    frozenset({"urgency_pressure", "credential_request"}),
+    frozenset({"urgency_pressure", "account_access_request"}),
 )
 
 # 사용자에게 보이는 등급을 직접 결정하는 임계값이다.
