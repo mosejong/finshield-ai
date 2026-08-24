@@ -37,6 +37,7 @@ from evaluation.fraud_golden import (
     HOLDOUT_V0_9_PATH,
     HOLDOUT_V1_0_PATH,
     HOLDOUT_V1_1_PATH,
+    HOLDOUT_V1_2_PATH,
     RISK_RANK,
     SIGNAL_CODES,
     FraudGoldenCase,
@@ -140,6 +141,7 @@ HOLDOUT_SIZES = {
     HOLDOUT_V0_9_PATH: 72,
     HOLDOUT_V1_0_PATH: 70,
     HOLDOUT_V1_1_PATH: 79,
+    HOLDOUT_V1_2_PATH: 80,
 }
 
 
@@ -211,6 +213,16 @@ def test_holdout_set_is_labelled_and_separated_from_the_development_set(
         (HOLDOUT_V0_8_PATH, HOLDOUT_V1_1_PATH),
         (HOLDOUT_V0_9_PATH, HOLDOUT_V1_1_PATH),
         (HOLDOUT_V1_0_PATH, HOLDOUT_V1_1_PATH),
+        (HOLDOUT_V0_2_PATH, HOLDOUT_V1_2_PATH),
+        (HOLDOUT_V0_3_PATH, HOLDOUT_V1_2_PATH),
+        (HOLDOUT_V0_4_PATH, HOLDOUT_V1_2_PATH),
+        (HOLDOUT_V0_5_PATH, HOLDOUT_V1_2_PATH),
+        (HOLDOUT_V0_6_PATH, HOLDOUT_V1_2_PATH),
+        (HOLDOUT_V0_7_PATH, HOLDOUT_V1_2_PATH),
+        (HOLDOUT_V0_8_PATH, HOLDOUT_V1_2_PATH),
+        (HOLDOUT_V0_9_PATH, HOLDOUT_V1_2_PATH),
+        (HOLDOUT_V1_0_PATH, HOLDOUT_V1_2_PATH),
+        (HOLDOUT_V1_1_PATH, HOLDOUT_V1_2_PATH),
     ],
 )
 def test_holdout_versions_do_not_overlap_each_other(

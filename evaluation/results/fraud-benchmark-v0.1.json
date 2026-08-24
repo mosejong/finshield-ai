@@ -1,9 +1,9 @@
 {
   "api_latency": {
-    "max_ms": 27.231,
-    "p50_ms": 3.649,
-    "p95_ms": 10.185,
-    "sample_count": 1220,
+    "max_ms": 24.679,
+    "p50_ms": 2.239,
+    "p95_ms": 3.397,
+    "sample_count": 183,
     "scope": "in_process_asgi_without_network_or_tls"
   },
   "dataset": {
@@ -35,47 +35,8 @@
   },
   "hybrid_v0_1": {
     "alternatives_considered": {
-      "note": "제품에 넣지 않은 조합이다. 규칙에 판정 권한을 둔 선택을 숫자로 남기기 위해 같은 예측 벡터로 계산했다. 두 조합 모두 모델이 위험 수준을 움직이게 하므로 CLAUDE.md 의 non-negotiable 과 충돌한다.",
-      "rule_and_llm": {
-        "binary": {
-          "accuracy": 1.0,
-          "f1": 1.0,
-          "false_negative": 0,
-          "false_positive": 0,
-          "false_positive_rate": 0.0,
-          "precision": 1.0,
-          "recall": 1.0,
-          "true_negative": 22,
-          "true_positive": 39
-        },
-        "errors": {
-          "false_negative_case_ids": [],
-          "false_positive_case_ids": []
-        },
-        "scope": "warn only when both agree"
-      },
-      "rule_or_llm": {
-        "binary": {
-          "accuracy": 0.967213,
-          "f1": 0.975,
-          "false_negative": 0,
-          "false_positive": 2,
-          "false_positive_rate": 0.090909,
-          "precision": 0.95122,
-          "recall": 1.0,
-          "true_negative": 20,
-          "true_positive": 39
-        },
-        "errors": {
-          "false_negative_case_ids": [],
-          "false_positive_case_ids": [
-            "fg-054",
-            "fg-058"
-          ]
-        },
-        "scope": "escalate when either the engine or the model calls it fraud"
-      },
-      "status": "measured"
+      "reason": "모델 판정 결과가 없어 조합을 계산할 수 없다.",
+      "status": "not_run"
     },
     "binary": {
       "accuracy": 1.0,
@@ -147,114 +108,8 @@
     "scope": "legacy five-keyword public compatibility baseline"
   },
   "llm_only": {
-    "binary": {
-      "accuracy": 0.967213,
-      "f1": 0.975,
-      "false_negative": 0,
-      "false_positive": 2,
-      "false_positive_rate": 0.090909,
-      "precision": 0.95122,
-      "recall": 1.0,
-      "true_negative": 20,
-      "true_positive": 39
-    },
-    "contract": {
-      "model": "gemini-3.6-flash",
-      "prompt_id": "fraud_judge_v1",
-      "prompt_sha256": "1fc8d0e92d7e5d5dc78a80e6735207c0c2f4fd2f0912081f1b2459ca0e7cca36",
-      "provider": "google_ai_studio",
-      "temperature": 0.0
-    },
-    "errors": {
-      "false_negative_case_ids": [],
-      "false_positive_case_ids": [
-        "fg-054",
-        "fg-058"
-      ]
-    },
-    "evidence_coverage": 0.0,
-    "evidence_note": "0.0 은 측정 실패가 아니라 구조다. 이 경로에는 행동을 뒷받침하는 공식 출처가 없다 - 모델은 근거 ID 를 만들지 않고, 만들게 하면 그것이야말로 지어낸 근거다.",
-    "failure_policy": "답하지 못한 호출은 '경고 없음'으로 집계한다. 빼고 채점하면 모델이 답한 것만 고른 점수가 된다.",
-    "forbidden_action_avoidance": null,
-    "fraud_types": {
-      "account_access_request": {
-        "f1": 0.909091,
-        "precision": 0.909091,
-        "recall": 0.909091,
-        "support": 11
-      },
-      "acquaintance_impersonation": {
-        "f1": 0.0,
-        "precision": 0.0,
-        "recall": 0.0,
-        "support": 0
-      },
-      "advance_fee_demand": {
-        "f1": 0.0,
-        "precision": 0.0,
-        "recall": 0.0,
-        "support": 0
-      },
-      "authority_impersonation": {
-        "f1": 1.0,
-        "precision": 1.0,
-        "recall": 1.0,
-        "support": 8
-      },
-      "card_delivery_impersonation": {
-        "f1": 1.0,
-        "precision": 1.0,
-        "recall": 1.0,
-        "support": 5
-      },
-      "investment_scheme": {
-        "f1": 0.0,
-        "precision": 0.0,
-        "recall": 0.0,
-        "support": 0
-      },
-      "isolation_coercion": {
-        "f1": 0.0,
-        "precision": 0.0,
-        "recall": 0.0,
-        "support": 0
-      },
-      "loan_policy_impersonation": {
-        "f1": 1.0,
-        "precision": 1.0,
-        "recall": 1.0,
-        "support": 6
-      },
-      "money_mule_transfer": {
-        "f1": 0.857143,
-        "precision": 0.75,
-        "recall": 1.0,
-        "support": 6
-      },
-      "smishing_malware": {
-        "f1": 1.0,
-        "precision": 1.0,
-        "recall": 1.0,
-        "support": 9
-      }
-    },
-    "not_measured": {
-      "required_signal_coverage": "signal 코드는 내부 표현이라 제품 출력 어휘가 아니다. 모델에게 주지 않았으므로 채점하지 않는다."
-    },
-    "required_action_coverage": 0.6,
-    "run": {
-      "case_count": 61,
-      "dataset_sha256": "e901feaf9d8295d014422d73c14c4b7360420864b4a7c3b5da0faa2c6a27b8b5",
-      "failure_count": 0,
-      "failure_kinds": {},
-      "invented_code_count": 0,
-      "judged_at": "2026-08-19T05:59:50+00:00",
-      "p50_ms": 2210.259,
-      "p95_ms": 5410.162
-    },
-    "scenario_policy_accuracy": 0.508197,
-    "scope": "the model alone decides fraud, type, risk level and actions from the message, persona and user state",
-    "status": "measured"
+    "reason": "판정 실행 결과 파일이 없다. `python -m scripts.run_llm_fraud_judge` 가 유료 호출로 만든다.",
+    "status": "not_run"
   },
   "report_version": "fraud_benchmark_v0.1",
   "scenario_engine_v0_1": {

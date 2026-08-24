@@ -1097,3 +1097,200 @@ def test_a_security_advisory_is_not_an_isolation_demand(text: str) -> None:
 
     assert "secrecy_isolation" not in {signal["code"] for signal in body["signals"]}
     assert body["fraud_types"] == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v1.2 `fh-1001`. 경찰청이 실제로 대는 창구는 이파인이다.
+        "경찰청 교통민원 안내입니다. 과태료 사전통지서가 우편으로 발송되었습니다. "
+        "이의신청은 이파인에서 하실 수 있습니다.",
+        # `fh-1002`. 검찰청은 형사사법포털을 댄다.
+        "지방검찰청 사건과입니다. 접수하신 고소 건에 사건번호가 부여되었습니다. "
+        "진행 상황은 형사사법포털에서 조회하십시오.",
+        # `fh-1006`. 법원은 민원실을 댄다.
+        "법원 집행관사무소 안내입니다. 부동산 현황조사 일정이 확정되었습니다. "
+        "자세한 사항은 관할 법원 민원실로 문의하십시오.",
+        # `fh-1005`. 이름이 아니라 종류를 대도 창구는 창구다.
+        "관할 경찰서입니다. 접수하신 사건의 참고인 조사 일정을 안내드립니다. "
+        "일정 조정이 필요하시면 경찰서 대표번호로 연락 주십시오.",
+        # held-out v1.1 `fh-942`. 같은 결함이 한 회차 전에 이미 지나갔다.
+        "경찰청입니다. 접수하신 사건의 담당 수사관이 배정되었습니다. "
+        "진행 상황은 경찰민원포털에서 조회하실 수 있습니다.",
+    ],
+)
+def test_an_institution_that_names_a_reachable_counter_is_not_impersonation(
+    text: str,
+) -> None:
+    """**진짜 기관은 읽는 사람이 혼자 갈 수 있는 창구를 준다.**
+
+    자칭 무조건 층은 기관명이 나오기만 하면 켜졌다. 그래서 경찰청·검찰청·
+    법원이 실제로 보내는 통지문이 전부 사칭으로 읽혔다 - held-out v1.2 동결
+    시점 오탐 열 건 중 여덟 건이 이 자리다.
+
+    갈리는 것은 기관명이 아니라 창구다. 사칭은 창구를 댈 수 없다. 대는 순간
+    읽는 사람이 거기로 가서 거짓이 드러나기 때문이다.
+    """
+    body = analyze(text)
+
+    assert "authority_impersonation" not in {
+        signal["code"] for signal in body["signals"]
+    }
+    assert body["fraud_types"] == []
+    assert "STOP_CONTACT" not in action_codes(body)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v1.2 `fh-1049`. 진짜 창구를 밀어내려고만 부른다.
+        "홈택스 말고 저희 전용 시스템으로만 신고가 가능합니다.",
+        # `fh-1051`. 창구 이름이 있어도 닫아 두면 창구가 아니다.
+        "1332는 지금 연결이 안 되니 안내드린 직통 번호로만 연락 주십시오.",
+        # `fh-1052`. `공식 홈페이지` 는 예방 안내문의 표지이기도 하다.
+        "공식 홈페이지에는 아직 반영되지 않은 건입니다. 저희 쪽 확인이 유일한 방법입니다.",
+        # `fh-1050`. 창구 어휘와 조사와 동사를 모두 갖췄지만 방향이 반대다.
+        "은행 창구에서는 처리되지 않는 건이라 저희 담당자를 통해서만 진행됩니다.",
+    ],
+)
+def test_naming_an_official_counter_only_to_close_it_is_not_a_counter(text: str) -> None:
+    """**창구를 대는 것과 창구를 닫는 것은 반대 방향이다.**
+
+    창구 이름은 억제의 표지다. 그 표지를 그대로 갖추고 부정만 덧붙이는
+    어형이 실제로 있고, 억제 규칙을 노리는 가장 싼 우회가 이것이다.
+    """
+    body = analyze(text)
+
+    assert "secrecy_isolation" in {signal["code"] for signal in body["signals"]}
+    assert "isolation_coercion" in body["fraud_types"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v1.2 `fh-1018`.
+        "서울중앙지검 형사부입니다. 귀하 명의 계좌가 범죄에 이용된 정황이 "
+        "확인되었습니다. 확인 절차는 이 번호로만 진행됩니다.",
+        # `fh-1020`. 창구 어휘가 있어서 창구 안내 절로 세어지던 자리다.
+        "국민연금공단입니다. 미납 내역이 확인되어 처리 중입니다. "
+        "확인은 저희 담당 창구에서만 가능합니다.",
+        # `fh-1021`.
+        "근로복지공단 급여팀입니다. 신청하신 건이 보류되었습니다. "
+        "사유는 담당자가 유선으로만 안내드립니다.",
+        # `fh-1022`·`fh-1053`. 다른 창구를 통째로 막는 쪽.
+        "병무청입니다. 병역 관련 확인 사항이 있어 연락드렸습니다. "
+        "다른 기관에는 문의하지 마시고 회신 부탁드립니다.",
+        "설치하신 앱의 상담창으로만 문의가 가능합니다. 다른 경로는 이용하지 마십시오.",
+    ],
+)
+def test_narrowing_the_counter_to_the_speaker_is_an_isolation_demand(text: str) -> None:
+    """**창구의 독점.** 고립의 나머지 절반은 어디로 가지 말라는 쪽이다.
+
+    전 어휘는 `저와만 연락`·`통화를 끊지` 같은 어형 몇 개뿐이었다. 실제
+    어형은 훨씬 흔한 자리에 있다 - 화자를 가리키는 말에 배타 조사가 붙는다.
+    진짜 기관은 자기를 유일한 통로로 만들지 않는다. 그럴 필요가 없다.
+    """
+    body = analyze(text)
+
+    assert "secrecy_isolation" in {signal["code"] for signal in body["signals"]}
+    assert "isolation_coercion" in body["fraud_types"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v1.2 `fh-1029`.
+        "금융범죄 수사 협조 요청입니다. 조사가 끝날 때까지 이 건을 외부에 알리지 마십시오.",
+        # `fh-1030`. 금지가 아니라 불이익 예고 어형이다.
+        "계좌 동결 해제 절차가 진행 중입니다. 절차상 외부에 문의하시면 처리가 지연됩니다.",
+        # `fh-1032`.
+        "명의도용 피해 확인 절차입니다. 보안상 이 통화 내용은 외부에 말씀하지 마십시오.",
+        # `fh-1034`.
+        "저희가 안내드린 절차는 외부에 유출하지 마시고 지시대로 진행해 주십시오.",
+    ],
+)
+def test_forbidding_disclosure_of_this_contact_itself_is_isolation(text: str) -> None:
+    """**금지의 대상이 이 연락 자체이면 고립이다.**
+
+    `외부에` 는 v1.0 부터 고립 어휘에서 일부러 빼 두었다. 사내 공지의 대외비
+    문구가 그 어형이기 때문이다(`fh-865`). 그래서 반대쪽도 통째로 비어 있었다.
+    어휘가 아니라 대상으로 가른다.
+    """
+    body = analyze(text)
+
+    assert "secrecy_isolation" in {signal["code"] for signal in body["signals"]}
+    assert "isolation_coercion" in body["fraud_types"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v1.2 `fh-1023`~`fh-1027`. 금지의 대상이 읽는 사람이 쥔 것이다.
+        "내년도 조직개편 초안 공유드립니다. 확정 전이라 외부에 알리지 말아 주세요.",
+        "채용 최종 결과는 발표일까지 대외비입니다. 합격 사실을 외부에 알리지 마시고 기다려 주십시오.",
+        "고객사와의 계약 조건은 비밀유지계약 대상입니다. 협의 내용을 외부에 공유하지 마십시오.",
+        "연구 참여자 정보는 연구윤리 규정상 외부에 공개할 수 없습니다. 문의는 연구책임자에게 해 주세요.",
+        "사내 감사가 진행 중입니다. 감사 종료 시까지 관련 내용을 외부에 말하지 말아 주세요.",
+        # `fh-1028`. 전칭 금지를 갖췄지만 남겨 두는 집단이 있다.
+        "인사 발표 전까지 팀원들 외에는 아무에게도 말하지 말아 주세요.",
+        # held-out v0.7 `fh-535`. 금지가 아니라 보장이다.
+        "개인정보 보호를 위해 상담 내용은 외부에 공개되지 않습니다. 녹취는 본인 요청 시에만 제공됩니다.",
+    ],
+)
+def test_ordinary_confidentiality_is_still_not_an_isolation_demand(text: str) -> None:
+    """넓히기의 값은 정상 문장이 치른다. 이 일곱 자리가 그 값이다.
+
+    `외부에` 를 고립 쪽으로 열면 사내 공지가 무너지고, 어미를 열면 "공개되지
+    않습니다" 같은 보장 서술이 금지로 읽힌다. 고립은 남겨 두는 집단이 없고,
+    금지의 대상이 이 연락 자체이며, 어미가 금지형이다.
+    """
+    body = analyze(text)
+
+    assert "secrecy_isolation" not in {signal["code"] for signal in body["signals"]}
+    assert body["fraud_types"] == []
+
+
+@pytest.mark.parametrize(
+    ("text", "state"),
+    [
+        # held-out v1.2 `fh-1059`. 상대가 회사다.
+        ("급여 입금 안내: 03/25 2,480,000원 입금되었습니다.", "transferred_money"),
+        # `fh-1063`. 상대가 정보보안팀이다.
+        (
+            "사내 보안 정책에 따라 업무용 단말에 보안 프로그램이 설치되었습니다. "
+            "문의는 정보보안팀으로 해 주세요.",
+            "installed_app",
+        ),
+        # `fh-1064`. 상대가 병원이다.
+        (
+            "진료 예약이 04/05 15:30으로 확정되었습니다. 변경은 예약 페이지에서 하실 수 있습니다.",
+            "shared_personal_info",
+        ),
+        # `fh-1065`. 상대가 거래처다.
+        (
+            "말씀하신 대금 입금 확인했습니다. 세금계산서는 이번 주 안에 발행해 드리겠습니다.",
+            "transferred_money",
+        ),
+        # `fh-1068`. 상대가 은행이고 계좌 권한 위임은 정상 제도다.
+        (
+            "가족 계좌 조회 서비스 동의가 등록되었습니다. 해지는 영업점이나 공식 앱에서 하실 수 있습니다.",
+            "shared_account_access",
+        ),
+    ],
+)
+def test_a_state_alone_never_tells_the_reader_to_cut_contact(
+    text: str, state: str
+) -> None:
+    """**상대를 적으로 부르는 말은 상대에 대한 신호가 있어야 한다.**
+
+    상태 표의 나머지 행동은 읽는 사람 쪽에서 끝난다 - 증거를 남기고, 창구에
+    전화하고, 더 넘기지 않는 것이다. `STOP_CONTACT` 만 방향이 반대라서
+    상대가 적이라는 판단이 먼저 있어야 하는데, 상태는 읽는 사람이 무엇을
+    했는지만 말한다.
+
+    등급은 상태의 몫으로 그대로 올라간다. 재는 것은 등급이 아니라 행동이다.
+    """
+    body = analyze(text, state)
+
+    assert body["signals"] == []
+    assert "STOP_CONTACT" not in action_codes(body)
