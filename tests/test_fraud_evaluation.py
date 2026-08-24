@@ -1424,3 +1424,41 @@ def test_adding_the_forbidden_label_does_not_move_any_earlier_dataset() -> None:
     for path, prefix in frozen.items():
         cases = load_holdout_cases(path)
         assert normalized_dataset_sha256(cases).startswith(prefix)
+
+
+def test_v1_0_fh_803_is_a_recorded_label_disagreement_not_a_silent_regression() -> None:
+    """두 얼린 셋이 서로 다른 판단을 적어 두었다. **뒤에 적힌 판단을 따른다.**
+
+    v1.0 `fh-803` "이 건은 가족에게 말씀하시면 안 됩니다. 수사 종료까지
+    안전계좌로 이체하셔야 합니다" 는 `VERIFY_OFFICIAL_CHANNEL` 을 금지한다.
+    v1.1 `fh-901` "본 건은 진행 중인 수사와 관련된 사안입니다 …" 는 같은
+    행동을 **요구한다.** 두 문장 다 기관을 자칭하지 않고, 둘 다 수사를
+    말하고, 둘 다 고립을 요구한다. 라벨만 반대다.
+
+    이 프로젝트는 이 상황을 이미 한 번 지났다 - v0.7 `fh-523` 과 v0.8
+    `fh-627` 이 거의 같은 문장에 반대 라벨을 달았고, `policy.py` 가 "뒤에
+    적힌 판단을 따른다" 고 적어 두었다. 같은 규칙을 적용해 v1.1 을 따른다.
+    수사 사칭 문자를 받은 사람에게 "이전부터 쓰던 연락처로 확인하세요" 는
+    실행할 수 없는 조언이다 - 수사기관과 이전부터 쓰던 연락처는 없다.
+
+    **얼린 라벨은 고치지 않는다.** 대신 그 값이 어디서 나가는지 여기에
+    못 박는다. v1.0 의 `forbidden_action_avoidance` 가 1.0 에서 0.9231 로
+    내려가 있고, 내려간 자리는 이 한 건이다. 누군가 이 수치를 되돌리려면
+    v1.1 의 판단을 먼저 뒤집어야 한다.
+    """
+    cases = {case.case_id: case for case in load_holdout_cases(HOLDOUT_V1_0_PATH)}
+    case = cases["fh-803"]
+    emitted = {action.code for action in analyze_fraud(case.request()).actions}
+
+    assert "VERIFY_OFFICIAL_CHANNEL" in case.forbidden_action_codes
+    assert "VERIFY_OFFICIAL_CHANNEL" in emitted
+    # 나머지는 전부 지켜져 있어야 한다. 알고 있는 불일치는 이 한 건뿐이다.
+    assert set(case.required_action_codes) <= emitted
+    others = [
+        other
+        for other in cases.values()
+        if other.case_id != "fh-803"
+        and {action.code for action in analyze_fraud(other.request()).actions}
+        & set(other.forbidden_action_codes)
+    ]
+    assert others == []
