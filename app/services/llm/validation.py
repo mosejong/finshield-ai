@@ -30,6 +30,8 @@ from __future__ import annotations
 
 import re
 
+from app.services.llm.outcomes import ExplanationOutcome
+
 _URL_PATTERN = re.compile(r"(?:https?://|www\.)\S+|\b[\w-]+\.(?:com|net|kr|co\.kr|io|link)\b", re.IGNORECASE)
 _RRN_PATTERN = re.compile(r"\b\d{6}\s?[-~]\s?[1-8]\d{6}\b")
 
@@ -127,7 +129,20 @@ _REASSURANCE_CHECKED_LEVELS = frozenset({"medium", "high"})
 
 
 class LlmOutputRejected(ValueError):
-    """출력이 계약을 어겼다. 어긴 출력은 고쳐 쓰지 않고 버린다."""
+    """출력이 계약을 어겼다. 어긴 출력은 고쳐 쓰지 않고 버린다.
+
+    `outcome` 은 **필수**다. 이 예외는 전부 이 파일 안에서 우리가 던지므로 사유를
+    요구할 수 있고, 요구하지 않으면 새 검사 규칙이 사유 없이 늘어난다. `outcomes.py`
+    가 여섯 가지를 따로 세는 이유도 같이 적혀 있다 - 없는 연락처를 지어낸 것과
+    길이가 넘친 것을 한 칸으로 세면, 전화를 걸게 만드는 출력이 사소한 것에 묻힌다.
+
+    같은 이유로 `LlmUnavailable` 쪽은 사유가 선택이다. 남이 던질 수 있는 예외는
+    사유를 요구할 수 없다.
+    """
+
+    def __init__(self, message: str, *, outcome: ExplanationOutcome) -> None:
+        super().__init__(message)
+        self.outcome = outcome
 
 
 def _contacts(text: str) -> set[str]:
@@ -146,23 +161,33 @@ def validate_explanation(
 ) -> str:
     explanation = output.strip()
     if not explanation:
-        raise LlmOutputRejected("empty explanation")
+        raise LlmOutputRejected(
+            "empty explanation", outcome=ExplanationOutcome.REJECTED_EMPTY
+        )
     if len(explanation) > max_chars:
         raise LlmOutputRejected(
-            f"explanation is {len(explanation)} characters, limit is {max_chars}"
+            f"explanation is {len(explanation)} characters, limit is {max_chars}",
+            outcome=ExplanationOutcome.REJECTED_TOO_LONG,
         )
     if _URL_PATTERN.search(explanation):
-        raise LlmOutputRejected("explanation introduced a URL")
+        raise LlmOutputRejected(
+            "explanation introduced a URL", outcome=ExplanationOutcome.REJECTED_URL
+        )
     if _RRN_PATTERN.search(explanation):
-        raise LlmOutputRejected("explanation contains a resident registration number")
+        raise LlmOutputRejected(
+            "explanation contains a resident registration number",
+            outcome=ExplanationOutcome.REJECTED_RRN,
+        )
     if contradicts_verdict(explanation, risk_level=risk_level):
         raise LlmOutputRejected(
-            f"explanation reassures the user while the verdict is {risk_level}"
+            f"explanation reassures the user while the verdict is {risk_level}",
+            outcome=ExplanationOutcome.REJECTED_CONTRADICTS_VERDICT,
         )
 
     invented = _contacts(explanation) - _contacts(grounded_text)
     if invented:
         raise LlmOutputRejected(
-            f"explanation introduced contacts absent from the evidence: {sorted(invented)}"
+            f"explanation introduced contacts absent from the evidence: {sorted(invented)}",
+            outcome=ExplanationOutcome.REJECTED_INVENTED_CONTACT,
         )
     return explanation

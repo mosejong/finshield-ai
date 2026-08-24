@@ -1,12 +1,22 @@
 """결정론 판정을 문장으로 옮기는 경계.
 
-이 함수가 `str | None` 을 돌려주는 것이 설계의 핵심이다. `AnalyzeResponse` 를 받아
-`AnalyzeResponse` 를 돌려주지 않으므로, 모델이 무엇을 말하든 위험 수준·점수·
-시나리오·권고 행동을 **구조적으로** 바꿀 수 없다. `CLAUDE.md` 의 첫 번째
-non-negotiable 을 주석이 아니라 타입으로 지킨다.
+이 함수가 **`AnalyzeResponse` 를 돌려주지 않는 것**이 설계의 핵심이다. 문장 하나만
+돌려주므로, 모델이 무엇을 말하든 위험 수준·점수·시나리오·권고 행동을 **구조적으로**
+바꿀 수 없다. `CLAUDE.md` 의 첫 번째 non-negotiable 을 주석이 아니라 타입으로 지킨다.
 
 검증에 실패하면 설명 없이 간다. 설명이 없는 결과는 불편하지만, 검증을 통과하지
 못한 설명이 붙은 결과는 위험하다.
+
+**그 "없음" 에 이유를 붙인다.** 오래 `str | None` 이었고, `None` 은 열 가지 이상의
+서로 다른 사건을 하나로 접었다 - 안전 필터가 우리 요청을 거부한 것, 모델이 답을
+만들다 멈춘 것, 우리 토큰 예산이 좁아 잘린 것, 모델이 없는 신고번호를 지어내서
+버린 것. 운영에서 이 넷은 완전히 다른 일이고 대응도 다르다. 그래서 이제
+`ExplanationAttempt(text, outcome)` 을 돌려준다. **설명이 없는 이유를 모르면 그
+이유를 고칠 수 없다.**
+
+이 함수는 여전히 세지 않고 기록하지 않는다. 순수한 계층이 로거를 들고 있으면
+테스트가 로그를 켜 놓고 돌아야 하고, 평가 스크립트가 이 함수를 부를 때마다 운영
+지표가 오염된다. **세는 것은 조립하는 자리(`runtime.py`)다.**
 
 여기서 사용자 원문이 세 겹을 지난다. `minimization.py` 가 개인정보를 걷어내고,
 `untrusted.py` 가 모델을 향한 지시를 무력화하고, `validation.py` 가 나온 문장을
@@ -20,6 +30,7 @@ from __future__ import annotations
 from app.schemas.analysis import AnalyzeResponse
 from app.services.llm.contract import LlmContract
 from app.services.llm.minimization import minimize_for_provider
+from app.services.llm.outcomes import ExplanationAttempt, ExplanationOutcome
 from app.services.llm.prompts import (
     FRAUD_EXPLANATION_PROMPT,
     FRAUD_EXPLANATION_PROMPT_ID,
@@ -104,11 +115,11 @@ def explain_analysis(
     *,
     provider: LlmProvider,
     contract: LlmContract,
-) -> str | None:
-    """설명 문장을 만든다. 만들지 못하면 None.
+) -> ExplanationAttempt:
+    """설명 문장을 만든다. 만들지 못하면 문장 없이 사유만.
 
-    None 은 예외 상황이 아니라 정상 결과 중 하나다. 호출하는 쪽은 설명이 없어도
-    동작해야 한다.
+    실패는 예외 상황이 아니라 정상 결과 중 하나다. 호출하는 쪽은 설명이 없어도
+    동작해야 한다 - 다만 이제 **왜 없는지**를 함께 받는다.
     """
     contract.verify_prompt(FRAUD_EXPLANATION_PROMPT)
 
@@ -131,17 +142,20 @@ def explain_analysis(
         message=neutralized.text[: contract.max_input_chars],
     )
 
+    # 예외의 사유를 그대로 옮긴다. 여기서 다시 판단하지 않는 것이 중요하다 -
+    # 사유를 아는 곳은 실패가 일어난 곳이고, 이 자리에서 추측하면 두 곳이 어긋난다.
     try:
         raw = provider.generate(contract=contract, prompt=prompt)
-    except LlmUnavailable:
-        return None
+    except LlmUnavailable as exc:
+        return ExplanationAttempt(text=None, outcome=exc.outcome)
 
     try:
-        return validate_explanation(
+        text = validate_explanation(
             raw,
             grounded_text=build_grounded_text(response),
             max_chars=MAX_EXPLANATION_CHARS,
             risk_level=response.risk_level,
         )
-    except LlmOutputRejected:
-        return None
+    except LlmOutputRejected as exc:
+        return ExplanationAttempt(text=None, outcome=exc.outcome)
+    return ExplanationAttempt(text=text, outcome=ExplanationOutcome.OK)

@@ -21,8 +21,14 @@ provider 와 model 이 환경변수로 조용히 움직이면, 그 전에 측정
 막으려던 문제와 정확히 같은 문제다. 그래서 어느 모델이 답했는지 함께 돌려준다.
 
 기본값이 `off` 인 것도 의도다. 키를 넣지 않은 환경에서 이 계층은 아무 일도 하지
-않고, 설명 없는 결과가 나간다. `explain_analysis` 가 `str | None` 을 돌려주는
-설계가 여기까지 이어진다 - 설명은 있으면 좋고 없어도 되는 것이다.
+않고, 설명 없는 결과가 나간다. `explain_analysis` 가 문장 없이 사유만 돌려줄 수
+있는 설계가 여기까지 이어진다 - 설명은 있으면 좋고 없어도 되는 것이다.
+
+**세는 것도 이 파일이다.** `explanation.py` 는 순수하게 두고, 요청 경로에서만
+지나가는 이 자리에서 시도와 결과를 센다. 그래서 `evaluation/` 을 돌려도 운영
+지표가 움직이지 않는다. 무엇을 남기고 무엇을 남기지 않는지는
+`app/core/observability.py` 의 `ExplanationMetrics` 와 `outcomes.py` 에 적혀 있다 -
+개수와 성패뿐이고, 사용자 원문·프롬프트·모델 출력은 한 글자도 지나가지 않는다.
 """
 
 from __future__ import annotations
@@ -30,14 +36,17 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from time import perf_counter
 
 from app.clients.google_ai_studio import (
     GoogleAiStudioConfigurationError,
     build_google_ai_studio_provider,
 )
+from app.core.observability import explanation_metrics
 from app.schemas.analysis import AnalyzeResponse
 from app.services.llm.contract import LlmContract
 from app.services.llm.explanation import explain_analysis, fraud_explanation_contract
+from app.services.llm.outcomes import ExplanationOutcome
 from app.services.llm.provider import LlmProvider, StubProvider
 
 PROVIDER_SETTING = "FINSHIELD_LLM_PROVIDER"
@@ -89,14 +98,20 @@ class ExplanationRuntime:
 
 @dataclass(frozen=True)
 class ExplanationResult:
-    """설명과, 그것을 만든 모델.
+    """설명과, 그것을 만든 모델, 그리고 왜 그 결과인지.
 
     `model` 은 `text` 가 있을 때만 채워진다. 어느 모델이 답했는지 모르는 설명은
     평가에서 쓸 수 없다.
+
+    `outcome` 은 항상 채워진다. 성공이면 `OK`, 전부 실패했으면 **마지막 시도의
+    사유**다. 마지막을 고르는 것은 임의가 아니다 - 대체 모델까지 갔다면 사용자가
+    설명 없는 화면을 보게 된 직접적인 이유는 마지막 실패이고, 앞선 실패들은
+    시도 지표에 이미 각각 남아 있다.
     """
 
     text: str | None
     model: str | None
+    outcome: ExplanationOutcome
 
 
 def _selected_provider(values: Mapping[str, str]) -> str:
@@ -169,21 +184,50 @@ def explain_with_fallback(
 ) -> ExplanationResult:
     """계약 순서대로 시도하고, 처음 성공한 것을 돌려준다.
 
-    `explain_analysis` 는 프로바이더 실패와 출력 거부를 둘 다 `None` 으로 접는다.
-    여기서 그 둘을 구분하지 않는 것은 의도다 - 호출하는 쪽에서 보면 둘 다 "설명이
-    없다" 이고, 어느 쪽이든 다음 모델을 시도할 가치가 있다. 대신 비용이 두 배로
-    나가는 경우가 생기므로 계약 목록은 짧게 유지한다.
+    **다음 모델로 넘어가는 판단은 여전히 사유를 보지 않는다.** 프로바이더가 죽은
+    것이든 출력이 거부된 것이든 호출하는 쪽에서 보면 둘 다 "설명이 없다" 이고,
+    어느 쪽이든 다음 모델을 시도할 가치가 있다. 사유로 분기하면 어떤 실패는 대체
+    모델을 안 부르게 되고, 그 규칙이 맞는지는 지금 재 볼 숫자가 없다. 사유는
+    **세기 위해** 들고 다니는 것이고, 그것으로 흐름을 바꾸는 것은 숫자가 쌓인
+    다음 일이다. 대신 비용이 두 배로 나가는 경우가 생기므로 계약 목록은 짧게
+    유지한다.
+
+    **세는 자리가 여기인 이유.** `explain_analysis` 는 프로바이더와 계약을 주입받는
+    순수한 함수이고, 평가 스크립트도 그것을 직접 부른다. 거기에 카운터를 두면
+    `evaluation/` 을 한 번 돌릴 때마다 운영 지표가 수십 건씩 오염된다. 조립하는
+    자리는 요청 경로에만 있다.
     """
+    attempts = 0
+    outcome = ExplanationOutcome.UNSPECIFIED
     for contract in runtime.contracts:
-        text = explain_analysis(
+        attempts += 1
+        started_at = perf_counter()
+        attempt = explain_analysis(
             response,
             message,
             provider=runtime.provider,
             contract=contract,
         )
-        if text is not None:
-            return ExplanationResult(text=text, model=contract.model)
-    return ExplanationResult(text=None, model=None)
+        duration_ms = (perf_counter() - started_at) * 1000
+        outcome = attempt.outcome
+        explanation_metrics.observe_attempt(
+            model=contract.model,
+            outcome=attempt.outcome.value,
+            attempt=attempts,
+            duration_ms=duration_ms,
+        )
+        if attempt.text is not None:
+            explanation_metrics.observe_result(
+                outcome=attempt.outcome.value, attempts=attempts
+            )
+            return ExplanationResult(
+                text=attempt.text, model=contract.model, outcome=attempt.outcome
+            )
+
+    # 계약 목록이 비어 있으면 시도가 없고 사유도 없다. `unspecified` 가 그 자리다 -
+    # 조립이 그런 런타임을 만들지는 않지만, 여기서 값을 지어내지는 않는다.
+    explanation_metrics.observe_result(outcome=outcome.value, attempts=attempts)
+    return ExplanationResult(text=None, model=None, outcome=outcome)
 
 
 _runtime: ExplanationRuntime | None = None

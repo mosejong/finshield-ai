@@ -7,6 +7,12 @@
 from app.services.llm.contract import LlmContract, LlmContractError
 from app.services.llm.explanation import explain_analysis
 from app.services.llm.minimization import MinimizedText, minimize_for_provider
+from app.services.llm.outcomes import (
+    BLOCKED_OUTCOMES,
+    REJECTION_OUTCOMES,
+    ExplanationAttempt,
+    ExplanationOutcome,
+)
 from app.services.llm.provider import LlmProvider, LlmUnavailable, StubProvider
 from app.services.llm.untrusted import (
     INSTRUCTION_PLACEHOLDER,
@@ -21,6 +27,9 @@ from app.services.llm.validation import (
 )
 
 __all__ = [
+    "BLOCKED_OUTCOMES",
+    "ExplanationAttempt",
+    "ExplanationOutcome",
     "INSTRUCTION_PLACEHOLDER",
     "LlmContract",
     "LlmContractError",
@@ -29,6 +38,7 @@ __all__ = [
     "LlmUnavailable",
     "MinimizedText",
     "NeutralizedText",
+    "REJECTION_OUTCOMES",
     "StubProvider",
     "contains_instruction",
     "contradicts_verdict",
