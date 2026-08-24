@@ -20,7 +20,7 @@ Fraud evaluation bootstrap policy · `adr/0007-bootstrap-fraud-evaluation.md`
 
 ## Security
 
-Privacy-safe logs and runtime PII regression: `27-observability-pii-masking.md`
+Privacy-safe logs and runtime PII regression: `27-observability-pii-masking.md` (설명 계층 실패 지표의 닫힌 어휘는 같은 문서 "설명 계층 지표" 절, 설계 이유는 `34-llm-explanation-runtime.md` 12절)
 HTTP response headers, same-origin state changes, trusted hosts and public TLS: `26-http-security-https.md`
 08 AI security alignment · 12 security threat model
 
