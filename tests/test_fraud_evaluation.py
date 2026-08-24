@@ -23,6 +23,7 @@ from evaluation.fraud_benchmark import (
     evaluate_golden_set,
     normalized_dataset_sha256,
 )
+from app.domain.fraud.policy import STATE_MINIMUM_RISK
 from app.domain.fraud.signals import CANONICAL_TO_LEGACY_PUBLIC, SIGNAL_RULES
 from evaluation.fraud_golden import (
     ACTION_CODES,
@@ -35,6 +36,8 @@ from evaluation.fraud_golden import (
     HOLDOUT_V0_8_PATH,
     HOLDOUT_V0_9_PATH,
     HOLDOUT_V1_0_PATH,
+    HOLDOUT_V1_1_PATH,
+    RISK_RANK,
     SIGNAL_CODES,
     FraudGoldenCase,
     _validate_collection,
@@ -136,6 +139,7 @@ HOLDOUT_SIZES = {
     HOLDOUT_V0_8_PATH: 72,
     HOLDOUT_V0_9_PATH: 72,
     HOLDOUT_V1_0_PATH: 70,
+    HOLDOUT_V1_1_PATH: 79,
 }
 
 
@@ -198,6 +202,15 @@ def test_holdout_set_is_labelled_and_separated_from_the_development_set(
         (HOLDOUT_V0_7_PATH, HOLDOUT_V1_0_PATH),
         (HOLDOUT_V0_8_PATH, HOLDOUT_V1_0_PATH),
         (HOLDOUT_V0_9_PATH, HOLDOUT_V1_0_PATH),
+        (HOLDOUT_V0_2_PATH, HOLDOUT_V1_1_PATH),
+        (HOLDOUT_V0_3_PATH, HOLDOUT_V1_1_PATH),
+        (HOLDOUT_V0_4_PATH, HOLDOUT_V1_1_PATH),
+        (HOLDOUT_V0_5_PATH, HOLDOUT_V1_1_PATH),
+        (HOLDOUT_V0_6_PATH, HOLDOUT_V1_1_PATH),
+        (HOLDOUT_V0_7_PATH, HOLDOUT_V1_1_PATH),
+        (HOLDOUT_V0_8_PATH, HOLDOUT_V1_1_PATH),
+        (HOLDOUT_V0_9_PATH, HOLDOUT_V1_1_PATH),
+        (HOLDOUT_V1_0_PATH, HOLDOUT_V1_1_PATH),
     ],
 )
 def test_holdout_versions_do_not_overlap_each_other(
@@ -659,6 +672,165 @@ def test_holdout_v1_0_declares_a_ceiling_on_every_normal_and_names_what_it_forbi
 
     forbidding = [c for c in cases if c.forbidden_action_codes]
     assert len(forbidding) >= 12
+
+
+def test_holdout_v1_1_covers_the_taxonomy_and_keeps_the_ceiling_discipline() -> None:
+    cases = load_holdout_cases(HOLDOUT_V1_1_PATH)
+    negatives = [case for case in cases if not case.is_fraud]
+    positives = [case for case in cases if case.is_fraud]
+    covered = {t for case in cases for t in case.expected_fraud_types}
+
+    assert covered == set(FRAUD_TYPES)
+    assert len(negatives) == 38
+    assert all(case.expected_max_risk is not None for case in negatives)
+    assert all(case.expected_max_risk is None for case in positives)
+
+
+def test_holdout_v1_1_puts_the_user_state_back_into_the_denominator() -> None:
+    """**이 셋이 존재하는 이유. 상태를 재는 자리가 열 회차에 걸쳐 말라붙었다.**
+
+    `received_only` 가 아닌 사례 수는 v0.2 부터 이렇게 움직였다 -
+    18, 27, 21, 15, 14, 17, 16, 14, 8, 6. 아무도 그렇게 정하지 않았다.
+    회차마다 고칠 결함이 문장 안에 있었고, 문장 안의 결함을 재는 데에는
+    `received_only` 가 가장 편했기 때문이다.
+
+    그래서 v1.0 의 `scenario_policy_accuracy` 0.9571 은 사실상
+    **`received_only` 에 대한 진술**이다. 상태 정책이 여섯 갈래인데 그중
+    하나가 표본의 91% 를 차지하면, 나머지 다섯 갈래가 무너져도 그 숫자는
+    거의 움직이지 않는다. 재지 않은 것을 잰 것처럼 적으면 그것이 지어낸
+    근거다.
+
+    이 셋은 그 비율을 뒤집는다. 상태별 최소치를 못박아 두는 이유는,
+    다음 회차가 또 편한 쪽으로 흘러가더라도 **이 셋만은 상태를 계속
+    재도록** 하기 위해서다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V1_1_PATH)
+    stateful = [c for c in cases if c.state is not UserState.RECEIVED_ONLY]
+
+    assert len(stateful) >= 30
+    # 여섯 갈래 전부가 혼자서도 의미 있는 표본이어야 한다.
+    for state in UserState:
+        if state is UserState.RECEIVED_ONLY:
+            continue
+        assert sum(c.state is state for c in cases) >= 4, state
+
+    # 뒤집혔는지는 앞 회차와 견줘야 말이 된다.
+    previous = load_holdout_cases(HOLDOUT_V1_0_PATH)
+    assert sum(
+        c.state is not UserState.RECEIVED_ONLY for c in previous
+    ) < len(stateful)
+
+    # 상태는 정상 문장에도 붙는다. 상태가 곧 사기라면 잰 것은 상태가
+    # 아니라 사기다.
+    assert sum(not c.is_fraud for c in stateful) >= 6
+
+
+def test_holdout_v1_1_ceilings_a_stateful_normal_at_the_floor_its_state_forces() -> None:
+    """**상태가 있는 정상 문장의 천장은 그 상태의 바닥이다.**
+
+    링크를 눌렀다는 사실은 등급을 medium 으로 올린다. 그것은 상태 정책의
+    몫이고 맞는 일이다. 하지만 거기서 한 칸이라도 더 올라가면 그것은
+    **문장이 올린 것**이고, 문장이 정상이면 틀린 것이다.
+
+    v1.0 은 정상 34건 전부에 `low` 천장을 걸었다. 상태가 전부
+    `received_only` 였으니 그럴 수 있었다. 여기서는 그렇게 적을 수 없다 -
+    적으면 상태 정책 자체를 결함으로 선언하는 라벨이 된다. 천장을
+    상태의 바닥에 맞추면, 재는 것이 **상태 위에 문장이 얹은 몫**으로
+    좁혀진다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V1_1_PATH)
+    negatives = [c for c in cases if not c.is_fraud]
+
+    for case in negatives:
+        floor = STATE_MINIMUM_RISK[case.state]
+        assert case.expected_max_risk is not None, case.case_id
+        assert RISK_RANK[case.expected_max_risk] >= RISK_RANK[floor], case.case_id
+        if case.state is UserState.RECEIVED_ONLY:
+            continue
+        # 상태가 있으면 천장은 바닥과 같다. 여유를 두면 아무것도 재지 않는다.
+        assert case.expected_max_risk == floor, case.case_id
+
+
+def test_holdout_v1_1_prices_the_state_and_channel_widenings_where_each_can_break() -> None:
+    """**이번 회차 다섯 수정 중 넷이 넓히기다. 값은 이 셋의 정상 쪽에서 나온다.**
+
+    - D1 상태가 예방 행동을 반복하지 않는다. `CLICKED_LINK` 는
+      `DO_NOT_CLICK` 을 돌려받고 `RECEIVED_UNKNOWN_MONEY` 는
+      `DO_NOT_FORWARD_MONEY` 를 돌려받는데, 계좌 권한과 앱 설치와
+      송금에는 그런 자리가 없다. **이미 한 번 넘긴 사람이 가장 다시
+      넘기기 쉬운 사람이다.** 값은 상태를 가진 정상 문장이 치른다.
+    - D2 창구를 기관 자칭으로만 찾는다. `수사`, `세무조사`, `결제 승인`,
+      `지원금·환급` 은 이름을 대지 않고도 확인할 창구를 가리킨다. 값은
+      진짜 승인 문자와 진짜 정부·국세청 안내문이 치른다 - **창구를
+      가리키는 것과 위험을 가리키는 것은 다르다.**
+    - D3 요구 어미의 종결형 계열(`-하셔야 합니다`). 값은 종결형으로 쓴
+      정상 안내문이 치른다.
+    - D4 고립 어휘 × 우언적 금지. v1.0 은 요구 쪽 자리만 닫았다. 값은
+      `가족`·`부모님` 이 정상적으로 등장하는 문장이 치른다.
+    - D5 채널 어휘 미등록 이름(구글플레이·원스토어·정부24). 값은 그
+      스토어로 **보내는** 정상 문장이 치른다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V1_1_PATH)
+    positives = [case for case in cases if case.is_fraud]
+    negatives = [case for case in cases if not case.is_fraud]
+
+    def count(pool, *needles: str) -> int:
+        return sum(any(n in c.text for n in needles) for c in pool)
+
+    # D1. 상태만이 낼 수 있는 예방 행동. 문장이 그 행동을 요구하지 않는데
+    #     라벨이 요구한다 - 이 조건은 상태에서 나오지 않으면 만족될 수 없다.
+    state_only = {
+        UserState.SHARED_ACCOUNT_ACCESS: "DO_NOT_SHARE_ACCESS",
+        UserState.INSTALLED_APP: "DO_NOT_INSTALL",
+        UserState.SHARED_PERSONAL_INFO: "DO_NOT_SHARE_ACCESS",
+        UserState.TRANSFERRED_MONEY: "DO_NOT_FORWARD_MONEY",
+    }
+    for state, action in state_only.items():
+        demanding = [
+            c
+            for c in positives
+            if c.state is state and action in c.required_action_codes
+        ]
+        assert len(demanding) >= 2, state
+    # 값을 치르는 쪽. 상태만 보고 붙이면 이 문장들에도 붙는다.
+    assert sum(
+        c.state in state_only for c in negatives
+    ) >= 4
+    assert all(
+        not c.required_action_codes for c in negatives
+    )
+
+    # D2. 이름을 대지 않고 사건으로 창구를 가리키는 문장.
+    events = ("수사", "조사", "승인", "환급", "지원")
+    channel_positives = [
+        c
+        for c in positives
+        if any(e in c.text for e in events)
+        and "VERIFY_OFFICIAL_CHANNEL" in c.required_action_codes
+    ]
+    assert len(channel_positives) >= 8
+    # 같은 낱말을 쓰는 진짜 안내문. 넓히기가 이쪽에 행동을 붙이면 값을
+    # 치른 것이다.
+    channel_negatives = [c for c in negatives if any(e in c.text for e in events)]
+    assert len(channel_negatives) >= 7
+    assert all(
+        "VERIFY_OFFICIAL_CHANNEL" not in c.required_action_codes
+        for c in channel_negatives
+    )
+
+    # D3. 종결형. 정상 쪽이 적으면 어미 표를 넓혀도 값을 치를 자리가 없다.
+    endings = ("셔야 합니다", "하셔야", "주셔야")
+    assert count(positives, *endings) >= 6
+    assert count(negatives, *endings) >= 4
+
+    # D4. 고립 어휘 × 우언적 금지. 같은 어형이 정반대 자리에 있다.
+    assert count(positives, "가족", "부모님", "직원분들께", "주변에") >= 5
+    assert count(negatives, "가족", "부모님", "직원분들께", "외부에") >= 4
+
+    # D5. 채널 이름. 사기는 공식 스토어를 **막고**, 정상은 그리로 **보낸다.**
+    stores = ("구글플레이", "플레이스토어", "원스토어", "정부24")
+    assert count(positives, *stores) >= 4
+    assert count(negatives, *stores) >= 3
 
 
 def test_holdout_v0_8_covers_the_taxonomy_and_keeps_the_ceiling_discipline() -> None:
