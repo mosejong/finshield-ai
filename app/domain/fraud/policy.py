@@ -316,6 +316,12 @@ HIGH_RISK_SIGNAL_COMBINATIONS: tuple[frozenset[str], ...] = (
     # 이 수정은 손해다. v0.9 정상 31건이 전부 천장을 선언하고 있다.
     frozenset({"urgency_pressure", "credential_request"}),
     frozenset({"urgency_pressure", "account_access_request"}),
+    # v1.0. 대출 짝의 나머지 한 칸이다. `account_access_request` 와
+    # `money_transfer_request` 는 앞선 회차가 채웠는데 인증정보 짝만
+    # 비어 있었다 - "서민 대환 대출 한도 조회를 도와드립니다. 공동인증서와
+    # 비밀번호를 알려 주세요"(`fh-821`). 한도 조회에 비밀번호가 필요한
+    # 대출 창구는 없다.
+    frozenset({"loan_policy_offer", "credential_request"}),
 )
 
 # 사용자에게 보이는 등급을 직접 결정하는 임계값이다.
