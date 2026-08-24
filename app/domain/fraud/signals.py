@@ -143,6 +143,89 @@ ISOLATION_PROHIBITION_PATTERN = re.compile(
     r"[^.!?\n]{0,8}?면\s*안\s*[되돼됩됐된될]"
 )
 
+# **창구의 독점.** 고립의 두 갈래 중 "연락 창구를 보내는 쪽 하나로 좁히는"
+# 쪽인데, 그동안 `저와만 연락`·`통화를 끊지` 같은 어형 몇 개만 적혀 있었다.
+# 실제 어형은 훨씬 흔한 자리에 있다 - **화자를 가리키는 말 + 배타 조사**다.
+# "이 번호로만"·"저희 담당 창구에서만"·"담당자를 통해서만"·"안내드린 직통
+# 번호로만"·"저희 쪽 확인이 유일한 방법" 은 전부 같은 문장이고, held-out
+# v1.2 에서 여덟 건이 이 어형 하나로 미탐이었다.
+#
+# 어휘가 아니라 자리로 적는다. 대상을 나열하면 다음 회차에 `전용 회선`·
+# `직통 라인` 이 그대로 남는다. 가르는 것은 **좁혀진 창구가 화자 자신인가**다 -
+# 진짜 기관은 자기를 유일한 통로로 만들지 않는다. 그럴 필요가 없기 때문이다.
+CHANNEL_MONOPOLY_PATTERN = re.compile(
+    r"(?:저희|담당자|담당관|담당\s*조사관|담당\s*수사관|이\s*번호"
+    r"|전용\s*(?:창구|시스템|번호|회선|라인)|직통\s*(?:번호|회선|라인)"
+    r"|안내(?:드린|해\s*드린)|상담창)"
+    r"[^.!?\n]{0,12}?"
+    r"(?:에서만|으로만|로만|을\s*통해서만|를\s*통해서만"
+    r"|만\s*(?:가능|진행|연락|문의|이용|따라|따르)|유일)"
+    r"|다른\s*(?:기관|곳|번호|경로|창구)[^.!?\n]{0,8}?(?:문의|연락|이용|확인)하지"
+)
+
+# **진짜 창구를 대되 밀어내려고만 대는 자리다.**
+#
+# 창구 이름은 억제의 표지다(`_names_reachable_counter`). 그 표지를 그대로
+# 흉내 내는 어형이 실제로 있고, 흉내가 아니라 **부정**이라서 갈린다 -
+# "홈택스 말고 저희 전용 시스템으로만"·"1332는 지금 연결이 안 되니"·
+# "공식 홈페이지에는 아직 반영되지 않은 건입니다"(held-out v1.2 `fh-1049`·
+# `fh-1051`·`fh-1052`). 창구를 대는 것과 창구를 닫는 것은 반대 방향이다.
+COUNTER_EXCLUSION_PATTERN = re.compile(
+    r"(?:말고|대신에|연결이\s*안\s*되|통화가\s*안\s*되"
+    r"|반영되지\s*않|처리되지\s*않|조회되지\s*않|접수되지\s*않)"
+)
+
+# **금지의 대상이 이 연락 자체이면 고립이다.**
+#
+# `외부에` 는 v1.0 부터 고립 어휘에서 일부러 빼 두었다. 사내 공지의 대외비
+# 문구가 그 어형이기 때문이다(`fh-865`). 그래서 반대쪽도 통째로 비어 있었다 -
+# 수사 기밀을 내세운 고립 요구 다섯 건이 held-out v1.2 에서 신호 없이 지나갔다.
+#
+# 어휘로는 갈리지 않는다. 정상 쪽이 말하지 말라는 것은 읽는 사람이 이미 쥔
+# 것이다 - 조직개편 초안, 합격 사실, 협의 내용, 연구 참여자 정보, 감사 내용.
+# 사기 쪽이 말하지 말라는 것은 **이 연락 그 자체**다 - 이 건, 이 통화,
+# 저희가 안내드린 절차. `ISOLATION_SECRET_OBJECTS` 와 같은 원칙을 대상만
+# 바꿔 적은 것이고, 대상은 흉내 낼 수 없다.
+ISOLATION_CONTACT_REFERENTS = (
+    "이 건",
+    "본 건",
+    "이 통화",
+    "통화 내용",
+    "상담 내용",
+    "안내드린",
+    "안내해 드린",
+    "절차상",
+    "수사상",
+)
+# **남겨 두는 집단이 있으면 고립이 아니다.**
+#
+# "인사 발표 전까지 팀원들 외에는 아무에게도 말하지 말아 주세요"(`fh-1028`)는
+# `아무에게도 말하지` 라는 전칭 금지를 그대로 갖고 있다. 어형만 보면 고립과
+# 같은데, 앞에 예외 집단이 있어서 제3자 확인이 막히지 않는다 - 읽는 사람은
+# 팀원에게 물어볼 수 있다. 고립 요구는 이 예외를 둘 수 없다. 두는 순간
+# 요구가 무너지기 때문이다.
+#
+# 집단 이름을 함께 본다. `외에는` 만으로 가르면 "저 말고는 아무에게도"가
+# 예외로 빠진다 - 화자 자신은 집단이 아니다.
+GROUP_EXEMPTION_PATTERN = re.compile(
+    r"(?:팀원|부서원|부서|동료|참석자|관계자|실무진|당사자|본인)"
+    r"(?:들)?\s*(?:분들)?\s*(?:외에|이외에|말고)"
+)
+
+EXTERNAL_ISOLATION_PATTERN = re.compile(
+    r"(?:" + "|".join(ISOLATION_CONTACT_REFERENTS) + r")"
+    r"[^.!?\n]{0,16}?외부[에로](?:는|도|만)?\s*"
+    r"[^.!?\n]{0,10}?"
+    r"(?:알리|말하|말씀|공유|문의|유출|공개|전하)"
+    # **금지여야 한다. 보장은 금지가 아니다.**
+    #
+    # 어미를 열어 두면 같은 낱말이 반대 뜻으로 걸린다 - "상담 내용은 외부에
+    # 공개되지 않습니다"(held-out v0.7 `fh-535`)는 읽는 사람에게 아무것도
+    # 금지하지 않고, 오히려 그를 보호하겠다는 서술이다. 고립은 읽는 사람이
+    # 할 일을 막는 말이라 어미가 금지형이거나 불이익 조건이다.
+    r"(?:하)?(?:지\s*(?:마|말)|시면|면\s*안\s*[되돼됩됐된될])"
+)
+
 
 # 계좌 권한을 **사람에게 넘기라**는 요구다. held-out v0.7 `fh-508`
 # ("세무서 … 계좌 접근 권한을 담당자에게 위임해 주셔야 합니다")은 신호가
@@ -357,7 +440,14 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         ),
         18,
         "주변 확인을 막는 고립 요구",
-        patterns=(ISOLATION_PROHIBITION_PATTERN,),
+        patterns=(
+            ISOLATION_PROHIBITION_PATTERN,
+            # v1.2. 위 어형은 **누구에게** 말하지 말라는 쪽만 본다. 고립의
+            # 나머지 절반은 **어디로** 가지 말라는 쪽이고, 그 두 어형이
+            # 여기 들어온다.
+            CHANNEL_MONOPOLY_PATTERN,
+            EXTERNAL_ISOLATION_PATTERN,
+        ),
         pattern_exemptions=ISOLATION_SECRET_OBJECTS,
     ),
     SignalRule(
@@ -1138,9 +1228,19 @@ SENSITIVE_DEMAND_TERMS = (
 # 조회할 수 있습니다" 였고, held-out v1.0 `fh-871` 이 그 예언을 그대로
 # 재현했다. 브랜드 이름을 여는 것이 아니라 **이미 아는 창구의 이름만**
 # 넣는다. 재지 않은 이름(구글플레이·원스토어·정부24)은 넣지 않는다.
+# v1.2. **진짜 기관은 읽는 사람이 혼자 갈 수 있는 창구를 준다.** 위 목록은
+# 창구의 **종류**만 담고 있어서 기관이 실제로 대는 창구의 **이름**을 몰랐다 -
+# 경찰청은 이파인을, 검찰청은 형사사법포털을, 법원은 민원실을 댄다. 이름을
+# 대는 쪽이 사칭보다 오히려 구체적이라 종류 어휘에는 하나도 걸리지 않았다
+# (held-out v1.2 `fh-1001`·`fh-1002`·`fh-1006`·`fh-1008`·`fh-1010`).
+#
+# 이름은 흉내 낼 수 없다. 사칭이 이파인이나 형사사법포털을 대면 읽는 사람이
+# 거기로 가서 거짓이 드러난다. 그래서 사칭은 창구를 대지 않거나, 진짜 창구를
+# **밀어내려고만** 댄다 - 뒤쪽 `COUNTER_EXCLUSION_PATTERN` 이 그 자리다.
 CHANNEL_REFERRAL_PATTERN = re.compile(
     r"(?:영업점|창구|고객센터|대표번호|홈페이지|누리집|인터넷뱅킹|공식 앱|모바일 앱|앱 내"
-    r"|공식 스토어|앱스토어|플레이스토어|홈택스)"
+    r"|공식 스토어|앱스토어|플레이스토어|홈택스"
+    r"|민원실|인트라넷|이파인|경찰민원포털|형사사법포털|정보포털 파인|카드사 앱)"
     r"(?:에서만|에서도|에서|으로만|으로도|으로|로만|로도|로|에|\s*방문)"
 )
 CHANNEL_REFERRAL_VERBS = (
@@ -1163,6 +1263,10 @@ CHANNEL_REFERRAL_VERBS = (
     "설치",
     "내려받",
     "다운로드",
+    # v1.2. 창구 이름이 먼저 걸린 자리에서만 본다. "경찰서 대표번호로 연락
+    # 주십시오"(`fh-1005`)·"우체국 대표번호로 재배달을 신청하십시오"
+    # (`fh-1012`)가 이 낱말 하나가 없어서 창구 안내로 세어지지 않았다.
+    "연락",
 )
 
 
@@ -1229,7 +1333,44 @@ def _is_channel_referral(clause: str) -> bool:
     remainder = _strip_prohibited_segment(clause)
     if not CHANNEL_REFERRAL_PATTERN.search(remainder):
         return False
+    # v1.2. **독점된 창구도 창구 안내가 아니다.** 위 v1.0 주석과 같은 이유인데
+    # 어형이 반대다. 금지형이 창구를 닫는다면 배타 조사는 창구를 화자 하나로
+    # 좁힌다 - "확인은 저희 담당 창구에서만 가능합니다"(`fh-1020`)는 창구
+    # 어휘와 조사와 동사를 모두 갖췄지만 읽는 사람을 메시지 밖으로 내보내지
+    # 않는다. 이 절이 안내로 세어지는 동안 그 안의 고립 어형은 아예 보이지도
+    # 않았다.
+    if CHANNEL_MONOPOLY_PATTERN.search(remainder):
+        return False
     return any(verb in remainder for verb in CHANNEL_REFERRAL_VERBS)
+
+
+def _names_reachable_counter(normalized: str) -> bool:
+    """읽는 사람이 이 메시지 밖에서 혼자 갈 수 있는 창구를 지목하는가.
+
+    v1.2. **진짜 기관도 문자를 보낸다.** 자칭 무조건 층은 기관명이 나오기만
+    하면 켜지므로, 경찰청·검찰청·법원·금감원이 실제로 보내는 통지문이 전부
+    사칭으로 읽혔다(held-out v1.2 동결 시점 오탐 열 건 중 여덟 건).
+
+    갈리는 자리는 기관명이 아니라 **창구**다. 진짜 기관은 읽는 사람이 이
+    메시지 없이도 갈 수 있는 창구를 대고, 사칭은 대지 않는다 - 대는 순간
+    거기서 거짓이 드러나기 때문이다. 그래서 어휘가 아니라 방향으로 본다.
+
+    세 가지가 하나라도 있으면 창구를 준 것이 아니다. 진짜 창구를 밀어내는
+    말이 있거나(`COUNTER_EXCLUSION_PATTERN`), 창구를 화자 자신으로 좁히거나
+    (`CHANNEL_MONOPOLY_PATTERN`), 창구 안내 밖의 절에서 읽는 사람에게
+    무언가를 요구하는 경우다. 마지막 조건은 `_is_prevention_notice` 와
+    같은 이유로 있다 - 안전 문구를 앞에 붙이고 뒤에서 요구하는 혼합 문장이
+    이 억제를 노리는 가장 쉬운 우회다.
+    """
+    if not any(
+        _is_channel_referral(clause) for clause in _demanding_clauses(normalized)
+    ):
+        return False
+    if COUNTER_EXCLUSION_PATTERN.search(normalized):
+        return False
+    if CHANNEL_MONOPOLY_PATTERN.search(normalized):
+        return False
+    return not _has_reader_demand(_open_clauses(normalized))
 
 
 # 금지의 우언적 형태. `-(으)시면 안 됩니다`.
@@ -1430,6 +1571,16 @@ def _is_prevention_notice(normalized: str) -> bool:
     )
     if not has_marker:
         return False
+    # v1.2. 공식 창구를 **밀어내려고** 대는 문장이 있다. "공식 홈페이지에는
+    # 아직 반영되지 않은 건입니다. 저희 쪽 확인이 유일한 방법입니다"
+    # (`fh-1052`)는 위 표지 목록의 `공식 홈페이지` 를 그대로 갖고 있고
+    # 요구도 하지 않아서 예방 안내문으로 통과했다. 이 함수가 억제하는
+    # 근거는 "공식 창구로 가면 거짓이 드러난다"는 것인데, 그 창구를 닫는
+    # 문장에는 그 근거가 없다.
+    if COUNTER_EXCLUSION_PATTERN.search(normalized) or CHANNEL_MONOPOLY_PATTERN.search(
+        normalized
+    ):
+        return False
     return not _has_reader_demand(_open_clauses(normalized))
 
 
@@ -1580,6 +1731,15 @@ def _safe_context_suppresses(code: str, normalized: str) -> bool:
                 "제출해 주세요",
             )
         )
+    # v1.2. 자칭은 **창구를 주지 않을 때만** 사칭이다. 기관명과 함께 읽는
+    # 사람이 혼자 갈 수 있는 창구를 대고 아무것도 요구하지 않는 문장은 진짜
+    # 기관의 통지문이다. 이 억제가 `money_transfer_request` 로 넓어지지
+    # 않는 이유는, 창구를 대면서 동시에 송금을 요구하는 문장은 요구 조건에서
+    # 이미 걸러지고 남는 것이 없기 때문이다.
+    if code == "authority_impersonation" and _names_reachable_counter(normalized):
+        return True
+    if code == "secrecy_isolation" and GROUP_EXEMPTION_PATTERN.search(normalized):
+        return True
     if code in {"authority_impersonation", "money_transfer_request"}:
         return "요구하지 않습니다" in normalized and not any(
             phrase in normalized

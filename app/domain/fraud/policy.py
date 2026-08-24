@@ -332,6 +332,26 @@ STATE_PREVENTION_ACTIONS: dict[UserState, tuple[str, ...]] = {
     UserState.TRANSFERRED_MONEY: ("DO_NOT_FORWARD_MONEY",),
 }
 
+# v1.2. **상대를 적으로 부르는 말은 상대에 대한 신호가 있어야 한다.**
+#
+# 위 표의 나머지 행동은 읽는 사람 쪽에서 끝난다 - 증거를 남기고, 창구에
+# 전화하고, 더 넘기지 않는 것이다. `STOP_CONTACT` 만 방향이 반대다. 이
+# 연락 상대와 말을 끊으라는 지시라서, 상대가 적이라는 판단이 먼저 있어야
+# 한다. 그런데 상태는 **읽는 사람이 무엇을 했는지**만 말하고 상대에 대해서는
+# 아무 말도 하지 않는다.
+#
+# 그 결과 신호가 하나도 없는 정상 문장이 상태만으로 절연 지시를 받았다 -
+# 급여 입금 안내(`fh-1059`), 뉴스레터 확인(`fh-1060`), 사내 보안 프로그램
+# 설치 안내(`fh-1063`), 진료 예약 확정(`fh-1064`), 거래처 대금 회신
+# (`fh-1065`), 가족 계좌 조회 동의(`fh-1068`). 여섯 건 모두 상대가 회사·
+# 병원·거래처·가족이고, 끊으면 손해를 보는 쪽은 읽는 사람이다.
+#
+# 값은 반대쪽에서 치른다. 어휘가 비어 신호가 하나도 켜지지 않은 사기는
+# 이제 `STOP_CONTACT` 를 받지 못한다. `STATE_PREVENTION_ACTIONS` 가 v1.1
+# 에서 같은 값을 치렀고 이유도 같다 - 그 구멍은 상태 표가 아니라 각자의
+# 신호에서 메워야 한다.
+SIGNAL_GATED_STATE_ACTIONS = frozenset({"STOP_CONTACT"})
+
 STATE_MINIMUM_RISK: dict[UserState, str] = {
     UserState.RECEIVED_ONLY: "low",
     UserState.CLICKED_LINK: "medium",
@@ -478,6 +498,8 @@ def select_actions(
 ) -> list[Action]:
     signal_codes = {signal.code for signal in signals}
     action_codes: set[str] = set(STATE_ACTIONS[state])
+    if not signals:
+        action_codes -= SIGNAL_GATED_STATE_ACTIONS
     for signal in signals:
         action_codes.update(SIGNAL_ACTIONS.get(signal.code, ()))
 
