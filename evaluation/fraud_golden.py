@@ -70,6 +70,30 @@ GOLDEN_SET_PATH = Path(__file__).with_name("data") / "fraud_golden_v0.1.jsonl"
 # 안내문은 금지형으로 위험한 행동을 입에 올리고, 정상 공지는 창구를
 # `…에서만` 으로 제한하며, 청구서는 오늘 자정을 말하고, 은행은 대환 대출을
 # 안내한다. 넓히기가 한 칸이라도 넘치면 그 자리에서 바로 드러난다.
+#
+# v1.3 은 v1.2 가 남긴 결함을 고치기 전에 얼린 셋이고, **셋을 짜는 순서가
+# 다르다.**
+#
+# v1.2 는 설계까지 끝낸 수정 둘을 커밋하지 못한 채 끝났다. 창구 부재 규칙과
+# `card_delivery_claim` 천장인데, 어형은 분명했고 규칙도 썼는데 **그 수정이
+# 값을 치를 정상 문장이 셋에 없었다.** 그 상태에서 커밋하면 held-out 점수는
+# 올라간다 - 값을 치를 자리가 없으니 오를 수밖에 없다. 그것은 고친 것이
+# 아니라 옮긴 것이다. **측정할 수 없는 수정은 고친 것이 아니다.**
+#
+# 그래서 이 셋은 반대 순서로 짰다. 넓히려는 어형마다 **그 어형을 정상적으로
+# 쓰는 문장을 먼저 놓고**, 그 다음에 사기 쪽을 채웠다. 84건 중 정상이
+# 41건이고 전부 천장을 선언한다.
+#
+# 방향은 전부 **넓히기** 하나다. 앞선 회차들이 자리 수정과 어휘 넓히기를
+# 섞어서 무엇 때문에 움직였는지 갈라내기 어려웠는데, 이번에는 여덟 묶음이
+# 각자 자기 값을 들고 있어 귀속이 묶음 단위로 닫힌다.
+#
+# 가장 어려운 자리는 A·B 묶음이다. 진짜 기관도 창구 없이 회신만 약속한다
+# ("접수해 주신 건, 담당자가 확인 후 연락드리겠습니다"). 창구 부재만으로
+# 가르면 이 문장들이 전부 무너지므로 갈리는 자리는 **누가 이 일을
+# 시작했는가**다 - 읽는 사람이 시작한 일이면 회신을 기다리는 것이 정상이고,
+# 시작하지 않은 일이면 확인할 창구가 있어야 한다. 두 묶음은 기관·어형·창구
+# 부재를 공유하고 **그 한 자리만 다르게** 짜 두었다.
 HOLDOUT_V0_2_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.2.jsonl"
 HOLDOUT_V0_3_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.3.jsonl"
 HOLDOUT_V0_4_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.4.jsonl"
@@ -81,6 +105,7 @@ HOLDOUT_V0_9_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.9.jsonl
 HOLDOUT_V1_0_PATH = Path(__file__).with_name("data") / "fraud_holdout_v1.0.jsonl"
 HOLDOUT_V1_1_PATH = Path(__file__).with_name("data") / "fraud_holdout_v1.1.jsonl"
 HOLDOUT_V1_2_PATH = Path(__file__).with_name("data") / "fraud_holdout_v1.2.jsonl"
+HOLDOUT_V1_3_PATH = Path(__file__).with_name("data") / "fraud_holdout_v1.3.jsonl"
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",
