@@ -5,8 +5,12 @@
 무엇이 잘못됐을 때 어떻게 접히는가** 다.
 
 프로바이더 쪽에서 가장 중요한 성질은 하나다. **실패는 전부 `LlmUnavailable` 로
-수렴한다.** 어떤 실패든 `explain_analysis` 에서 `None` 이 되고, 판정은 그대로
-나간다. 새로운 예외 타입이 여기서 새어 나가면 그 경로가 깨진다.
+수렴한다.** 어떤 실패든 설명이 비고 판정은 그대로 나간다. 새로운 예외 타입이
+여기서 새어 나가면 그 경로가 깨진다.
+
+타입은 하나로 수렴하되 **사유는 갈린다.** 예외에 붙는 `ExplanationOutcome` 이
+어느 실패인지 말해 주고, 그것만이 로그와 지표로 나간다. 사유별 대응표는
+`tests/test_llm_explanation_outcomes.py` 가 따로 지킨다.
 """
 
 from __future__ import annotations
@@ -27,7 +31,12 @@ from app.clients.google_ai_studio import (
 )
 from app.schemas.analysis import AnalyzeRequest, UserState
 from app.services.fraud_analysis import analyze_fraud
-from app.services.llm import LlmContract, LlmUnavailable, explain_analysis
+from app.services.llm import (
+    ExplanationOutcome,
+    LlmContract,
+    LlmUnavailable,
+    explain_analysis,
+)
 from app.services.llm.explanation import fraud_explanation_contract
 
 API_KEY = "test-key-not-a-real-one"
@@ -311,14 +320,15 @@ def test_full_path_sends_no_raw_identifiers_and_keeps_the_verdict(
     )
     before = analysis.model_dump()
 
-    explanation = explain_analysis(
+    attempt = explain_analysis(
         analysis,
         SUSPICIOUS_TEXT,
         provider=_provider_with(handler),
         contract=contract,
     )
 
-    assert explanation == "이 문자는 정상 절차와 다릅니다."
+    assert attempt.text == "이 문자는 정상 절차와 다릅니다."
+    assert attempt.outcome is ExplanationOutcome.OK
     assert analysis.model_dump() == before
 
     (request,) = seen
@@ -341,14 +351,15 @@ def test_provider_failure_leaves_the_verdict_intact(contract: LlmContract) -> No
     )
     before = analysis.model_dump()
 
-    assert (
-        explain_analysis(
-            analysis,
-            SUSPICIOUS_TEXT,
-            provider=_provider_with(handler),
-            contract=contract,
-        )
-        is None
+    attempt = explain_analysis(
+        analysis,
+        SUSPICIOUS_TEXT,
+        provider=_provider_with(handler),
+        contract=contract,
     )
+
+    assert attempt.text is None
+    # 타임아웃은 우리 예산 이야기라 다른 전송 오류와 따로 센다(`outcomes.py`).
+    assert attempt.outcome is ExplanationOutcome.TIMEOUT
     assert analysis.model_dump() == before
     assert analysis.risk_level == "high"

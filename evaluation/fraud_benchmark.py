@@ -212,9 +212,9 @@ def _hybrid_section(
         ),
         "detection_identical_to": "scenario_engine_v0_1",
         "why_identical": (
-            "explain_analysis 는 AnalyzeResponse 를 받아 str | None 을 돌려준다. "
-            "설명 계층은 위험 수준·유형·행동을 구조적으로 바꿀 수 없다 "
-            "(app/services/llm/explanation.py)."
+            "explain_analysis 는 AnalyzeResponse 를 받아 ExplanationAttempt "
+            "(문장 하나와 결과 사유)를 돌려준다. 설명 계층은 위험 수준·유형·행동을 "
+            "구조적으로 바꿀 수 없다 (app/services/llm/explanation.py)."
         ),
         "binary": engine["binary"],
         "scenario_policy_accuracy": engine["scenario_policy_accuracy"],
@@ -226,8 +226,11 @@ def _hybrid_section(
             "fallback_model": "gemini-3.1-flash-lite",
             "measured_in": "docs/34-llm-explanation-runtime.md",
             "note": (
-                "설명 문장의 근거 이탈률과 안전 필터 차단율은 아직 측정하지 "
-                "않았다. 여기 숫자는 탐지 성능이며 설명 품질이 아니다."
+                "설명 문장의 근거 이탈률과 안전 필터 차단율은 이제 셀 수 있으나 "
+                "아직 숫자가 없다. 계측은 2026-08-24 에 넣었고 "
+                "(app/core/observability.py 의 ExplanationMetrics), 유료 실행을 "
+                "하지 않았으므로 분모가 0 이다. 여기 숫자는 탐지 성능이며 "
+                "설명 품질이 아니다."
             ),
         },
     }

@@ -33,6 +33,7 @@ from app.core.runtime_secrets import (
     read_secret_setting,
 )
 from app.services.llm.contract import LlmContract
+from app.services.llm.outcomes import ExplanationOutcome
 from app.services.llm.provider import LlmUnavailable
 
 API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -98,10 +99,14 @@ class GoogleAiStudioProvider:
             # 계약이 다른 프로바이더용인데 여기로 흘러왔다. 조용히 처리하면 어디로
             # 나가는지 아무도 모르게 된다.
             raise LlmUnavailable(
-                f"{PROVIDER_NAME} cannot serve a contract for {contract.provider}"
+                f"{PROVIDER_NAME} cannot serve a contract for {contract.provider}",
+                outcome=ExplanationOutcome.PROVIDER_MISCONTRACTED,
             )
         if not _MODEL_PATTERN.match(contract.model):
-            raise LlmUnavailable(f"unsupported model name: {contract.model!r}")
+            raise LlmUnavailable(
+                f"unsupported model name: {contract.model!r}",
+                outcome=ExplanationOutcome.UNSUPPORTED_MODEL,
+            )
 
         url = f"{API_BASE_URL}/{contract.model}:generateContent"
         payload: dict[str, Any] = {
@@ -128,22 +133,49 @@ class GoogleAiStudioProvider:
                     response = client.post(url, json=payload, headers=headers)
         except httpx.HTTPError as exc:
             # 예외 본문에 원인 문자열만 넣는다. 요청 본문은 넣지 않는다.
+            #
+            # 타임아웃을 따로 센다. 이 칸이 오르는 것은 프로바이더 장애가 아니라
+            # **우리 예산이 좁다**는 뜻이고, 다른 전송 오류와 뭉치면 그 구분이
+            # 사라진다(`outcomes.py`).
             raise LlmUnavailable(
-                f"{PROVIDER_NAME} request failed: {type(exc).__name__}"
+                f"{PROVIDER_NAME} request failed: {type(exc).__name__}",
+                outcome=(
+                    ExplanationOutcome.TIMEOUT
+                    if isinstance(exc, httpx.TimeoutException)
+                    else ExplanationOutcome.TRANSPORT_ERROR
+                ),
             ) from exc
 
         if response.status_code != 200:
             # 상태 코드만 남긴다. 본문은 요청 일부를 되돌려 줄 수 있다.
+            #
+            # 지표에 상태 코드를 라벨로 붙이지 않는 것도 같은 규율이다. 프로바이더가
+            # 내는 코드는 우리가 정하는 목록이 아니다.
             raise LlmUnavailable(
-                f"{PROVIDER_NAME} returned HTTP {response.status_code}"
+                f"{PROVIDER_NAME} returned HTTP {response.status_code}",
+                outcome=ExplanationOutcome.HTTP_ERROR,
             )
 
         try:
             body = response.json()
         except ValueError as exc:
-            raise LlmUnavailable(f"{PROVIDER_NAME} returned a non-JSON body") from exc
+            raise LlmUnavailable(
+                f"{PROVIDER_NAME} returned a non-JSON body",
+                outcome=ExplanationOutcome.MALFORMED_BODY,
+            ) from exc
 
         return _extract_text(body)
+
+
+# 프로바이더가 주는 `finishReason` 을 우리 어휘로 옮기는 표. 여기 없는 값은
+# `STOPPED_EARLY` 로 접는다 - **프로바이더 문자열이 그대로 라벨이 되는 경로를 두지
+# 않는다.** Gemini 가 새 사유를 추가하면 우리 지표에 새 시계열이 생기는 것이 아니라
+# `stopped_early` 가 오르고, 그때 이 표를 고치는 것이 검토를 거치는 자리다.
+_FINISH_REASON_OUTCOMES = {
+    "SAFETY": ExplanationOutcome.SAFETY_BLOCKED,
+    "MAX_TOKENS": ExplanationOutcome.TRUNCATED,
+    "RECITATION": ExplanationOutcome.RECITATION_BLOCKED,
+}
 
 
 def _extract_text(body: Any) -> str:
@@ -151,29 +183,66 @@ def _extract_text(body: Any) -> str:
 
     빈 문자열을 돌려주지 않는 것이 중요하다. 빈 문자열은 "모델이 답했지만 할 말이
     없었다" 처럼 보이는데, 실제로는 안전 필터에 막혔거나 응답 모양이 바뀐 것이다.
+
+    실패는 여전히 하나의 예외로 나가지만 **사유는 하나가 아니다.** 예외에 붙는
+    `outcome` 이 여기서 갈리고, 그것만이 로그와 지표에 나간다. 응답 본문에서 온
+    문자열은 한 글자도 나가지 않는다 - 사유 문자열을 라벨로 쓰면 400 응답이
+    되돌려 준 요청 조각이 지표에 실린다.
     """
     if not isinstance(body, dict):
-        raise LlmUnavailable(f"{PROVIDER_NAME} returned an unexpected payload shape")
+        raise LlmUnavailable(
+            f"{PROVIDER_NAME} returned an unexpected payload shape",
+            outcome=ExplanationOutcome.MALFORMED_BODY,
+        )
 
     candidates = body.get("candidates")
     if not isinstance(candidates, list) or not candidates:
-        # 안전 필터 차단이 여기로 온다. `promptFeedback.blockReason` 이 붙지만
-        # 사유 문자열을 그대로 올리지는 않는다.
-        raise LlmUnavailable(f"{PROVIDER_NAME} returned no candidate")
+        # 후보가 없는 두 경우를 나눈다. `promptFeedback.blockReason` 이 붙어 있으면
+        # **우리가 보낸 것이 거부된 것**이고(사기 문자를 그대로 넣는 서비스라
+        # 정상 입력에서도 일어날 수 있다), 없으면 응답 모양이 우리가 아는 것과
+        # 다른 것이다. 둘을 같이 세면 프롬프트를 고쳐야 할 때를 놓친다.
+        #
+        # 사유 문자열(`SAFETY`·`OTHER`·`BLOCKLIST`…)은 읽지 않는다. **붙어 있다는
+        # 사실만** 본다 - 어느 값이 오든 우리가 할 일은 같고, 값을 라벨로 옮기는
+        # 순간 프로바이더가 우리 어휘를 정하게 된다.
+        prompt_feedback = body.get("promptFeedback")
+        blocked = (
+            isinstance(prompt_feedback, dict) and "blockReason" in prompt_feedback
+        )
+        raise LlmUnavailable(
+            f"{PROVIDER_NAME} returned no candidate",
+            outcome=(
+                ExplanationOutcome.PROMPT_BLOCKED
+                if blocked
+                else ExplanationOutcome.MALFORMED_BODY
+            ),
+        )
 
     candidate = candidates[0]
     if not isinstance(candidate, dict):
-        raise LlmUnavailable(f"{PROVIDER_NAME} returned an unexpected candidate shape")
+        raise LlmUnavailable(
+            f"{PROVIDER_NAME} returned an unexpected candidate shape",
+            outcome=ExplanationOutcome.MALFORMED_BODY,
+        )
 
     finish_reason = candidate.get("finishReason")
     if finish_reason not in (None, "STOP"):
         # MAX_TOKENS 로 잘린 문장을 사용자에게 보여 주지 않는다. SAFETY,
         # RECITATION 도 마찬가지로 설명 없이 간다.
-        raise LlmUnavailable(f"{PROVIDER_NAME} stopped early: {finish_reason}")
+        raise LlmUnavailable(
+            f"{PROVIDER_NAME} stopped early: {finish_reason}",
+            outcome=_FINISH_REASON_OUTCOMES.get(
+                finish_reason if isinstance(finish_reason, str) else "",
+                ExplanationOutcome.STOPPED_EARLY,
+            ),
+        )
 
     parts = candidate.get("content", {}).get("parts")
     if not isinstance(parts, list):
-        raise LlmUnavailable(f"{PROVIDER_NAME} returned no content parts")
+        raise LlmUnavailable(
+            f"{PROVIDER_NAME} returned no content parts",
+            outcome=ExplanationOutcome.MALFORMED_BODY,
+        )
 
     text = "".join(
         part["text"]
@@ -181,7 +250,10 @@ def _extract_text(body: Any) -> str:
         if isinstance(part, dict) and isinstance(part.get("text"), str)
     )
     if not text.strip():
-        raise LlmUnavailable(f"{PROVIDER_NAME} returned empty text")
+        raise LlmUnavailable(
+            f"{PROVIDER_NAME} returned empty text",
+            outcome=ExplanationOutcome.EMPTY_TEXT,
+        )
     return text
 
 

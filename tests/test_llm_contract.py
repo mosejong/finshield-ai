@@ -22,6 +22,7 @@ import pytest
 from app.schemas.analysis import AnalyzeRequest, AnalyzeResponse, UserState
 from app.services.fraud_analysis import analyze_fraud
 from app.services.llm import (
+    ExplanationOutcome,
     LlmContract,
     LlmContractError,
     LlmOutputRejected,
@@ -259,45 +260,64 @@ def test_over_length_output_is_rejected(response: AnalyzeResponse) -> None:
 def test_unavailable_provider_yields_no_explanation(
     response: AnalyzeResponse, contract: LlmContract
 ) -> None:
+    """사유를 붙이지 않은 프로바이더도 받아 준다.
+
+    `LlmProvider` 는 Protocol 이라 우리가 쓰지 않은 구현이 사유 없이
+    `LlmUnavailable` 을 던질 수 있다. 그때 `TypeError` 로 요청이 죽으면, 설명이
+    없어도 판정은 나가야 한다는 이 계층의 전제가 무너진다. `unspecified` 로
+    세는 것이 그 자리다.
+    """
+
     class DeadProvider:
         name = "stub"
 
         def generate(self, *, contract: LlmContract, prompt: str) -> str:
             raise LlmUnavailable("timeout")
 
-    assert (
-        explain_analysis(
-            response, SUSPICIOUS_TEXT, provider=DeadProvider(), contract=contract
-        )
-        is None
+    attempt = explain_analysis(
+        response, SUSPICIOUS_TEXT, provider=DeadProvider(), contract=contract
     )
+
+    assert attempt.text is None
+    assert attempt.outcome is ExplanationOutcome.UNSPECIFIED
 
 
 def test_stub_refuses_a_contract_for_another_provider(
     response: AnalyzeResponse,
 ) -> None:
-    """실제 프로바이더 계약이 stub 으로 잘못 흘러도 조용히 성공하지 않는다."""
+    """실제 프로바이더 계약이 stub 으로 잘못 흘러도 조용히 성공하지 않는다.
+
+    조립 오류를 프로바이더 장애와 같은 칸에 세면, 계약이 잘못 흘러가는 배포에서
+    "왜 항상 대체 모델이 답하는가" 를 영영 찾지 못한다.
+    """
     vertex_contract = fraud_explanation_contract(
         provider="google_vertex", model="gemini-2.0-flash"
     )
-    assert (
-        explain_analysis(
-            response, SUSPICIOUS_TEXT, provider=StubProvider(), contract=vertex_contract
-        )
-        is None
+
+    attempt = explain_analysis(
+        response, SUSPICIOUS_TEXT, provider=StubProvider(), contract=vertex_contract
     )
+
+    assert attempt.text is None
+    assert attempt.outcome is ExplanationOutcome.PROVIDER_MISCONTRACTED
 
 
 def test_rejected_output_yields_no_explanation(
     response: AnalyzeResponse, contract: LlmContract
 ) -> None:
+    """지어낸 연락처는 다른 거부와 같은 칸에 세지 않는다.
+
+    이 서비스가 낼 수 있는 가장 나쁜 출력이라 따로 센다 - 사용자가 그 번호로
+    전화를 건다. 길이 초과와 뭉치면 경보를 걸 수 있는 숫자가 사라진다.
+    """
     provider = StubProvider(response="지금 당장 02-9999-8888 로 전화하세요.")
-    assert (
-        explain_analysis(
-            response, SUSPICIOUS_TEXT, provider=provider, contract=contract
-        )
-        is None
+
+    attempt = explain_analysis(
+        response, SUSPICIOUS_TEXT, provider=provider, contract=contract
     )
+
+    assert attempt.text is None
+    assert attempt.outcome is ExplanationOutcome.REJECTED_INVENTED_CONTACT
 
 
 @pytest.mark.parametrize(
@@ -323,7 +343,7 @@ def test_the_verdict_survives_any_model_output(
     )
     before = analysis.model_dump()
 
-    explanation = explain_analysis(
+    attempt = explain_analysis(
         analysis,
         SUSPICIOUS_TEXT,
         provider=StubProvider(response=model_output),
@@ -332,4 +352,5 @@ def test_the_verdict_survives_any_model_output(
 
     assert analysis.model_dump() == before
     assert analysis.risk_level == "high"
-    assert explanation is None or isinstance(explanation, str)
+    assert attempt.text is None or isinstance(attempt.text, str)
+    assert attempt.outcome in tuple(ExplanationOutcome)
