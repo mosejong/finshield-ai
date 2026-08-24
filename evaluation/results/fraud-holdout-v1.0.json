@@ -1,27 +1,28 @@
 {
   "api_latency": {
-    "max_ms": 30.285,
-    "p50_ms": 3.032,
-    "p95_ms": 4.865,
-    "sample_count": 216,
+    "max_ms": 36.45,
+    "p50_ms": 2.943,
+    "p95_ms": 4.284,
+    "sample_count": 210,
     "scope": "in_process_asgi_without_network_or_tls"
   },
   "dataset": {
-    "case_count": 72,
+    "case_count": 70,
     "held_out": true,
     "id": "fraud_holdout_v1.0",
-    "negative_count": 34,
-    "normalized_sha256": "a372d89786e64802fdbc3c8f7ebdcff69cc756d3a2675dce0810bd13030a849c",
+    "negative_count": 32,
+    "normalized_sha256": "ba90db9dbae7d7f578b58405aa4b27bbb22f5e993d2146fcaf4e266d091a9c19",
     "persona_counts": {
-      "early_career": 67,
-      "small_business": 5
+      "early_career": 59,
+      "small_business": 5,
+      "unknown": 6
     },
     "positive_count": 38,
     "source_kind": "locally_authored_synthetic_reviewed",
     "state_counts": {
       "clicked_link": 1,
       "installed_app": 1,
-      "received_only": 66,
+      "received_only": 64,
       "received_unknown_money": 1,
       "shared_account_access": 1,
       "shared_personal_info": 1,
@@ -38,14 +39,14 @@
       "status": "not_run"
     },
     "binary": {
-      "accuracy": 0.972222,
+      "accuracy": 0.971429,
       "f1": 0.972973,
       "false_negative": 2,
       "false_positive": 0,
       "false_positive_rate": 0.0,
       "precision": 1.0,
       "recall": 0.947368,
-      "true_negative": 34,
+      "true_negative": 32,
       "true_positive": 36
     },
     "detection_identical_to": "scenario_engine_v0_1",
@@ -58,21 +59,21 @@
     },
     "forbidden_action_avoidance": 1.0,
     "required_action_coverage": 0.969697,
-    "scenario_policy_accuracy": 0.958333,
+    "scenario_policy_accuracy": 0.957143,
     "scope": "deterministic engine decides; the model only rewrites that decision in plain Korean",
     "status": "measured",
     "why_identical": "explain_analysis 는 AnalyzeResponse 를 받아 str | None 을 돌려준다. 설명 계층은 위험 수준·유형·행동을 구조적으로 바꿀 수 없다 (app/services/llm/explanation.py)."
   },
   "legacy_rule_v0": {
     "binary": {
-      "accuracy": 0.763889,
+      "accuracy": 0.757143,
       "f1": 0.711865,
       "false_negative": 17,
       "false_positive": 0,
       "false_positive_rate": 0.0,
       "precision": 1.0,
       "recall": 0.552632,
-      "true_negative": 34,
+      "true_negative": 32,
       "true_positive": 21
     },
     "errors": {
@@ -106,14 +107,14 @@
   "report_version": "fraud_benchmark_v0.1",
   "scenario_engine_v0_1": {
     "binary": {
-      "accuracy": 0.972222,
+      "accuracy": 0.971429,
       "f1": 0.972973,
       "false_negative": 2,
       "false_positive": 0,
       "false_positive_rate": 0.0,
       "precision": 1.0,
       "recall": 0.947368,
-      "true_negative": 34,
+      "true_negative": 32,
       "true_positive": 36
     },
     "errors": {
@@ -190,7 +191,7 @@
     "required_action_coverage": 0.969697,
     "required_signal_coverage": 0.9375,
     "risk_ceiling_accuracy": 1.0,
-    "scenario_policy_accuracy": 0.958333,
+    "scenario_policy_accuracy": 0.957143,
     "scope": "deterministic signals, taxonomy, state policy and evidence"
   }
 }

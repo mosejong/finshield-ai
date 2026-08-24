@@ -58,6 +58,18 @@ GOLDEN_SET_PATH = Path(__file__).with_name("data") / "fraud_golden_v0.1.jsonl"
 # 넓히기도 좁히기도 올리기도 아닌 **갈아 끼우기**라서, 값은 양쪽에서
 # 치러진다. 자칭이 없는 쪽으로 너무 돌면 기관 사칭 열 건이 공식 창구를
 # 잃고, 자칭 쪽으로 너무 돌면 지인 사칭 네 건이 v0.4 회귀가 된다.
+#
+# v1.0 은 **앞선 회차들이 이름으로 적어 둔 결함만** 재는 셋이다. 새로
+# 상상한 사기 어형이 아니라 v0.9 §9 가 다음 회차 몫으로 남긴 목록이
+# 그대로 다섯 그룹이 됐다 - 우언적 금지 어형, 자기 경로 제한, 숫자로 적은
+# 기한, 띄어 쓴 `대환 대출`, 고립 요구만 든 조건부 자칭.
+#
+# 다섯 수정이 **전부 넓히기**라서 값은 한 방향으로만 치러진다. 그래서 이
+# 셋은 사기보다 정상을 세게 짠다 - 정상 34건 전부가 천장을 선언하고, 그중
+# 스물여덟 건이 **넓히려는 바로 그 어형을 쓰는 정상 문장**이다. 예방
+# 안내문은 금지형으로 위험한 행동을 입에 올리고, 정상 공지는 창구를
+# `…에서만` 으로 제한하며, 청구서는 오늘 자정을 말하고, 은행은 대환 대출을
+# 안내한다. 넓히기가 한 칸이라도 넘치면 그 자리에서 바로 드러난다.
 HOLDOUT_V0_2_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.2.jsonl"
 HOLDOUT_V0_3_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.3.jsonl"
 HOLDOUT_V0_4_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.4.jsonl"
@@ -66,6 +78,7 @@ HOLDOUT_V0_6_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.6.jsonl
 HOLDOUT_V0_7_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.7.jsonl"
 HOLDOUT_V0_8_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.8.jsonl"
 HOLDOUT_V0_9_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.9.jsonl"
+HOLDOUT_V1_0_PATH = Path(__file__).with_name("data") / "fraud_holdout_v1.0.jsonl"
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",

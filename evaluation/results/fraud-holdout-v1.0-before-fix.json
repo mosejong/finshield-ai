@@ -1,27 +1,28 @@
 {
   "api_latency": {
-    "max_ms": 34.288,
-    "p50_ms": 3.292,
-    "p95_ms": 5.267,
-    "sample_count": 216,
+    "max_ms": 29.571,
+    "p50_ms": 2.747,
+    "p95_ms": 4.352,
+    "sample_count": 210,
     "scope": "in_process_asgi_without_network_or_tls"
   },
   "dataset": {
-    "case_count": 72,
+    "case_count": 70,
     "held_out": true,
     "id": "fraud_holdout_v1.0",
-    "negative_count": 34,
-    "normalized_sha256": "a372d89786e64802fdbc3c8f7ebdcff69cc756d3a2675dce0810bd13030a849c",
+    "negative_count": 32,
+    "normalized_sha256": "ba90db9dbae7d7f578b58405aa4b27bbb22f5e993d2146fcaf4e266d091a9c19",
     "persona_counts": {
-      "early_career": 67,
-      "small_business": 5
+      "early_career": 59,
+      "small_business": 5,
+      "unknown": 6
     },
     "positive_count": 38,
     "source_kind": "locally_authored_synthetic_reviewed",
     "state_counts": {
       "clicked_link": 1,
       "installed_app": 1,
-      "received_only": 66,
+      "received_only": 64,
       "received_unknown_money": 1,
       "shared_account_access": 1,
       "shared_personal_info": 1,
@@ -38,12 +39,12 @@
       "status": "not_run"
     },
     "binary": {
-      "accuracy": 0.833333,
-      "f1": 0.853659,
+      "accuracy": 0.857143,
+      "f1": 0.875,
       "false_negative": 3,
-      "false_positive": 9,
-      "false_positive_rate": 0.264706,
-      "precision": 0.795455,
+      "false_positive": 7,
+      "false_positive_rate": 0.21875,
+      "precision": 0.833333,
       "recall": 0.921053,
       "true_negative": 25,
       "true_positive": 35
@@ -58,19 +59,19 @@
     },
     "forbidden_action_avoidance": 1.0,
     "required_action_coverage": 0.878788,
-    "scenario_policy_accuracy": 0.805556,
+    "scenario_policy_accuracy": 0.8,
     "scope": "deterministic engine decides; the model only rewrites that decision in plain Korean",
     "status": "measured",
     "why_identical": "explain_analysis 는 AnalyzeResponse 를 받아 str | None 을 돌려준다. 설명 계층은 위험 수준·유형·행동을 구조적으로 바꿀 수 없다 (app/services/llm/explanation.py)."
   },
   "legacy_rule_v0": {
     "binary": {
-      "accuracy": 0.638889,
-      "f1": 0.606061,
+      "accuracy": 0.657143,
+      "f1": 0.625,
       "false_negative": 18,
-      "false_positive": 8,
-      "false_positive_rate": 0.235294,
-      "precision": 0.714286,
+      "false_positive": 6,
+      "false_positive_rate": 0.1875,
+      "precision": 0.769231,
       "recall": 0.526316,
       "true_negative": 26,
       "true_positive": 20
@@ -97,12 +98,10 @@
         "fh-835"
       ],
       "false_positive_case_ids": [
-        "fh-839",
         "fh-840",
         "fh-841",
         "fh-842",
         "fh-844",
-        "fh-846",
         "fh-847",
         "fh-848"
       ]
@@ -116,12 +115,12 @@
   "report_version": "fraud_benchmark_v0.1",
   "scenario_engine_v0_1": {
     "binary": {
-      "accuracy": 0.833333,
-      "f1": 0.853659,
+      "accuracy": 0.857143,
+      "f1": 0.875,
       "false_negative": 3,
-      "false_positive": 9,
-      "false_positive_rate": 0.264706,
-      "precision": 0.795455,
+      "false_positive": 7,
+      "false_positive_rate": 0.21875,
+      "precision": 0.833333,
       "recall": 0.921053,
       "true_negative": 25,
       "true_positive": 35
@@ -133,12 +132,10 @@
         "fh-806"
       ],
       "false_positive_case_ids": [
-        "fh-839",
         "fh-840",
         "fh-841",
         "fh-842",
         "fh-844",
-        "fh-846",
         "fh-847",
         "fh-848",
         "fh-871"
@@ -148,8 +145,8 @@
     "forbidden_action_avoidance": 1.0,
     "fraud_types": {
       "account_access_request": {
-        "f1": 0.8125,
-        "precision": 0.722222,
+        "f1": 0.83871,
+        "precision": 0.764706,
         "recall": 0.928571,
         "support": 14
       },
@@ -202,16 +199,16 @@
         "support": 2
       },
       "smishing_malware": {
-        "f1": 0.705883,
-        "precision": 0.545455,
+        "f1": 0.75,
+        "precision": 0.6,
         "recall": 1.0,
         "support": 6
       }
     },
     "required_action_coverage": 0.878788,
     "required_signal_coverage": 0.71875,
-    "risk_ceiling_accuracy": 0.735294,
-    "scenario_policy_accuracy": 0.805556,
+    "risk_ceiling_accuracy": 0.78125,
+    "scenario_policy_accuracy": 0.8,
     "scope": "deterministic signals, taxonomy, state policy and evidence"
   }
 }
