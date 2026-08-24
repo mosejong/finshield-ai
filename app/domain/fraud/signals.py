@@ -82,7 +82,33 @@ ACCOUNT_AUTHORITY_SEQUENCES: tuple[tuple[str, ...], ...] = tuple(
 SIGNAL_RULES: tuple[SignalRule, ...] = (
     SignalRule(
         "urgency_pressure",
-        ("오늘까지", "즉시", "긴급", "지금 바로", "곧 정지", "시간이 없습니다"),
+        (
+            "오늘까지",
+            "즉시",
+            "긴급",
+            "지금 바로",
+            "곧 정지",
+            "시간이 없습니다",
+            # v1.0. 여섯 낱말로는 **기한을 숫자로 적은 재촉**이 하나도
+            # 걸리지 않았다. held-out v1.0 은 그 어형만 여섯 건 담고 있고
+            # (`fh-807`·`fh-813`~`fh-818`), 그 중 넷은 접근수단 요구와
+            # 짝을 이루므로 재촉이 보이지 않으면 등급이 medium 에서 멈춘다.
+            #
+            # 값은 천장에서 치러진다. 같은 시간 표현은 평범한 안내문도
+            # 쓰기 때문이다("자동이체일이 내일이라 오늘 자정까지 잔액을
+            # 확인해 주세요"). 그래서 **점수를 만드는 `LEGACY_RULES` 는
+            # 건드리지 않는다** - 이 어휘는 등급 조합과 설명에만 쓰이고,
+            # 정상 안내문의 점수는 0 그대로다. 정상 34건이 전부 천장을
+            # 선언하고 있으므로 그 판단은 이 회차에서 측정된다.
+            "1시간 안에",
+            "30분 내",
+            "오늘 자정까지",
+            "내일까지",
+            "금일 중",
+            # `마감이 임박했습니다`(이벤트 안내, `fh-855`)와 갈리도록
+            # 붙여 쓴 형태만 넣는다.
+            "마감 임박",
+        ),
         12,
         "긴급한 행동 압박",
     ),
@@ -218,6 +244,23 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
             "저와만 연락",
             "저에게만 연락",
             "제게만 연락",
+            # v1.0. 두 어형이 비어 있었다. 둘 다 위 원칙의 두 갈래 안에
+            # 있는데 낱말만 없었다.
+            #
+            # `직원에게도 알리` 는 전칭이 아니라 **확인할 수 있는 단 한
+            # 사람**을 지목해 막는다("이 사건은 비공개라 은행 직원에게도
+            # 알리지 마세요", `fh-824`). 전칭보다 좁아 보이지만 막는
+            # 대상이 창구 그 자체라 효과는 더 크다.
+            #
+            # `다른 곳에 연락하지` 는 창구 봉쇄 쪽이다("통화 중 다른 곳에
+            # 연락하지 마시고 대기해 주세요", `fh-823`). `통화를 끊지` 와
+            # 같은 요구를 반대편에서 적은 것이다.
+            #
+            # 기밀 유지는 여전히 넣지 않는다 - "외부에 공유하지 말아
+            # 주세요"(사내 공지, `fh-865`)는 화제를 집단 안에 두는 말이지
+            # 제3자 확인을 막는 말이 아니다.
+            "직원에게도 알리",
+            "다른 곳에 연락하지",
         ),
         18,
         "주변 확인을 막는 고립 요구",
@@ -367,6 +410,18 @@ SIGNAL_RULES: tuple[SignalRule, ...] = (
         ),
         30,
         "대출·정책금융 제안",
+        # v1.0. `대환대출` 은 붙여 쓴 형태만 있었다. 띄어 쓰면 같은 낱말이
+        # 통째로 보이지 않아 held-out v1.0 의 대출 사기 세 건이 유형까지
+        # 함께 비었다(`fh-819`~`fh-821`, 유형 F1 0.0).
+        #
+        # 무조건 층에 넣지 않는다. **띄어 쓴 형태는 정상 안내문이 쓰는
+        # 형태이기도 하다** - "대환 대출 상담은 영업점 창구에서 신청하실
+        # 수 있습니다"(`fh-860`). 붙여 쓴 `대환대출` 은 광고 문구에 가깝고
+        # 띄어 쓴 쪽은 그냥 제도 이름이라, 같은 낱말이라도 자리가 다르다.
+        # 그래서 민감 요구가 함께 있을 때만 켠다 - `지검` 을 두 층으로
+        # 나눈 것과 같은 이유이고, 정상 넷(`fh-860`~`fh-863`)이 그 판단을
+        # 이 회차에서 측정한다.
+        request_gated_keywords=("대환 대출",),
     ),
     SignalRule(
         "credential_request",
@@ -922,6 +977,14 @@ SENSITIVE_REQUEST_SIGNALS = frozenset(
         "money_transfer_request",
         "receive_and_forward_money",
         "card_delivery_claim",
+        # v1.0. 고립 요구도 기관이 문자로 시키지 않는 요구다. 등급 조합은
+        # 이미 그렇게 적혀 있는데(`{authority_impersonation,
+        # secrecy_isolation}`) 이 목록에만 빠져 있어서, **고립 요구 하나만
+        # 들고 오는 자칭이 켜지지 않았다** - "서울중앙지검 수사팀입니다.
+        # 수사 기밀이라 가족을 포함해 누구에게도 말씀하지 마십시오"
+        # (`fh-822`)는 `지검` 이 요구 게이트에 있어 자칭이 사라진다.
+        # 넘겨줄 물건이 없을 뿐 요구가 없는 것이 아니다.
+        "secrecy_isolation",
     }
 )
 
@@ -972,8 +1035,17 @@ SENSITIVE_DEMAND_TERMS = (
 # (그래야 "○○은행 고객센터입니다" 같은 자칭이 걸리지 않는다), 같은 절에
 # **안내 서술어**가 있어야 한다. 절 단위로만 본다. 메시지 단위로 보면 안전한
 # 첫 문장 하나로 나머지 전부가 통과한다.
+# v1.0. 앱을 어디서 받으라고 하는 안내가 통째로 빠져 있었다. 스토어는
+# **읽는 사람이 이미 아는 창구 중에서도 가장 확인하기 쉬운 곳**인데,
+# 이름이 목록에 없어서 "설치는 공식 스토어에서만 진행해 주세요" 가 설치
+# 요구로 세어졌다(`fh-846`~`fh-848`). `홈택스` 도 같은 자리다 - 어휘에
+# 국세청을 넣지 못한 이유로 v0.2 가 적어 둔 문장이 바로 "국세청 홈택스에서
+# 조회할 수 있습니다" 였고, held-out v1.0 `fh-871` 이 그 예언을 그대로
+# 재현했다. 브랜드 이름을 여는 것이 아니라 **이미 아는 창구의 이름만**
+# 넣는다. 재지 않은 이름(구글플레이·원스토어·정부24)은 넣지 않는다.
 CHANNEL_REFERRAL_PATTERN = re.compile(
-    r"(?:영업점|창구|고객센터|대표번호|홈페이지|누리집|인터넷뱅킹|공식 앱|모바일 앱|앱 내)"
+    r"(?:영업점|창구|고객센터|대표번호|홈페이지|누리집|인터넷뱅킹|공식 앱|모바일 앱|앱 내"
+    r"|공식 스토어|앱스토어|플레이스토어|홈택스)"
     r"(?:에서만|에서도|에서|으로만|으로도|으로|로만|로도|로|에|\s*방문)"
 )
 CHANNEL_REFERRAL_VERBS = (
@@ -988,6 +1060,14 @@ CHANNEL_REFERRAL_VERBS = (
     "출력",
     "방문",
     "지참",
+    # v1.0. 창구 이름이 먼저 걸린 자리에서만 본다. `설치`·`내려받` 을 여기
+    # 넣어도 "첨부된 앱에서만 설치해 주세요" 는 걸리지 않는다 - 그 앱은
+    # 위 목록에 없는 창구이고, 목록에 없다는 것이 곧 아는 창구가 아니라는
+    # 뜻이다(`fh-809`·`fh-812` 가 그 자리를 지킨다).
+    "진행",
+    "설치",
+    "내려받",
+    "다운로드",
 )
 
 
@@ -1043,19 +1123,57 @@ def _open_clauses(normalized: str) -> list[str]:
 
 
 def _is_channel_referral(clause: str) -> bool:
-    """읽는 사람을 이미 아는 공식 창구로 보내는 절인가."""
-    if not CHANNEL_REFERRAL_PATTERN.search(clause):
+    """읽는 사람을 이미 아는 공식 창구로 보내는 절인가.
+
+    v1.0. **금지된 창구는 창구 안내가 아니다.** 이 배제가 있는 이유는 그
+    절이 읽는 사람을 메시지 밖으로 내보내기 때문인데, 창구를 막는 절은
+    정확히 반대 방향이다 - "창구 방문은 하시면 안 되고, 담당자에게 통장
+    사본을 보내 주셔야 합니다"(`fh-802`)는 아는 창구를 금지형으로 닫아
+    두고 같은 절에서 요구한다. 금지 앞자락을 떼고 남은 말로 판단한다.
+    """
+    remainder = _strip_prohibited_segment(clause)
+    if not CHANNEL_REFERRAL_PATTERN.search(remainder):
         return False
-    return any(verb in clause for verb in CHANNEL_REFERRAL_VERBS)
+    return any(verb in remainder for verb in CHANNEL_REFERRAL_VERBS)
+
+
+# 금지의 우언적 형태. `-(으)시면 안 됩니다`.
+#
+# `PROHIBITION_ENDINGS` 는 동사에 바로 붙는 금지형(`-지 마세요`)만 본다.
+# 예방 안내문은 같은 말을 다른 어형으로 쓰고, 그 어형이 **요구 표지를
+# 그대로 품고 있다** - "알려 주시면 안 됩니다" 에는 `주시면` 이, "입력하시면
+# 안 됩니다" 에는 `입력` 이 들어 있다. 그래서 요구를 하지 말라는 문장이
+# 요구를 세는 자리에서 요구로 세어졌다(held-out v1.0 `fh-839`~`fh-842`·
+# `fh-844`, 동결 시점 오탐 다섯 건이 전부 이 어형이다).
+#
+# 어휘로 피하지 않는다. "주시면 안" 을 요구 표지에서 빼면 다음 회차에
+# "입력하시면 안"·"설치하시면 안" 이 그대로 남는다. `_is_prohibited` 와
+# 같은 원칙으로 **자리**에서 본다 - 금지 앞은 하지 말라는 말이다.
+PERIPHRASTIC_PROHIBITION_PATTERN = re.compile(r"면\s*안\s*[되돼됩됐된될]")
+
+
+def _strip_prohibited_segment(clause: str) -> str:
+    """`-(으)면 안 되-` 앞자락을 잘라 낸다.
+
+    자르는 것은 절 전체가 아니라 **금지까지**다. 사기 문자는 아는 창구를
+    금지해 놓고 그 뒤에서 요구한다 - "창구 방문은 하시면 안 되고, 담당자에게
+    통장 사본을 보내 주셔야 합니다"(held-out v1.0 `fh-802`). 절을 통째로
+    버리면 이 요구가 함께 사라지고, 그러면 좁히기가 미탐으로 치러진다.
+    """
+    matches = list(PERIPHRASTIC_PROHIBITION_PATTERN.finditer(clause))
+    if not matches:
+        return clause
+    return clause[matches[-1].end() :]
 
 
 def _has_reader_demand(clauses: list[str]) -> bool:
     for clause in clauses:
-        if any(marker in clause for marker in DEMAND_MARKERS):
+        remainder = _strip_prohibited_segment(clause)
+        if any(marker in remainder for marker in DEMAND_MARKERS):
             return True
-        if ACTION_DEMAND_PATTERN.search(clause):
+        if ACTION_DEMAND_PATTERN.search(remainder):
             return True
-        if CASUAL_DEMAND_PATTERN.search(clause):
+        if CASUAL_DEMAND_PATTERN.search(remainder):
             return True
     return False
 

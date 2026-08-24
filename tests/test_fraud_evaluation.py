@@ -34,6 +34,7 @@ from evaluation.fraud_golden import (
     HOLDOUT_V0_7_PATH,
     HOLDOUT_V0_8_PATH,
     HOLDOUT_V0_9_PATH,
+    HOLDOUT_V1_0_PATH,
     SIGNAL_CODES,
     FraudGoldenCase,
     _validate_collection,
@@ -134,6 +135,7 @@ HOLDOUT_SIZES = {
     HOLDOUT_V0_7_PATH: 72,
     HOLDOUT_V0_8_PATH: 72,
     HOLDOUT_V0_9_PATH: 72,
+    HOLDOUT_V1_0_PATH: 70,
 }
 
 
@@ -188,6 +190,14 @@ def test_holdout_set_is_labelled_and_separated_from_the_development_set(
         (HOLDOUT_V0_6_PATH, HOLDOUT_V0_9_PATH),
         (HOLDOUT_V0_7_PATH, HOLDOUT_V0_9_PATH),
         (HOLDOUT_V0_8_PATH, HOLDOUT_V0_9_PATH),
+        (HOLDOUT_V0_2_PATH, HOLDOUT_V1_0_PATH),
+        (HOLDOUT_V0_3_PATH, HOLDOUT_V1_0_PATH),
+        (HOLDOUT_V0_4_PATH, HOLDOUT_V1_0_PATH),
+        (HOLDOUT_V0_5_PATH, HOLDOUT_V1_0_PATH),
+        (HOLDOUT_V0_6_PATH, HOLDOUT_V1_0_PATH),
+        (HOLDOUT_V0_7_PATH, HOLDOUT_V1_0_PATH),
+        (HOLDOUT_V0_8_PATH, HOLDOUT_V1_0_PATH),
+        (HOLDOUT_V0_9_PATH, HOLDOUT_V1_0_PATH),
     ],
 )
 def test_holdout_versions_do_not_overlap_each_other(
@@ -560,6 +570,95 @@ def test_holdout_v0_9_prices_the_grade_raise_and_the_accusation_narrowing() -> N
         and "account_access_request" in c.expected_fraud_types
     ]
     assert len(demanded) >= 6
+
+
+def test_holdout_v1_0_covers_the_taxonomy_and_keeps_the_ceiling_discipline() -> None:
+    cases = load_holdout_cases(HOLDOUT_V1_0_PATH)
+    negatives = [case for case in cases if not case.is_fraud]
+    positives = [case for case in cases if case.is_fraud]
+    covered = {t for case in cases for t in case.expected_fraud_types}
+
+    assert covered == set(FRAUD_TYPES)
+    assert len(negatives) == 32
+    assert all(case.expected_max_risk is not None for case in negatives)
+    assert all(case.expected_max_risk is None for case in positives)
+
+
+def test_holdout_v1_0_prices_five_widenings_against_the_normal_form_they_touch() -> None:
+    """**다섯 수정이 전부 넓히기다. 값은 한 방향으로만 치러진다.**
+
+    v0.9 §9 가 다음 회차 몫으로 이름을 적어 둔 결함이 그대로 이 셋의 다섯
+    그룹이다. 넓히기의 값은 정상 문장에서 나오는데, 아무 정상 문장이 아니라
+    **넓히려는 바로 그 어형을 정상적으로 쓰는 문장**이어야 한다.
+
+    - 우언적 금지(`-면 안 됩니다`): 예방 안내문은 위험한 행동을 **금지형으로
+      입에 올린다.** 요구를 세는 자리에서 그 문장이 요구로 세어졌다.
+    - 자기 경로 제한(`…에서만`): 정상 공지도 창구를 하나로 제한한다. 다른
+      점은 그 창구를 읽는 사람이 이미 아는가뿐이다.
+    - 숫자로 적은 기한: 청구서도 오늘 자정을 말한다.
+    - 띄어 쓴 `대환 대출`: 은행도 그 제도를 안내한다.
+    - 고립 요구만 든 조건부 자칭: 대외비 공지도 비밀을 요구한다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V1_0_PATH)
+    positives = [case for case in cases if case.is_fraud]
+    negatives = [case for case in cases if not case.is_fraud]
+
+    def count(pool, *needles: str) -> int:
+        return sum(any(n in c.text for n in needles) for c in pool)
+
+    # 1. 우언적 금지 어형. 사기는 아는 창구를 금지해 놓고 그 뒤에서 요구하고,
+    #    정상은 요구하지 말라고 말한다. 같은 어형이 정반대 자리에 있다.
+    assert count(positives, "면 안 됩니다", "면 안 되") >= 6
+    assert count(negatives, "면 안 됩니다", "면 안 되") >= 5
+
+    # 2. 자기 경로 제한. 정상 쪽이 더 많아야 한다 - 넓히면 이쪽이 먼저 깨진다.
+    assert count(positives, "에서만", "으로만", "만 가능", "만 처리", "만 진행") >= 6
+    assert count(negatives, "에서만", "으로만", "만 가능", "만 처리", "만 진행") >= 7
+
+    # 3. 숫자로 적은 기한. 사기 쪽 넷은 접근수단 요구와 짝을 이뤄 high 를,
+    #    정상 쪽 일곱은 같은 표현을 쓰고도 low 를 요구한다.
+    deadlines = ("1시간 안에", "30분 내", "오늘 자정까지", "내일까지", "금일 중", "마감 임박")
+    assert count(positives, *deadlines) >= 6
+    assert count(negatives, *deadlines) >= 5
+    assert (
+        sum(
+            any(d in c.text for d in deadlines) and c.expected_min_risk == "high"
+            for c in positives
+        )
+        >= 4
+    )
+
+    # 4. 띄어 쓴 `대환 대출`. 무조건 층에 넣으면 이 넷이 바로 오탐이 된다.
+    assert count(positives, "대환 대출") >= 3
+    assert count(negatives, "대환 대출", "대출 갈아타기", "햇살론") >= 4
+
+    # 5. 고립 요구만 든 조건부 자칭. 넘겨줄 물건이 없을 뿐 요구가 없는 것이
+    #    아니다. 값은 기밀 유지를 말하는 정상 공지가 치른다.
+    isolation = [c for c in positives if "isolation_coercion" in c.expected_fraud_types]
+    assert len(isolation) >= 3
+    assert all(c.expected_min_risk == "high" for c in isolation)
+    assert count(negatives, "대외비", "비밀유지", "공유하지 말아") >= 2
+
+
+def test_holdout_v1_0_declares_a_ceiling_on_every_normal_and_names_what_it_forbids() -> None:
+    """정상 34건 전부가 천장을 선언한다. 다섯 수정이 전부 넓히기이기 때문이다.
+
+    넓히기는 등급을 올리는 방향으로만 미끄러진다. 사기 쪽에 바닥을 적는 것은
+    이 회차에서 거의 아무것도 재지 못하고, 정상 쪽 천장 하나가 깨지는 것이
+    이 수정들이 지불할 수 있는 유일한 값이다.
+
+    금지 행동은 v0.9 가 들여온 자다. 여기서는 **고발과 예방을 요구로 읽지
+    않는지**를 겹쳐 센다 - 통장을 빌려주지 말라는 안내문이 접근수단 요구로
+    읽히면 사용자에게 계좌 보호 행동이 나간다.
+    """
+    cases = load_holdout_cases(HOLDOUT_V1_0_PATH)
+    negatives = [case for case in cases if not case.is_fraud]
+
+    assert len(negatives) == 32
+    assert all(case.expected_max_risk == "low" for case in negatives)
+
+    forbidding = [c for c in cases if c.forbidden_action_codes]
+    assert len(forbidding) >= 12
 
 
 def test_holdout_v0_8_covers_the_taxonomy_and_keeps_the_ceiling_discipline() -> None:

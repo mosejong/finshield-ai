@@ -1,31 +1,31 @@
 {
   "api_latency": {
-    "max_ms": 37.16,
-    "p50_ms": 3.349,
-    "p95_ms": 5.204,
-    "sample_count": 216,
+    "max_ms": 29.571,
+    "p50_ms": 2.747,
+    "p95_ms": 4.352,
+    "sample_count": 210,
     "scope": "in_process_asgi_without_network_or_tls"
   },
   "dataset": {
-    "case_count": 72,
+    "case_count": 70,
     "held_out": true,
-    "id": "fraud_holdout_v0.9",
-    "negative_count": 31,
-    "normalized_sha256": "63ab06259bcdb5a1520300ce218566c3c974df6dfeb37420b505552bea54978f",
+    "id": "fraud_holdout_v1.0",
+    "negative_count": 32,
+    "normalized_sha256": "ba90db9dbae7d7f578b58405aa4b27bbb22f5e993d2146fcaf4e266d091a9c19",
     "persona_counts": {
-      "early_career": 56,
-      "small_business": 10,
+      "early_career": 59,
+      "small_business": 5,
       "unknown": 6
     },
-    "positive_count": 41,
+    "positive_count": 38,
     "source_kind": "locally_authored_synthetic_reviewed",
     "state_counts": {
-      "clicked_link": 2,
+      "clicked_link": 1,
       "installed_app": 1,
       "received_only": 64,
       "received_unknown_money": 1,
       "shared_account_access": 1,
-      "shared_personal_info": 2,
+      "shared_personal_info": 1,
       "transferred_money": 1
     }
   },
@@ -39,15 +39,15 @@
       "status": "not_run"
     },
     "binary": {
-      "accuracy": 1.0,
-      "f1": 1.0,
-      "false_negative": 0,
-      "false_positive": 0,
-      "false_positive_rate": 0.0,
-      "precision": 1.0,
-      "recall": 1.0,
-      "true_negative": 31,
-      "true_positive": 41
+      "accuracy": 0.857143,
+      "f1": 0.875,
+      "false_negative": 3,
+      "false_positive": 7,
+      "false_positive_rate": 0.21875,
+      "precision": 0.833333,
+      "recall": 0.921053,
+      "true_negative": 25,
+      "true_positive": 35
     },
     "detection_identical_to": "scenario_engine_v0_1",
     "evidence_coverage": 1.0,
@@ -57,51 +57,53 @@
       "model": "gemini-3.6-flash",
       "note": "설명 문장의 근거 이탈률과 안전 필터 차단율은 아직 측정하지 않았다. 여기 숫자는 탐지 성능이며 설명 품질이 아니다."
     },
-    "forbidden_action_avoidance": 0.926829,
-    "required_action_coverage": 0.9625,
-    "scenario_policy_accuracy": 0.958333,
+    "forbidden_action_avoidance": 1.0,
+    "required_action_coverage": 0.878788,
+    "scenario_policy_accuracy": 0.8,
     "scope": "deterministic engine decides; the model only rewrites that decision in plain Korean",
     "status": "measured",
     "why_identical": "explain_analysis 는 AnalyzeResponse 를 받아 str | None 을 돌려준다. 설명 계층은 위험 수준·유형·행동을 구조적으로 바꿀 수 없다 (app/services/llm/explanation.py)."
   },
   "legacy_rule_v0": {
     "binary": {
-      "accuracy": 0.694444,
-      "f1": 0.666666,
-      "false_negative": 19,
-      "false_positive": 3,
-      "false_positive_rate": 0.096774,
-      "precision": 0.88,
-      "recall": 0.536585,
-      "true_negative": 28,
-      "true_positive": 22
+      "accuracy": 0.657143,
+      "f1": 0.625,
+      "false_negative": 18,
+      "false_positive": 6,
+      "false_positive_rate": 0.1875,
+      "precision": 0.769231,
+      "recall": 0.526316,
+      "true_negative": 26,
+      "true_positive": 20
     },
     "errors": {
       "false_negative_case_ids": [
-        "fh-701",
-        "fh-703",
-        "fh-704",
-        "fh-708",
-        "fh-709",
-        "fh-710",
-        "fh-711",
-        "fh-712",
-        "fh-716",
-        "fh-717",
-        "fh-718",
-        "fh-720",
-        "fh-721",
-        "fh-722",
-        "fh-723",
-        "fh-760",
-        "fh-762",
-        "fh-764",
-        "fh-765"
+        "fh-801",
+        "fh-802",
+        "fh-803",
+        "fh-805",
+        "fh-806",
+        "fh-807",
+        "fh-810",
+        "fh-817",
+        "fh-819",
+        "fh-820",
+        "fh-822",
+        "fh-823",
+        "fh-824",
+        "fh-825",
+        "fh-826",
+        "fh-830",
+        "fh-834",
+        "fh-835"
       ],
       "false_positive_case_ids": [
-        "fh-739",
-        "fh-743",
-        "fh-746"
+        "fh-840",
+        "fh-841",
+        "fh-842",
+        "fh-844",
+        "fh-847",
+        "fh-848"
       ]
     },
     "scope": "legacy five-keyword public compatibility baseline"
@@ -113,46 +115,58 @@
   "report_version": "fraud_benchmark_v0.1",
   "scenario_engine_v0_1": {
     "binary": {
-      "accuracy": 1.0,
-      "f1": 1.0,
-      "false_negative": 0,
-      "false_positive": 0,
-      "false_positive_rate": 0.0,
-      "precision": 1.0,
-      "recall": 1.0,
-      "true_negative": 31,
-      "true_positive": 41
+      "accuracy": 0.857143,
+      "f1": 0.875,
+      "false_negative": 3,
+      "false_positive": 7,
+      "false_positive_rate": 0.21875,
+      "precision": 0.833333,
+      "recall": 0.921053,
+      "true_negative": 25,
+      "true_positive": 35
     },
     "errors": {
-      "false_negative_case_ids": [],
-      "false_positive_case_ids": []
+      "false_negative_case_ids": [
+        "fh-802",
+        "fh-803",
+        "fh-806"
+      ],
+      "false_positive_case_ids": [
+        "fh-840",
+        "fh-841",
+        "fh-842",
+        "fh-844",
+        "fh-847",
+        "fh-848",
+        "fh-871"
+      ]
     },
     "evidence_coverage": 1.0,
-    "forbidden_action_avoidance": 0.926829,
+    "forbidden_action_avoidance": 1.0,
     "fraud_types": {
       "account_access_request": {
-        "f1": 1.0,
-        "precision": 1.0,
-        "recall": 1.0,
-        "support": 22
+        "f1": 0.83871,
+        "precision": 0.764706,
+        "recall": 0.928571,
+        "support": 14
       },
       "acquaintance_impersonation": {
         "f1": 1.0,
         "precision": 1.0,
         "recall": 1.0,
-        "support": 4
+        "support": 2
       },
       "advance_fee_demand": {
         "f1": 1.0,
         "precision": 1.0,
         "recall": 1.0,
-        "support": 4
+        "support": 7
       },
       "authority_impersonation": {
-        "f1": 1.0,
-        "precision": 1.0,
-        "recall": 1.0,
-        "support": 14
+        "f1": 0.714286,
+        "precision": 0.714286,
+        "recall": 0.714286,
+        "support": 7
       },
       "card_delivery_impersonation": {
         "f1": 1.0,
@@ -164,37 +178,37 @@
         "f1": 1.0,
         "precision": 1.0,
         "recall": 1.0,
-        "support": 2
+        "support": 1
       },
       "isolation_coercion": {
-        "f1": 1.0,
+        "f1": 0.4,
         "precision": 1.0,
-        "recall": 1.0,
-        "support": 6
+        "recall": 0.25,
+        "support": 4
       },
       "loan_policy_impersonation": {
-        "f1": 1.0,
-        "precision": 1.0,
-        "recall": 1.0,
-        "support": 1
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 3
       },
       "money_mule_transfer": {
         "f1": 1.0,
         "precision": 1.0,
         "recall": 1.0,
-        "support": 1
+        "support": 2
       },
       "smishing_malware": {
-        "f1": 1.0,
-        "precision": 1.0,
+        "f1": 0.75,
+        "precision": 0.6,
         "recall": 1.0,
-        "support": 2
+        "support": 6
       }
     },
-    "required_action_coverage": 0.9625,
-    "required_signal_coverage": 1.0,
-    "risk_ceiling_accuracy": 1.0,
-    "scenario_policy_accuracy": 0.958333,
+    "required_action_coverage": 0.878788,
+    "required_signal_coverage": 0.71875,
+    "risk_ceiling_accuracy": 0.78125,
+    "scenario_policy_accuracy": 0.8,
     "scope": "deterministic signals, taxonomy, state policy and evidence"
   }
 }

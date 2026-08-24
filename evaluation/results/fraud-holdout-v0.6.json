@@ -1,8 +1,8 @@
 {
   "api_latency": {
-    "max_ms": 25.787,
-    "p50_ms": 2.429,
-    "p95_ms": 3.681,
+    "max_ms": 31.165,
+    "p50_ms": 3.219,
+    "p95_ms": 4.758,
     "sample_count": 216,
     "scope": "in_process_asgi_without_network_or_tls"
   },
