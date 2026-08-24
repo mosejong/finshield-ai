@@ -103,11 +103,19 @@ def test_isolation_demand_now_has_a_name_instead_of_only_a_grade() -> None:
     assert "isolation_coercion" in body["fraud_types"]
     assert body["risk_level"] == "medium"
     assert "STOP_CONTACT" in action_codes(body)
-    # v0.9 에서 뒤집혔다. 이 문장에는 자칭한 기관도 상품도 없다 - 말하는
-    # 사람만 있고 찾아갈 창구가 없다. held-out v0.8 `fh-627` 이 거의 같은
-    # 문장에 아는 창구를 요구하며 이것을 결함으로 적어 두었다.
-    assert "VERIFY_BY_KNOWN_CONTACT" in action_codes(body)
-    assert "VERIFY_OFFICIAL_CHANNEL" not in action_codes(body)
+    # v1.1 에서 다시 뒤집혔다. **뒤집힌 것은 고립에 대한 판단이 아니라 이
+    # 문장이 고립만 말하고 있다는 읽기다.**
+    #
+    # v0.9 는 "이 문장에는 자칭한 기관도 상품도 없다 - 말하는 사람만 있고
+    # 찾아갈 창구가 없다" 고 적었다(held-out v0.8 `fh-627`). 앞부분은 맞고
+    # 뒷부분이 틀렸다. 이 문장은 `수사 중인 사안` 이라고 말하고 있고, 수사가
+    # 실재한다면 확인할 창구도 실재한다 - 112 와 관할서다. 기관을 자칭하지
+    # 않았을 뿐 사건을 말하는 순간 창구가 생긴다(held-out v1.1 `fh-901`).
+    #
+    # 고립 자체에 대한 v0.9 의 판단은 그대로다. 사건 어휘가 없는 순수 고립
+    # 요구는 여전히 아는 연락처로 보내고, 바로 아래 테스트가 그 자리를
+    # 지킨다("주변에는 알리지 마시고 저와만 연락하세요").
+    assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
 
 
 def test_isolation_stands_on_its_own_without_an_impersonated_institution() -> None:
@@ -929,3 +937,163 @@ def test_a_destination_still_counts_when_the_money_word_was_filtered_out() -> No
 
     assert "money_mule" in {signal["code"] for signal in body["signals"]}
     assert "money_mule_transfer" in body["fraud_types"]
+
+
+@pytest.mark.parametrize(
+    ("state", "expected"),
+    [
+        ("shared_personal_info", "DO_NOT_SHARE_ACCESS"),
+        ("shared_account_access", "DO_NOT_SHARE_ACCESS"),
+        ("installed_app", "DO_NOT_INSTALL"),
+        ("transferred_money", "DO_NOT_FORWARD_MONEY"),
+    ],
+)
+def test_the_state_repeats_the_prevention_it_had_only_for_two_states(
+    state: str, expected: str
+) -> None:
+    """**이미 한 번 넘긴 사람이 가장 다시 넘기기 쉬운 사람이다.**
+
+    `clicked_link` 는 `DO_NOT_CLICK` 을, `received_unknown_money` 는
+    `DO_NOT_FORWARD_MONEY` 를 냈는데 나머지 네 상태에는 예방 행동이 하나도
+    없었다. 사기는 한 번으로 끝나지 않고 같은 요구를 다시 하는데, 두 번째
+    요구를 막는 말이 이미 당한 사람에게만 빠져 있었다. held-out v0.2
+    `fh-021` 이 여섯 회차 전에 이 자리를 지나갔다.
+    """
+    body = analyze("검찰청 첨단범죄수사부입니다. 접수 확인되었고 나머지는 내부 절차로 진행됩니다.", state)
+
+    assert expected in action_codes(body)
+
+
+@pytest.mark.parametrize(
+    ("text", "state"),
+    [
+        # 급여 계좌를 알려 준 일이 사기인 것은 아니다.
+        ("알려 주신 급여이체 계좌로 4월분부터 지급됩니다.", "shared_account_access"),
+        # 송금은 대부분 정상이다.
+        ("이체가 정상 처리되었습니다. 수취인 확인 후 입금까지 최대 10분 소요됩니다.", "transferred_money"),
+        # 회사가 시킨 보안 앱 설치.
+        ("사내 보안 정책에 따라 업무용 단말에 보안 앱 설치가 완료되었습니다.", "installed_app"),
+    ],
+)
+def test_a_state_alone_never_emits_a_prevention_action(text: str, state: str) -> None:
+    """**상태는 신호를 대신하지 않는다.**
+
+    상태만으로 예방 행동을 켜면 위 문장들이 전부 경고를 받는다. 이 값을
+    치르는 자리를 held-out v1.1 이 따로 만들어 두었다(`fh-969`·`fh-974`·
+    `fh-975`). 등급은 상태의 몫으로 그대로 올라가되, 행동은 메시지에
+    위험 신호가 켜졌을 때만 붙는다.
+    """
+    body = analyze(text, state)
+
+    assert body["signals"] == []
+    assert body["fraud_types"] == []
+    assert not {
+        "DO_NOT_SHARE_ACCESS",
+        "DO_NOT_INSTALL",
+        "DO_NOT_FORWARD_MONEY",
+    } & action_codes(body)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 결제 승인. 창구는 카드 뒷면 번호다.
+        (
+            "[Web발신] 해외가맹점 결제 47만원 승인되었습니다. "
+            "본인이 아닐 경우 즉시 취소하세요 http://bit.ly/pay-cx9"
+        ),
+        # 환급. 창구는 홈택스다.
+        "종합소득세 환급금 조회 결과를 안내드립니다. 환급 계좌 등록은 cutt.ly/tax-rf2 에서 하세요.",
+        # 창구 이름을 **막으려고** 부른다. 이름이 불린 이상 그리로 갈 수 있다.
+        "정부24 는 점검 중이라 신청이 되지 않습니다. 아래 주소에서 진행해 주세요. https://cutt.ly/gov-24",
+    ],
+)
+def test_an_event_names_a_counter_even_when_no_institution_is_claimed(
+    text: str,
+) -> None:
+    """**창구를 가리키는 것은 기관 자칭만이 아니다.**
+
+    사기 문자의 절반은 자기가 누구인지 말하지 않고 무슨 일이 일어났는지만
+    말한다. 그래도 읽는 사람이 찾아갈 창구는 명확하다 - 카드 뒷면 번호,
+    홈택스, 112 다. 창구가 없다고 판단하면 폴백이 아는 연락처를 내므로
+    미탐 하나가 **틀린 행동 하나**를 함께 낸다(held-out v1.1 `fh-903`·
+    `fh-905`·`fh-921`).
+    """
+    body = analyze(text)
+
+    assert "VERIFY_OFFICIAL_CHANNEL" in action_codes(body)
+    assert "VERIFY_BY_KNOWN_CONTACT" not in action_codes(body)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 예방 안내문은 말리려고 그 어휘를 입에 올린다.
+        "세무조사 사전통지서는 우편으로만 발송됩니다. 전화로 자료를 요구하는 경우 관할 세무서에 확인해 주세요.",
+        # 승인 알림은 하루에도 여러 번 온다.
+        "출금 승인 알림: 03/14 09:10 자동이체 통신요금 42,900원",
+        # 지원금 안내가 스스로 창구를 말하고 있다.
+        "청년내일저축계좌 지원금 신청은 복지로 또는 가까운 주민센터에서 가능합니다.",
+    ],
+)
+def test_an_event_word_alone_never_adds_a_verification_action(text: str) -> None:
+    """사건 어휘는 등급을 올리지 않고, 신호가 없으면 행동도 내지 않는다.
+
+    **넓히기의 값은 넓히려는 바로 그 어형을 정상적으로 쓰는 문장이 치른다.**
+    승인 알림에 창구 안내가 붙으면 사용자는 곧 모든 안내를 무시하게 된다
+    (held-out v1.1 `fh-976`~`fh-978`).
+    """
+    body = analyze(text)
+
+    assert body["risk_level"] == "low"
+    assert not {"VERIFY_OFFICIAL_CHANNEL", "VERIFY_BY_KNOWN_CONTACT"} & action_codes(
+        body
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "가족에게 말씀하시면 안 됩니다. 지금은 저와만 진행하시는 편이 안전합니다.",
+        "이 내용은 직원분들께 공유하시면 안 됩니다. 대표님만 알고 계셔야 합니다.",
+        "지금 상황은 주변에 알리시면 안 되고, 저와만 확인하시면 됩니다.",
+        "부모님께 상의하시면 안 됩니다. 절차만 복잡해지고 기한을 넘기게 됩니다.",
+    ],
+)
+def test_isolation_is_caught_when_the_prohibition_is_periphrastic(text: str) -> None:
+    """`-지 마세요` 만 보던 자리에 `-(으)시면 안 됩니다` 를 더한다.
+
+    어휘를 더 적지 않는다. `가족에게 말`, `직원분들께 공유` 를 목록에 넣으면
+    다음 회차에 `가족분들께 말씀`, `동료에게 공유` 가 그대로 남는다. 고립의
+    **대상**과 **금지**를 따로 세우고 둘이 한 절 안에 있을 때만 켠다.
+    """
+    body = analyze(text)
+
+    assert "secrecy_isolation" in {signal["code"] for signal in body["signals"]}
+    assert "isolation_coercion" in body["fraud_types"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v0.9 `fh-741`. 어형이 위 네 문장과 글자까지 겹친다.
+        "고객센터입니다. 인증번호는 저희를 포함해 누구에게도 알려 주시면 안 됩니다.",
+        "비밀번호는 은행 직원에게도 알려 주시면 안 됩니다. 은행은 절대 묻지 않습니다.",
+        # 대상이 고립의 대상이 아니다.
+        "가족 명의로는 신청하시면 안 됩니다. 본인 명의로만 접수됩니다.",
+        # 금지가 없다.
+        "이 지침은 직원분들께도 공유하셔야 합니다.",
+        "부모님과 상의하신 뒤 결정하시는 것을 권해 드립니다.",
+    ],
+)
+def test_a_security_advisory_is_not_an_isolation_demand(text: str) -> None:
+    """**금지의 대상이 읽는 사람이 쥔 비밀이면 고립이 아니라 보안 안내다.**
+
+    고립은 **이 대화 자체**를 말하지 말라고 하고, 보안 안내는 읽는 사람이
+    이미 쥔 비밀을 말하지 말라고 한다. 앞의 것은 제3자 확인을 막고, 뒤의
+    것은 제3자 확인과 아무 상관이 없다.
+    """
+    body = analyze(text)
+
+    assert "secrecy_isolation" not in {signal["code"] for signal in body["signals"]}
+    assert body["fraud_types"] == []

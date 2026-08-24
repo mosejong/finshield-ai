@@ -82,7 +82,7 @@ def analyze_fraud(request: AnalyzeRequest) -> AnalyzeResponse:
     # 등급을 정한 **뒤에** 점수를 그 띠까지 올린다. 순서가 중요하다 - 올린
     # 점수를 다시 등급 계산에 넣으면 자기 자신을 근거로 삼는다.
     score = max(score, score_floor_for_level(level))
-    actions = select_actions(canonical_signals, request.state)
+    actions = select_actions(canonical_signals, request.state, request.text)
     official_sources = sources_for_actions(actions)
     public_signals = project_public_signals(canonical_signals)
 

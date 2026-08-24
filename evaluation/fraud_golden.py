@@ -79,6 +79,7 @@ HOLDOUT_V0_7_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.7.jsonl
 HOLDOUT_V0_8_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.8.jsonl"
 HOLDOUT_V0_9_PATH = Path(__file__).with_name("data") / "fraud_holdout_v0.9.jsonl"
 HOLDOUT_V1_0_PATH = Path(__file__).with_name("data") / "fraud_holdout_v1.0.jsonl"
+HOLDOUT_V1_1_PATH = Path(__file__).with_name("data") / "fraud_holdout_v1.1.jsonl"
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 FRAUD_TYPE_CODES = {
     "authority_impersonation",

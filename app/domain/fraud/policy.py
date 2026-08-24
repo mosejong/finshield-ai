@@ -130,8 +130,76 @@ OFFICIAL_CHANNEL_SIGNALS: frozenset[str] = frozenset(
 # 자칭 지인에게는 대표번호가 없다. 확인 수단은 이전부터 쓰던 연락처다.
 KNOWN_CONTACT_SIGNALS: frozenset[str] = frozenset({"familiar_person_claim"})
 
+# v1.1. **창구를 가리키는 것은 자칭만이 아니다.**
+#
+# 위 목록은 창구를 신호에서만 찾는다. 그런데 사기 문자의 절반은 자기가
+# 누구인지 말하지 않고 **무슨 일이 일어났는지**만 말한다 - "결제 47만원
+# 승인되었습니다", "종합소득세 환급금 조회 결과", "진행 중인 수사와 관련된
+# 사안입니다". 이 문장들에는 기관명이 없지만 읽는 사람이 찾아갈 창구는
+# 명확하다. 카드 뒷면 번호, 홈택스, 112 다. 사건 어휘가 창구를 가리킨다.
+#
+# 재 보니 동결 시점 미탐의 가장 큰 덩이가 여기였다 - `VERIFY_OFFICIAL_CHANNEL`
+# 누락 15 건, 다음이 `VERIFY_BY_KNOWN_CONTACT` 7 건이다. 그리고 창구가 없다고
+# 판단하면 폴백이 아는 연락처를 내므로, 미탐 하나가 **금지 행동 하나**를
+# 함께 낸다(v1.1 `fh-901`·`fh-903`·`fh-904`·`fh-907` 이 그 모양이다).
+#
+# 넓히는 값은 정상 문장이 치른다. 그래서 두 겹으로 좁힌다.
+#
+# 첫째, **어휘를 사건으로 한정한다.** `확인`·`절차`·`신청` 같은 일반 명사는
+# 넣지 않는다 - 그 말들은 창구를 가리키지 않고 그냥 흔하다. 남기는 것은
+# 공식 창구가 실재하는 사건들뿐이다.
+#
+# 둘째, **이미 위험 신호가 켜진 메시지에서만 본다.** 이 어휘는 등급을 올리지
+# 않고 행동만 고른다. 신호가 하나도 없는 메시지는 애초에 확인을 권하는
+# 자리가 아니다 - "출금 승인 알림: 03/14 자동이체 통신요금"(`fh-977`)에
+# 창구 안내가 붙으면 사용자는 곧 모든 안내를 무시하게 된다. 정상 문장이
+# 값을 치르되 **아무 정상 문장이 아니라 바로 이 어형을 정상적으로 쓰는
+# 문장**이어야 한다는 규칙을 여기서도 지킨다(`fh-976`~`fh-978`).
+OFFICIAL_CHANNEL_CONTEXT_TERMS: tuple[str, ...] = (
+    # 수사기관. 사건이 실재하면 112 와 관할서가 창구다.
+    "수사",
+    "조사",
+    "압수",
+    "영장",
+    "고소",
+    "입건",
+    # 카드사·은행. 창구는 카드 뒷면과 대표번호다.
+    "승인되었",
+    "승인 되었",
+    "결제 취소",
+    "출금되었",
+    "이상 거래",
+    "부정 사용",
+    # 세무·복지. 창구는 홈택스·정부24·복지로다.
+    "환급",
+    "지급 대상",
+    "지원금",
+    "보조금",
+    "과태료",
+    "체납",
+    # 창구 이름이 문장에 직접 있는 경우. 사기는 그 이름을 **막으려고**
+    # 부른다("정부24 는 점검 중이라", `fh-921`). 이름이 불린 이상 읽는
+    # 사람은 그 창구로 갈 수 있다.
+    "정부24",
+    "홈택스",
+    "복지로",
+    "손택스",
+)
 
-def resolve_verification_actions(signal_codes: set[str]) -> tuple[str, ...]:
+
+def mentions_official_channel_event(text: str) -> bool:
+    """이 문장이 공식 창구가 실재하는 사건을 말하고 있는가.
+
+    등급에는 관여하지 않는다. 이 함수가 참이어도 위험 점수는 그대로이고,
+    바뀌는 것은 **무엇으로 확인하라고 말하는가**뿐이다.
+    """
+    lowered = text.casefold()
+    return any(term in lowered for term in OFFICIAL_CHANNEL_CONTEXT_TERMS)
+
+
+def resolve_verification_actions(
+    signal_codes: set[str], *, official_channel_context: bool = False
+) -> tuple[str, ...]:
     """이 메시지에서 실제로 확인할 수 있는 창구만 낸다.
 
     둘 다 해당하면 둘 다 낸다. 한쪽을 이기게 하면 문장에 실제로 적힌 확인
@@ -144,7 +212,7 @@ def resolve_verification_actions(signal_codes: set[str]) -> tuple[str, ...]:
     뒷면이나 기존 거래 창구가 그 자리를 메운다.
     """
     resolved: list[str] = []
-    if signal_codes & OFFICIAL_CHANNEL_SIGNALS:
+    if signal_codes & OFFICIAL_CHANNEL_SIGNALS or official_channel_context:
         resolved.append("VERIFY_OFFICIAL_CHANNEL")
     if signal_codes & KNOWN_CONTACT_SIGNALS:
         resolved.append("VERIFY_BY_KNOWN_CONTACT")
@@ -233,6 +301,35 @@ STATE_ACTIONS: dict[UserState, tuple[str, ...]] = {
         "CONTACT_112",
         "PRESERVE_EVIDENCE",
     ),
+}
+
+# v1.1. **이미 한 번 넘긴 사람이 가장 다시 넘기기 쉬운 사람이다.**
+#
+# 위 표에서 `CLICKED_LINK` 는 `DO_NOT_CLICK` 을, `RECEIVED_UNKNOWN_MONEY` 는
+# `DO_NOT_FORWARD_MONEY` 를 낸다. 그런데 계좌 권한을 넘겼거나 앱을 깔았거나
+# 이미 송금한 상태에는 예방 행동이 하나도 없다. 사기는 한 번으로 끝나지
+# 않고 같은 요구를 다시 하는데, 두 번째 요구를 막는 말이 그 사람에게만
+# 빠져 있었다. held-out v0.2 `fh-021` 이 여섯 회차 전에 이 자리를 지나갔고
+# 그때는 상태를 재는 사례가 적어 묻혔다.
+#
+# **상태가 신호를 대신하지는 않는다.** 이 행동들은 위험 신호가 하나라도
+# 켜진 메시지에서만 낸다. 계좌를 알려 주는 일도 앱을 까는 일도 송금하는
+# 일도 대부분은 정상이고, 그 정상 문장이 값을 치르는 자리를 v1.1 이
+# 따로 만들어 두었다 - "알려 주신 급여이체 계좌로 4월분부터 지급됩니다"
+# (`fh-974`), "이체가 정상 처리되었습니다"(`fh-975`), 회사 보안 앱 설치
+# 안내(`fh-969`). 상태만으로 켜면 이 문장들이 전부 예방 경고를 받는다.
+#
+# 값은 반대쪽에서도 치른다. 이 네 상태를 가진 v1.1 사기 19건 중 여덟 건 -
+# `fh-906`·`fh-908`·`fh-910`·`fh-922`·`fh-923`·`fh-925`·`fh-926`·`fh-937` -
+# 은 신호가 하나도 켜지지 않아 이 수정으로도 예방 행동을 받지 못한다.
+# 그 여덟이 못 받는 이유는 상태 표가 아니라 **어휘가 비어서**이고, 그
+# 구멍은 각자의 신호에서 메워야 한다. 게이트를 무조건으로 바꾸면 여덟을
+# 얻는 대신 같은 네 상태의 정상 다섯 건을 잃는다.
+STATE_PREVENTION_ACTIONS: dict[UserState, tuple[str, ...]] = {
+    UserState.SHARED_PERSONAL_INFO: ("DO_NOT_SHARE_ACCESS",),
+    UserState.SHARED_ACCOUNT_ACCESS: ("DO_NOT_SHARE_ACCESS",),
+    UserState.INSTALLED_APP: ("DO_NOT_INSTALL",),
+    UserState.TRANSFERRED_MONEY: ("DO_NOT_FORWARD_MONEY",),
 }
 
 STATE_MINIMUM_RISK: dict[UserState, str] = {
@@ -376,18 +473,36 @@ def score_floor_for_level(level: str) -> int:
     return 0
 
 
-def select_actions(signals: list[RiskSignal], state: UserState) -> list[Action]:
+def select_actions(
+    signals: list[RiskSignal], state: UserState, text: str = ""
+) -> list[Action]:
     signal_codes = {signal.code for signal in signals}
     action_codes: set[str] = set(STATE_ACTIONS[state])
     for signal in signals:
         action_codes.update(SIGNAL_ACTIONS.get(signal.code, ()))
+
+    # 상태가 내는 예방 행동과 사건 어휘가 가리키는 창구는 **위험 신호가
+    # 켜진 메시지에서만** 본다. 둘 다 등급을 올리지 않고 행동만 고른다.
+    if signals:
+        action_codes.update(STATE_PREVENTION_ACTIONS.get(state, ()))
+    official_channel_context = bool(signals) and mentions_official_channel_event(text)
 
     # 자리표시자는 정책표에 없다. 여기서 풀지 않으면 아래 조회가 터진다 -
     # 조용히 빠지는 것보다 낫다. 정책표에 없다는 것은 판정 프롬프트에도
     # 실리지 않는다는 뜻이기도 하다.
     if VERIFY_CLAIMED_IDENTITY in action_codes:
         action_codes.discard(VERIFY_CLAIMED_IDENTITY)
-        action_codes.update(resolve_verification_actions(signal_codes))
+        action_codes.update(
+            resolve_verification_actions(
+                signal_codes, official_channel_context=official_channel_context
+            )
+        )
+    elif official_channel_context:
+        # 자리표시자를 다는 신호가 하나도 없는데 창구는 있는 경우다. 링크
+        # 하나만 켜진 스미싱이 이 모양이고(`fh-905`·`fh-921`), 그때 사용자가
+        # 받는 말은 "누르지 마세요"뿐이다. **무엇으로 확인하라는 말이 없으면
+        # 사용자는 확인할 방법을 그 대화창 안에서 찾는다.**
+        action_codes.add("VERIFY_OFFICIAL_CHANNEL")
 
     ordered_codes = sorted(
         action_codes,
