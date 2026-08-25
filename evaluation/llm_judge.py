@@ -36,6 +36,7 @@ from app.domain.fraud.policy import ACTION_POLICIES
 from app.services.llm.contract import LlmContract
 from app.services.llm.minimization import minimize_for_provider
 from app.services.llm.provider import LlmProvider, LlmUnavailable
+from evaluation.fraud_golden import CASE_ID_PATTERN
 
 FRAUD_JUDGE_PROMPT_ID = "fraud_judge_v1"
 
@@ -44,6 +45,17 @@ FRAUD_JUDGE_PROMPT_ID = "fraud_judge_v1"
 # 하나로 확인된다.
 JUDGE_RUN_PATH = (
     Path(__file__).with_name("results") / "llm-judge-fraud-v0.1.json"
+)
+
+# 2026-08-25. 홀드아웃 두 셋을 같은 모델·같은 프롬프트로 판정시킨 결과다
+# (`docs/32` 의 `held-out 에서 다시 잰 3자 비교`). 개발셋 결과와 파일을 나눈
+# 이유는 셋마다 sha256 이 다르고, 한 파일에 섞으면 어느 셋의 숫자인지 집계가
+# 구분할 수 없기 때문이다.
+HOLDOUT_JUDGE_V1_2_PATH = (
+    Path(__file__).with_name("results") / "llm-judge-fraud-holdout-v1.2.json"
+)
+HOLDOUT_JUDGE_V1_3_PATH = (
+    Path(__file__).with_name("results") / "llm-judge-fraud-holdout-v1.3.json"
 )
 
 # state 코드를 그대로 보내면 모델이 무슨 뜻인지 추측해야 한다. 규칙 엔진은
@@ -168,7 +180,7 @@ class LlmJudgement(BaseModel):
     아니다 - 사용자 입장에서 답이 없는 것은 경고가 없는 것과 같다.
     """
 
-    case_id: str = Field(pattern=r"^fg-[0-9]{3}$")
+    case_id: str = Field(pattern=CASE_ID_PATTERN)
     ok: bool
     is_fraud: bool = False
     fraud_types: list[str] = Field(default_factory=list)

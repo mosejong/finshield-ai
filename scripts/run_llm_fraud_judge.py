@@ -14,6 +14,12 @@
 `--limit` 으로 몇 건만 먼저 돌려 프롬프트가 의도대로 나가는지 확인한 뒤 전체를
 돌리는 것을 권한다. 61건을 잘못된 프롬프트로 태우는 것보다 3건이 싸다.
 
+`--dataset` 으로 홀드아웃 셋을 판정할 수 있고, 그때는 `--output` 도 같이 준다.
+기본 출력 경로는 개발셋 판정 결과이므로 덮어쓰면 그것을 잃는다. 집계는
+`scripts/evaluate_fraud_engine.py --dataset <같은 셋> --llm-judgements <그 파일>`
+로 한다 - 셋과 판정을 따로 주는 이유는 sha256 이 어긋나면 `stale` 로 막기
+위해서다.
+
 이 스크립트는 원문도, 모델 응답 본문도 출력하지 않는다. 진행 상황은 건수와
 성공·실패로만 찍는다(`adr/0006-privacy-safe-observability.md`).
 """
@@ -147,7 +153,11 @@ def main() -> int:
 
     run = LlmJudgeRun(
         judged_at=datetime.now(UTC).isoformat(timespec="seconds"),
-        dataset_id="fraud_golden_v0.1",
+        # `--dataset` 을 받으면서 이름은 개발셋으로 박아 두면, 홀드아웃을
+        # 판정한 파일이 자기를 개발셋이라고 말한다. sha256 이 어긋나므로
+        # 집계는 `stale` 로 막히지만, 그때 사람이 읽는 것은 이름이다.
+        # 파일 하나로 출처가 확인된다는 전제가 이름에서 먼저 깨진다.
+        dataset_id=args.dataset.stem,
         dataset_sha256=dataset_sha256,
         provider=provider_name,
         model=args.model,

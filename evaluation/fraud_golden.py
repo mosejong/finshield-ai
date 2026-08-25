@@ -156,8 +156,17 @@ ACTION_CODES = {
 }
 
 
+#: 사례 번호의 모양. `fg-` 는 개발셋, `fh-` 는 홀드아웃이다. 이 접두사와
+#: `held_out` 플래그가 어긋나면 `load_golden_cases` 가 거부한다.
+#:
+#: 이 값을 상수로 뺀 것은 `llm_judge.LlmJudgement` 가 같은 번호를 자기 필드에
+#: 다시 적어 두고 있었고, 홀드아웃이 생긴 뒤에도 `fg-` 만 받도록 남아 있었기
+#: 때문이다. 같은 규칙을 두 곳에 적으면 한 곳만 넓어진다.
+CASE_ID_PATTERN = r"^(?:fg|fh)-[0-9]{3,4}$"
+
+
 class FraudGoldenCase(BaseModel):
-    case_id: str = Field(pattern=r"^(?:fg|fh)-[0-9]{3,4}$")
+    case_id: str = Field(pattern=CASE_ID_PATTERN)
     text: str = Field(min_length=1, max_length=10_000)
     persona: Persona
     state: UserState
