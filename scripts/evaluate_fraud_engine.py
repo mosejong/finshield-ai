@@ -10,6 +10,7 @@ from time import perf_counter
 import httpx
 
 from app.main import app
+from evaluation.explanation_probe import ExplanationProbeRun
 from evaluation.fraud_benchmark import check_minimum_quality, evaluate_golden_set
 from evaluation.fraud_golden import FraudGoldenCase, GOLDEN_SET_PATH, load_golden_cases
 from evaluation.llm_judge import JUDGE_RUN_PATH, LlmJudgeRun
@@ -71,6 +72,21 @@ def load_llm_run(path: Path) -> LlmJudgeRun | None:
     return LlmJudgeRun.model_validate_json(path.read_text(encoding="utf-8"))
 
 
+def load_explanation_probe(path: Path | None) -> ExplanationProbeRun | None:
+    """설명 계층 실행 결과를 읽는다. 없으면 `None`, 그러면 그 칸은 `not_measured`.
+
+    `load_llm_run` 과 같은 규율이다 - 여기서 유료 호출이 나가지 않는다. 설명은
+    `scripts/run_explanation_probe.py` 가 한 번 태우고, 이쪽은 그 파일을 읽는다.
+
+    기본값을 주지 않는다. 판정 쪽은 기본 경로가 개발셋 결과라 홀드아웃을 돌릴 때
+    엉뚱한 파일을 읽는 문제가 있었고, 그것을 `--dataset` 비교로 무마해야 했다.
+    여기서는 처음부터 지정하게 한다.
+    """
+    if path is None or not path.exists():
+        return None
+    return ExplanationProbeRun.model_validate_json(path.read_text(encoding="utf-8"))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=Path, default=GOLDEN_SET_PATH)
@@ -82,6 +98,15 @@ def main() -> int:
         type=Path,
         default=JUDGE_RUN_PATH,
         help="모델 단독 판정 결과 파일. 없으면 LLM 구간을 not_run 으로 남긴다.",
+    )
+    parser.add_argument(
+        "--explanation-probe",
+        type=Path,
+        default=None,
+        help=(
+            "설명 계층 실행 결과 파일. 없으면 explanation_layer 를 "
+            "not_measured 로 남긴다."
+        ),
     )
     args = parser.parse_args()
 
@@ -107,6 +132,7 @@ def main() -> int:
         **evaluate_golden_set(
             cases,
             llm_run=load_llm_run(judgements) if judgements else None,
+            explanation_probe=load_explanation_probe(args.explanation_probe),
             dataset_id=args.dataset.stem,
         ),
     }
