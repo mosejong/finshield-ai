@@ -165,8 +165,13 @@ def test_ordinary_confidentiality_is_not_an_isolation_demand(text: str) -> None:
         # held-out v0.6 `fh-446`. 어휘에는 "빼서 넣어" 가 **붙어** 있었는데 실제
         # 문장은 그 사이에 목적지가 낀다. 붙여 적은 어휘는 아무것도 잡지 못한다.
         "그 돈 빼서 다른 계좌로 넣어 주세요.",
-        # 개발셋 `fg-004`. 요구가 문장 다른 곳이 아니라 **동사에 붙어 있다.**
-        "조사 협조를 위해 자금을 지정 장소로 옮기세요.",
+        # held-out v1.2 `fh-1039`. 착오송금 사기는 돈을 요구하지 않고
+        # **돌려 달라고** 한다. `보내다` 의 관형형이 `보낸` 이라 과거형
+        # `보냈` 만 적어 둔 수취 표지가 이 문장을 통째로 지나쳤다.
+        "잘못 보낸 돈이 있습니다. 아래 계좌로 반환해 주시면 감사하겠습니다.",
+        # held-out v1.3 `fh-1142`. 재전달 동사는 어휘에 있었는데 목적어가
+        # 액수로만 적혀 있어 금액 조건이 차지 않았다.
+        "실수로 귀하 계좌에 300만원을 잘못 보냈습니다. 확인하시고 아래 계좌로 다시 보내 주세요.",
     ],
 )
 def test_forwarding_money_is_caught_in_the_forms_that_actually_arrive(
@@ -176,6 +181,41 @@ def test_forwarding_money_is_caught_in_the_forms_that_actually_arrive(
 
     assert "money_mule" in [signal["code"] for signal in body["signals"]]
     assert "money_mule_transfer" in body["fraud_types"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 개발셋 `fg-004`. 요구가 문장 다른 곳이 아니라 **동사에 붙어 있다.**
+        "조사 협조를 위해 자금을 지정 장소로 옮기세요.",
+        # held-out v0.5 `fh-317`. v0.8 이 이 문장 때문에 목적지를 좁혔다.
+        "검찰 수사 때문에 계좌가 묶였어. 일단 안전계좌로 옮겨 놔.",
+        # held-out v1.3 `fh-1161`~`fh-1163`. 셋 다 `옮겨`·`옮기` 를 쓰고
+        # 셋 다 받은 돈이 없다.
+        "검찰청 수사관입니다. 계좌 안전 확보를 위해 잔액을 국가안전계좌로 옮겨 주십시오.",
+        "경찰 사이버팀입니다. 계좌가 범죄에 이용되어 잔액 전부를 지정 계좌로 옮겨 두셔야 합니다.",
+    ],
+)
+def test_moving_money_you_never_received_is_not_a_mule_demand(text: str) -> None:
+    """**같은 동사를 가르는 것은 돈이 어디서 왔는지다.**
+
+    `옮겨`·`넘겨` 는 재전달의 동사이기도 하고 제 돈을 움직이는 동사이기도
+    하다. 금액과 요구만으로는 갈리지 않는다 - "들어온 돈은 그대로 다른
+    계좌로 넘겨 주시면 됩니다"(`fh-138`)와 "잔액을 국가안전계좌로 옮겨
+    주십시오"(`fh-1161`)는 어휘도 요구도 목적어도 같다.
+
+    갈리지 않으면 **사용자에게 나가는 행동이 뒤집힌다.** 앞은 "받은 돈을
+    보내지 마세요"이고 뒤는 "안전계좌라는 것은 존재하지 않습니다"이다.
+    사기라는 판정은 어느 쪽이든 서지만, 판정만 맞고 행동이 틀리면 이
+    제품이 하는 일이 남지 않는다.
+
+    v0.8 이 이 문제를 만나 목적지 조건을 좁혀서 피했고, v1.3 이 수취
+    표지를 조건으로 세워 정면으로 갈랐다.
+    """
+    codes = [signal["code"] for signal in analyze(text)["signals"]]
+
+    assert "money_transfer_request" in codes
+    assert "money_mule" not in codes
 
 
 @pytest.mark.parametrize(
@@ -1294,3 +1334,169 @@ def test_a_state_alone_never_tells_the_reader_to_cut_contact(
 
     assert body["signals"] == []
     assert "STOP_CONTACT" not in action_codes(body)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v1.3 `fh-1112`. 기관 이름과 요구 없음이 v1.2 정상군과
+        # 같고, 갈리는 것은 읽는 사람이 이 일을 시작하지 않았다는 것뿐이다.
+        "국민연금공단입니다. 확인할 사항이 있어 담당자가 곧 연락드리겠습니다.",
+        # `fh-1116`. `드리` 가 아니라 `드립` 이다. 한글은 어미가 앞 음절에
+        # 합쳐지므로 기본형의 접두사로는 활용형을 잡지 못한다.
+        "우체국입니다. 등기 관련 확인이 필요하여 안내드립니다. 잠시 후 통화 부탁드립니다.",
+    ],
+)
+def test_an_institution_that_starts_the_matter_itself_is_impersonation(
+    text: str,
+) -> None:
+    """**누가 이 일을 시작했는가.**
+
+    v1.2 는 진짜 기관도 문자를 보낸다는 것을 인정하고, 자칭을 요구가 있을
+    때만 신호로 올렸다. 그 조건이 통째로 비켜 가는 자리가 여기다 - 아직
+    아무것도 요구하지 않고 연락하겠다고만 하는 문자다.
+
+    요구는 다음 통화에 온다. 이 문자는 그 통화를 받게 만드는 것이 전부이고,
+    그래서 요구 조건 하나로는 이 회차의 사기 열 건이 전부 조용하다.
+
+    갈라 주는 것은 창구도 어휘도 아니다. v1.3 A군 정상 열 건은 전부 창구를
+    대지 않으므로(`_names_reachable_counter` 가 열 건 모두 거짓) 창구는
+    여기서 아무 일도 하지 않는다. 남는 표지는 **읽는 사람이 먼저 물었는가**
+    다 - 진짜 기관은 신청·문의·접수를 받은 뒤에 연락하고, 사칭은 아무것도
+    받지 않은 사람에게 먼저 건다.
+    """
+    codes = [signal["code"] for signal in analyze(text)["signals"]]
+
+    assert "authority_impersonation" in codes
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v1.3 `fh-1121`. 읽는 사람이 시작한 일이다.
+        "문의하신 카드 재발급 건으로 담당자가 확인 후 연락드리겠습니다.",
+        # `fh-1123`. 신청이 먼저 있었다.
+        "신청해 주신 대출 상담 예약이 접수되었습니다. 담당자가 순차적으로 연락드립니다.",
+    ],
+)
+def test_an_institution_answering_what_the_reader_asked_is_not_impersonation(
+    text: str,
+) -> None:
+    """**표지가 값을 치르는 자리다.**
+
+    앞의 조건은 요구 없는 자칭을 전부 켜므로, 읽는 사람이 먼저 물어서
+    돌아오는 연락도 함께 켠다. 그 절반이 정상이고 그것이 이 조건의 값이다.
+
+    한계를 적어 둔다 - 사칭이 `문의하신` 을 거짓으로 붙이면 이 표지는
+    흉내 난다. 카드 배송 사칭에서는 실제로 그렇게 하고 있어서 같은 표지를
+    그쪽 천장에는 쓰지 않는다(`test_a_card_delivery_claim_is_not_excused_by_
+    claiming_the_reader_applied`). 여기서는 아직 값을 치른 사례가 없어
+    조건으로 세워 두고, 그 자리는 다음 회차의 값으로 남긴다.
+    """
+    assert analyze(text)["fraud_types"] == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v0.2 `fh-015`·v0.4 `fh-232`·v1.1 `fh-973`. 셋 다
+        # "신청하신" 으로 시작하고 셋 다 사기다.
+        "고객님께서 신청하신 카드가 발급되어 배송 예정입니다. 상담원 연결을 눌러 확인해 주세요.",
+        "신청하신 신용카드가 발급되어 오늘 방문 예정입니다. 아래 번호로 연락 주세요.",
+        "신청하신 카드가 오늘 배송 예정입니다. 본인 확인이 완료되지 않으면 반송 처리됩니다.",
+    ],
+)
+def test_a_card_delivery_claim_is_not_excused_by_claiming_the_reader_applied(
+    text: str,
+) -> None:
+    """**카드 배송 사칭에서 `신청하신` 은 흉내가 아니라 문법이다.**
+
+    자칭 게이트가 쓰는 `읽는 사람이 시작했다`는 표지를 이 천장에도 걸었더니
+    얼려 둔 사기 일곱 건이 한꺼번에 미탐이 됐다. 신청한 적 없는 사람을
+    흔드는 것이 이 사기의 방식이라, 신청했다는 말은 오히려 사기 쪽이 더
+    자주 한다.
+
+    같은 표지가 한쪽에서는 서고 한쪽에서는 무너진다. 표지의 값은 신호마다
+    따로 재야 한다는 것이 이 회차가 여기서 치른 값이다.
+    """
+    codes = [signal["code"] for signal in analyze(text)["signals"]]
+
+    assert "card_delivery_claim" in codes
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v1.3 `fh-1127`·`fh-1129`. 연락 수단이 바뀐 핑계를 대지
+        # 않는다. 곧장 돈으로 넘어간다.
+        "형 나야. 급하게 쓸 데가 있는데 200만원만 보내 줄 수 있어? 이따 바로 줄게.",
+        "엄마 나예요. 지금 급해서 그런데 아래 계좌로 150만원만 넣어 주세요.",
+    ],
+)
+def test_a_relative_who_names_himself_and_asks_is_an_impersonation_signal(
+    text: str,
+) -> None:
+    """**호칭과 자기지목만으로는 신호가 아니고, 요구가 붙으면 신호다.**
+
+    이 규칙은 지금까지 연락 수단이 바뀐 핑계만 봤다. 그 설계는 "엄마야는
+    진짜 엄마도 쓴다"는 문장 위에 서 있고 그 문장은 지금도 맞다. 핑계를
+    대지 않는 사칭이 그 어휘를 통째로 비켜 가는 것이 문제였다.
+    """
+    codes = [signal["code"] for signal in analyze(text)["signals"]]
+
+    assert "familiar_person_claim" in codes
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v1.3 `fh-1131`~`fh-1134`. 진짜 가족의 평상시 문자다.
+        "엄마 나 오늘 좀 늦어. 저녁 먼저 드세요.",
+        "형 나야. 내일 몇 시에 볼까? 역에서 만나자.",
+        "누나 나야. 어제 빌린 책 언제 돌려줄까?",
+        "아빠 저예요. 학원 끝나고 바로 집에 갈게요.",
+    ],
+)
+def test_a_relative_who_only_says_hello_is_not_a_signal(text: str) -> None:
+    """호칭과 자기지목은 가족 문자의 인사말이다. 무조건 켜면 매일 오는
+    문자마다 경고가 뜬다. 이 어형에만 요구 조건을 거는 이유가 이것이다."""
+    body = analyze(text)
+
+    assert body["signals"] == []
+    assert body["fraud_types"] == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # held-out v1.3 `fh-1151`·`fh-1152`. 제도 이름은 같고 창구가 다르다.
+        "햇살론유스는 서민금융진흥원 앱이나 서민금융통합지원센터에서 신청하실 수 있습니다.",
+        "정책 자금 상담은 가까운 서민금융통합지원센터 방문으로 가능합니다.",
+    ],
+)
+def test_naming_the_real_policy_loan_counter_is_not_an_offer(text: str) -> None:
+    """**제도 이름을 신호로 올린 값을 창구가 치른다.**
+
+    `햇살론`·`정책 자금` 은 진짜 제도의 이름이다. 사기가 이 이름을 쓰는
+    이유는 없는 제도를 지어내면 검색 한 번에 들통나기 때문이고, 그래서 이
+    수법은 **진짜 제도의 이름을 쓰고 창구만 바꾼다.**
+
+    가르는 것은 이름이 아니라 신청하는 곳이다. 진짜 안내는 서민금융진흥원과
+    통합지원센터를 대고, 사기는 "저희 담당자"·"이 번호로만" 이라고 한다.
+    """
+    assert analyze(text)["fraud_types"] == []
+
+
+def test_a_policy_loan_that_asks_for_a_guarantee_fee_is_not_excused_by_a_counter() -> (
+    None
+):
+    """정책금융은 신청자에게 보증료를 먼저 송금하라고 하지 않는다. 창구를
+    대더라도 그 한 마디는 제도 밖이라 천장이 열리지 않는다."""
+    codes = [
+        signal["code"]
+        for signal in analyze(
+            "서민금융진흥원 안내입니다. 보증료 입금이 확인되면 당일 실행됩니다."
+        )["signals"]
+    ]
+
+    assert "loan_policy_offer" in codes
