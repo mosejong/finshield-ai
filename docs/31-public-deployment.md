@@ -180,12 +180,39 @@ compose 의 `secrets:` 는 파일이 없으면 스택 자체를 못 올리므로
 mkdir -p secrets
 read -rsp 'Gemini API key: ' KEY && printf '%s' "$KEY" > secrets/gemini_api_key.txt
 unset KEY
-chmod 600 secrets/gemini_api_key.txt
+sudo chown 10001:10001 secrets/gemini_api_key.txt
+sudo chmod 400 secrets/gemini_api_key.txt
+ls -ln secrets/gemini_api_key.txt      # -r-------- 1 10001 10001
 ```
 
 `read -rs` 는 입력을 화면에도 히스토리에도 남기지 않는다. `echo '키' > 파일` 로
 쓰면 `~/.bash_history` 에 그대로 박힌다. `printf '%s'` 를 쓰는 이유는 `echo` 가
 줄바꿈을 붙이기 때문이다 — 뒤에 개행이 붙은 키는 인증에 실패한다.
+
+**소유자를 옮기는 것이 이 절차의 핵심이다.** 이 문서는 2026-08-25 까지
+`chmod 600` 만 적어 두었고, 그것이 실제로 서비스를 내렸다. `Dockerfile` 은
+`USER finshield`(uid 10001)로 돌고, compose 의 파일 secret 은 호스트 파일의
+권한을 그대로 들고 들어간다. uid 1000 소유의 `600` 파일은 컨테이너 안의
+uid 10001 에게는 **읽기 거부**다. 그리고 `app/main.py` 의 lifespan 이 시작할 때
+런타임을 실제로 조립해 보기 때문에(`verify_llm_runtime_configuration`), 키를
+못 읽으면 설명만 꺼지는 것이 아니라 **백엔드가 아예 뜨지 않는다** —
+`/analyze` 까지 502 가 된다.
+
+`chmod 644` 로 푸는 것은 답이 아니다. 그러면 VM 의 모든 계정이 키를 읽는다.
+소유자를 컨테이너 uid 로 넘기고 `400` 으로 잠그면, 읽을 수 있는 것은 그
+컨테이너뿐이다. 호스트 계정은 그 뒤로 키를 못 읽지만 읽을 일이 없다 —
+마운트는 root 로 도는 docker 데몬이 한다.
+
+증상과 원인이 멀어지는 자리라 로그를 어디서 보는지 적어 둔다.
+
+```bash
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml \
+  -f compose.gemini.yaml logs --tail=40 backend
+```
+
+`LlmRuntimeConfigurationError: ... the API key is missing` 은 **키가 없다는
+뜻이 아니다.** `read_secret_setting` 의 `OSError` 가 거기까지 접혀 온 것이고,
+`--tail` 을 짧게 주면 뿌리가 잘려서 안 보인다.
 
 그다음 override 를 끼워 다시 올린다.
 
@@ -209,8 +236,76 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 | 결과 | 뜻 |
 |---|---|
 | 404 | 아직 옛 이미지다. pull 이 안 됐거나 `up -d` 가 web 을 갈아끼우지 않았다 |
-| 200 + `available: false` | 새 이미지는 떴고 설명 계층만 꺼져 있다 (키 없음) |
+| 200 + `status: off` | 새 이미지는 떴고 설명 계층만 꺼져 있다 (override 없이 올림) |
+| 200 + `status: failed` | 계층은 켜졌는데 호출이 실패한다 (바로 아래) |
+| 502 | **백엔드가 안 떠 있다.** 키 파일 권한을 먼저 본다 |
 | 200 + 설명 문장 | 완료 |
+
+`status: failed` 가 1~2초 만에 나오면 모델을 부르기도 전에 거절당한 것이다.
+정상 호출은 6~8초 걸린다. 키를 드러내지 않고 컨테이너 안에서 확인한다.
+
+```bash
+docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml \
+  -f compose.gemini.yaml exec backend python -c '
+import io, httpx
+k = io.open("/run/secrets/gemini_api_key").read().strip()
+print("key_len", len(k))
+r = httpx.get("https://generativelanguage.googleapis.com/v1beta/models",
+              headers={"x-goog-api-key": k}, timeout=20.0)
+print("list_status", r.status_code)
+if r.status_code != 200:
+    print(r.text[:200].replace(k, "<RED>"))
+'
+```
+
+`403 Gemini API has not been used in project <번호> before or it is disabled`
+가 이 프로젝트에서 실제로 나왔다(2026-08-25). **키가 유효한 것과 그 키의
+프로젝트에서 API 가 켜져 있는 것은 다른 조건이다.** AI Studio 에서 키를
+만들었다고 해서 그 프로젝트의 `generativelanguage.googleapis.com` 이
+활성화되는 것은 아니다.
+
+```bash
+gcloud services enable generativelanguage.googleapis.com --project=<PROJECT_ID>
+```
+
+재배포도 재시작도 필요 없다 — 활성화는 Google 쪽 상태라 몇 분 뒤 반영되면
+돌고 있는 백엔드가 그냥 성공하기 시작한다. **켜기 전에 예산 알림을 먼저
+건다.** 이 프로젝트에는 결제 계정이 붙어 있고, 켜는 순간 상한 없는 유료
+호출 경로가 하나 열린다. 예산은 알림이지 차단이 아니다 — 실제 제동은
+`analyze_explanation` 요청 한도(60초당 10회, IP 기준)가 건다.
+
+API 를 켠 뒤에도 같은 프로브가 `403` 을 냈다. 이번에는 문구가 다르다.
+
+```
+Requests to this API generativelanguage.googleapis.com method
+google.ai.generativelanguage.v1beta.ModelService.ListModels are blocked.
+PERMISSION_DENIED
+```
+
+**"켜져 있지 않다" 가 아니라 "차단됐다" 다.** 앞의 것은 프로젝트 상태이고
+이것은 키 자신의 제한이다. 콘솔에서 키를 열어 보면 갈래가 둘이다.
+
+| 칸 | 이 프로젝트에서 나온 값 | 뜻 |
+|---|---|---|
+| 애플리케이션 제한사항 | 없음 | 어디서 불러도 됨 |
+| **API 제한사항** | **API 1개 — `Agent Platform API`** | 그 API 말고는 전부 차단 |
+
+이 키는 Vertex Express 경로로 만들어져 서비스 계정에 묶여 있었고, 그래서
+목록에 `Gemini API` 를 더하려 하면 **체크박스가 비활성화되고** "현재 선택된
+API 제한사항과 결합할 수 없습니다" 가 뜬다. 둘은 상호 배타다 —
+`Agent Platform API` 를 **먼저 해제한 뒤** `Gemini API` 를 선택해야 한다.
+더하는 것이 아니라 **바꾸는 것**이라는 게 이 화면에서 안 보인다.
+
+바꾸고 나면 재배포 없이 다음 호출부터 성공한다. 실측 `status: ready`,
+`model: gemini-3.6-flash`, 5~7초.
+
+세 가지가 전부 `403` 이고 전부 다른 조치를 요구한다는 점을 적어 둔다.
+
+| 본문 | 원인 | 조치 |
+|---|---|---|
+| `API key not valid` | 키 값 자체 | 키를 다시 만든다 |
+| `has not been used in project … or it is disabled` | 프로젝트에서 API 가 꺼짐 | `gcloud services enable` |
+| `Requests to this API … are blocked` | 키의 API 제한 목록 | 콘솔에서 제한을 바꾼다 |
 
 #### 그 릴리스에서 처음 생긴 경로를 하나 찍는다
 
@@ -698,6 +793,42 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
    경로를 하나 골라 찍는 검사**가 따로 있어야 한다.
 2. **릴리스 대장에 배포 칸이 없었다.** 만든 날만 적고 올린 날을 적지 않으면,
    대장을 보면서도 안 올라간 것을 알 수 없다.
+
+### 배포 대장 — 공개 URL 에 실제로 올라간 것
+
+위 표의 짝이다. 만든 날이 아니라 **올린 날**을 적는다.
+
+| 올린 날 | 태그 | 올린 방법 | 확인한 경로 |
+|---|---|---|---|
+| 2026-08-18 | `sha-4457f0e…` | 3-4 최초 기동 | — |
+| 2026-08-25 | `v0.3.0` | 3-6 재배포 | `/check/deposit` `200`, `POST /api/proxy/analyze` `200`, `.../explanation` `200 status: ready` |
+
+`v0.1.0` 과 `v0.2.0` 은 **이 표에 줄이 없다.** 만들어졌지만 배포된 적이 없다.
+줄이 없는 것이 이 표가 하는 일이다 — 위 대장만 보면 세 릴리스가 나란히
+있으니 다 올라간 것처럼 읽힌다.
+
+2026-08-25 재배포에서 실제로 일어난 일을 순서대로 적어 둔다. 이미지 교체
+자체는 한 번에 됐고, 시간을 쓴 것은 그다음이다.
+
+1. `.env` 의 `FINSHIELD_IMAGE_TAG` 를 `v0.3.0` 으로 바꾸고 `pull` → `up -d`.
+   네 컨테이너 전부 교체, `migration` 은 이미 head 라 no-op 으로 종료.
+   `/check/deposit` 이 `404` 에서 `200` 이 됐다.
+2. VM 의 저장소가 `4457f0e` 에 멈춰 있어 `compose.gemini.yaml` 이 없었다.
+   그 파일은 `f6d5485` (#66) 에서 들어왔다. `git pull --ff-only` 로 해결.
+   **compose 파일들은 그 사이 하나도 바뀌지 않았으므로**(`compose.yaml`,
+   `compose.https.yaml`, `compose.deploy.yaml`, `Caddyfile` 전부 무변경)
+   당겨도 돌고 있는 스택에 영향이 없다.
+3. 키 파일 권한 때문에 백엔드가 startup 에서 죽었다. `/analyze` 까지 `502`.
+   3-6 에 적어 둔 `chmod 600` 이 원인이었다 — 지금은 고쳤다.
+4. 백엔드는 살아났지만 설명이 `status: failed`. 프로젝트에서 Gemini API 가
+   꺼져 있었다(`403`). 3-6 의 확인 절차에 이 갈래를 추가했다.
+5. API 를 켠 뒤에도 `403`. 이번에는 키가 `Agent Platform API` 로 제한돼
+   있었다. 제한을 `Gemini API` 로 바꾸자 `status: ready`. 3-6 에 세 가지
+   `403` 을 갈라 적었다.
+
+3번과 4번은 둘 다 **설명 계층에서만 생긴 문제인데 3번은 서비스 전체를
+내렸다.** 있으면 좋고 없어도 되는 기능이 필수 경로를 끌고 내려가는 구조라는
+뜻이고, 이건 권한을 고친 것과 별개로 남아 있는 설계 문제다 (`docs/34` 참조).
 
 ### 되돌릴 대상
 
