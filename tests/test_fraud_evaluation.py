@@ -27,6 +27,7 @@ from app.domain.fraud.policy import STATE_MINIMUM_RISK
 from app.domain.fraud.signals import CANONICAL_TO_LEGACY_PUBLIC, SIGNAL_RULES
 from evaluation.fraud_golden import (
     ACTION_CODES,
+    CASE_ID_PATTERN,
     HOLDOUT_V0_2_PATH,
     HOLDOUT_V0_3_PATH,
     HOLDOUT_V0_4_PATH,
@@ -49,6 +50,8 @@ from evaluation.fraud_golden import (
 )
 from evaluation.llm_judge import (
     FRAUD_JUDGE_PROMPT,
+    HOLDOUT_JUDGE_V1_2_PATH,
+    HOLDOUT_JUDGE_V1_3_PATH,
     JUDGE_RUN_PATH,
     LlmJudgement,
     LlmJudgeRun,
@@ -1487,3 +1490,73 @@ def test_v1_0_fh_803_is_a_recorded_label_disagreement_not_a_silent_regression() 
         & set(other.forbidden_action_codes)
     ]
     assert others == []
+
+
+# ---------------------------------------------------------------------------
+# 2026-08-25. held-out 을 판정시키려다 재는 자에서 막혔다.
+# ---------------------------------------------------------------------------
+
+
+def test_judgement_accepts_every_case_id_the_datasets_actually_use() -> None:
+    """`LlmJudgement.case_id` 는 데이터셋과 같은 번호를 받아야 한다.
+
+    홀드아웃이 생기기 전에 쓰인 필드라 `^fg-[0-9]{3}$` 로 남아 있었고, 그래서
+    `fh-` 사례를 판정시키면 **모델 응답을 받아 놓고** 검증에서 죽었다. 유료
+    호출이 나간 뒤에 터지는 자리라 값이 두 번 든다.
+
+    같은 규칙이 두 곳에 적혀 있던 것이 원인이므로 상수 하나를 공유하게 했다.
+    이 테스트는 그 공유가 풀리는 것을 잡는다 - 한쪽만 넓히면 여기서 걸린다.
+    """
+    assert LlmJudgement.model_fields["case_id"].metadata[0].pattern == (
+        CASE_ID_PATTERN
+    )
+
+    every_case = list(load_golden_cases())
+    for path in (
+        HOLDOUT_V0_2_PATH,
+        HOLDOUT_V0_3_PATH,
+        HOLDOUT_V0_4_PATH,
+        HOLDOUT_V0_5_PATH,
+        HOLDOUT_V0_6_PATH,
+        HOLDOUT_V0_7_PATH,
+        HOLDOUT_V0_8_PATH,
+        HOLDOUT_V0_9_PATH,
+        HOLDOUT_V1_0_PATH,
+        HOLDOUT_V1_1_PATH,
+        HOLDOUT_V1_2_PATH,
+        HOLDOUT_V1_3_PATH,
+    ):
+        every_case.extend(load_holdout_cases(path))
+
+    for case in every_case:
+        # 모든 사례가 판정 결과로 옮겨질 수 있어야 한다.
+        LlmJudgement(case_id=case.case_id, ok=False, failure="unused")
+
+
+def test_holdout_judge_runs_name_the_dataset_they_actually_judged() -> None:
+    """판정 파일의 `dataset_id` 가 sha256 과 같은 셋을 가리켜야 한다.
+
+    러너가 이 값을 개발셋으로 박아 두고 있었다. sha256 이 어긋나면 집계는
+    `stale` 로 막히지만, 그때 사람이 읽는 것은 이름이다. **파일 하나로 출처가
+    확인된다**는 전제가 이름에서 먼저 깨진다.
+    """
+    for path, dataset in (
+        (
+            HOLDOUT_JUDGE_V1_2_PATH,
+            HOLDOUT_V1_2_PATH,
+        ),
+        (
+            HOLDOUT_JUDGE_V1_3_PATH,
+            HOLDOUT_V1_3_PATH,
+        ),
+    ):
+        run = LlmJudgeRun.model_validate_json(path.read_text(encoding="utf-8"))
+        cases = load_golden_cases(dataset)
+
+        assert run.dataset_id == dataset.stem
+        assert run.dataset_sha256 == normalized_dataset_sha256(cases)
+        # 판정을 한 건도 빠뜨리지 않았다. 빠진 것은 집계에서 실패로 세어지므로
+        # 조용히 숫자를 좋게 만들지는 않지만, 여기서 먼저 잡는 편이 낫다.
+        assert {judgement.case_id for judgement in run.judgements} == {
+            case.case_id for case in cases
+        }
