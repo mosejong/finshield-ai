@@ -362,10 +362,13 @@ URL 형태 분석 1종: `suspicious_link`
 | 주 모델 | `gemini-3.6-flash` |
 | 대체 모델 | `gemini-3.1-flash-lite` |
 | temperature | 0.0 |
-| 프롬프트 | `fraud_explanation` — sha256을 상수로 고정, 테스트가 검증 |
+| 프롬프트 | `fraud_explanation_v2` — sha256을 상수로 고정, 테스트가 검증 |
 
 프롬프트를 한 글자라도 고치면 해시가 어긋나 테스트가 깨진다. **모델·프롬프트를
-조용히 바꾸는 일이 불가능하다.**
+조용히 바꾸는 일이 불가능하다.** 벤치마크 보고서도 같은 해시를 보므로, 다른 지시문에서
+잰 설명 품질은 `measured` 가 아니라 `stale` 로 나온다. 직전 판 `fraud_explanation_v1`
+은 지우지 않고 그대로 남겨 둔다 — 나아졌다는 말은 무엇과 비교했는지가 남아 있을 때만
+확인 가능한 주장이다.
 
 ### 6.2 출력 검증
 
@@ -811,6 +814,15 @@ held-out 3자 비교는 **2026-08-25 에 처음 했다.** v1.2(80건)·v1.3(84�
 문장을 실제로 막는 그 함수가 했고, LLM 판정자는 쓰지 않았다(`docs/32`,
 `docs/34` 13절).
 
+그 6건을 보고 지시문을 v2 로 고쳐 같은 두 셋을 다시 태웠다. **지어낸 연락처가
+7시도 / 6사례에서 2시도 / 1사례로 줄었고, 같은 조건 반복 실행에서 같은 값이
+나왔다.** 사라진 다섯 건은 전부 `high`, 즉 돈이 이미 움직인 뒤의 사례다. 다만
+**규칙이 겨냥한 바로 그 한 건(`fh-1007`)은 고쳐지지 않았다** — 모델이 연락처를
+제안하는 게 아니라 "이것은 112 안내입니다" 라고 문자를 설명하는 중이고, 검증기는
+그 둘을 구분하지 못한다. 검증기를 느슨하게 하지 않는다: 오거부는 설명 문장 하나를
+잃고, 오통과는 사기범이 고른 번호를 공식 안내의 얼굴로 내보낸다. 남은 수는 근거가
+비면 모델을 아예 부르지 않는 것이고 다음 회차다(`docs/34` 14절).
+
 그러므로 **규칙에 판정 권한을 남겨 두는 근거는 정확도가 아니다.** 남는 것은
 (1) 공식 근거 coverage 가 모델 0.0 / 규칙 1.0 이고 이건 실행 결과가 아니라
 구조라는 것, (2) 규칙의 수정은 커밋으로 남고 회귀를 CI 가 잡지만 모델의
@@ -850,7 +862,9 @@ URL 도메인·평판 조회(외부 호출 정책 선행), 음성 통화·STT �
 | held-out 12셋 결과 | `evaluation/results/fraud-holdout-v*.json` |
 | LLM 단독 판정 (개발셋) | `evaluation/results/llm-judge-fraud-v0.1.json` |
 | LLM 단독 판정 (held-out v1.2·v1.3) | `evaluation/results/llm-judge-fraud-holdout-v1.*.json` |
-| 설명 계층 실측 (held-out v1.2·v1.3) | `evaluation/results/explanation-probe-fraud-holdout-v1.*.json` |
+| 설명 계층 실측 — 배포 지시문 | `evaluation/results/explanation-probe-fraud-holdout-v1.{2,3}-prompt-v2.json` |
+| 설명 계층 실측 — 같은 조건 반복 | `evaluation/results/explanation-probe-fraud-holdout-v1.{2,3}-prompt-v2-repeat.json` |
+| 설명 계층 실측 — 직전 지시문 (비교 대상) | `evaluation/results/explanation-probe-fraud-holdout-v1.{2,3}-prompt-v1.json` |
 | 설명 계층 실행 스크립트 | `scripts/run_explanation_probe.py` |
 | 회차별 관찰 기록 | `docs/devlog/` (회차마다 한 편) |
 | 공개 배포·이미지 대장 | `docs/31-public-deployment.md` |
