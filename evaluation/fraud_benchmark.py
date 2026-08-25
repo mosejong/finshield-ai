@@ -7,6 +7,7 @@ from math import ceil
 from app.domain.fraud.signals import detect_legacy_signals
 from app.schemas.analysis import AnalyzeResponse
 from app.services.fraud_analysis import analyze_fraud
+from evaluation.explanation_probe import ExplanationProbeRun, summarize
 from evaluation.fraud_golden import FraudGoldenCase, RISK_RANK, is_held_out
 from evaluation.llm_judge import LlmJudgement, LlmJudgeRun
 
@@ -45,6 +46,7 @@ def evaluate_golden_set(
     cases: list[FraudGoldenCase],
     *,
     llm_run: LlmJudgeRun | None = None,
+    explanation_probe: ExplanationProbeRun | None = None,
     dataset_id: str = "fraud_golden_v0.1",
 ) -> dict[str, object]:
     responses = [analyze_fraud(case.request()) for case in cases]
@@ -90,7 +92,13 @@ def evaluate_golden_set(
         "scenario_engine_v0_1": engine,
         "llm_only": _llm_only_section(cases, llm_run, dataset_sha256),
         "hybrid_v0_1": _hybrid_section(
-            cases, engine, truth, scenario_predictions, llm_run, dataset_sha256
+            cases,
+            engine,
+            truth,
+            scenario_predictions,
+            llm_run,
+            dataset_sha256,
+            explanation_probe,
         ),
     }
 
@@ -185,6 +193,55 @@ def _llm_only_section(
     }
 
 
+def _explanation_layer(
+    probe: ExplanationProbeRun | None, dataset_sha256: str
+) -> dict[str, object]:
+    """설명 문장이 계약을 지킨 비율. 안 쟀으면 안 쟀다고 적는다.
+
+    이 칸은 오래 `note` 하나였다 - "셀 수 있으나 아직 숫자가 없다." 계측이 있다는
+    것과 측정했다는 것은 다르고, 그 구분을 문장으로만 적어 두면 다음 사람이 표를
+    보고 계측을 측정으로 읽는다.
+
+    `stale` 을 따로 두는 이유는 판정 결과와 같다. 다른 셋에서 잰 설명 품질을 이 셋의
+    표에 붙이면, 숫자는 있는데 아무 셋의 것도 아니게 된다.
+
+    **여기 숫자는 탐지 성능이 아니다.** 위 칸들과 분모가 다르다 - 이쪽은 사례가
+    아니라 **시도**를 세고, 재는 것은 "모델이 맞혔는가" 가 아니라 "모델이 우리
+    계약을 어겼는가" 다.
+    """
+    base: dict[str, object] = {
+        "measured_in": "docs/34-llm-explanation-runtime.md",
+        "scope": (
+            "설명 문장의 계약 준수율. 탐지 성능이 아니며, "
+            "문장이 읽을 만한지도 재지 않는다."
+        ),
+    }
+    if probe is None:
+        return {
+            **base,
+            "status": "not_measured",
+            "reason": (
+                "설명 계층 실행 결과가 없다. "
+                "scripts/run_explanation_probe.py 로 만든다."
+            ),
+        }
+    if probe.dataset_sha256 != dataset_sha256:
+        return {
+            **base,
+            "status": "stale",
+            "reason": "설명 계층 실행이 다른 셋에서 나왔다.",
+            "probe_dataset_id": probe.dataset_id,
+        }
+    return {
+        **base,
+        "status": "measured",
+        "probed_at": probe.probed_at,
+        "models": list(probe.contracts),
+        "prompt_id": probe.prompt_id,
+        **summarize(probe),
+    }
+
+
 def _hybrid_section(
     cases: list[FraudGoldenCase],
     engine: dict[str, object],
@@ -192,6 +249,7 @@ def _hybrid_section(
     scenario_predictions: list[bool],
     run: LlmJudgeRun | None,
     dataset_sha256: str,
+    explanation_probe: ExplanationProbeRun | None,
 ) -> dict[str, object]:
     """실제로 배포된 조합.
 
@@ -221,18 +279,7 @@ def _hybrid_section(
         "required_action_coverage": engine["required_action_coverage"],
         "forbidden_action_avoidance": engine["forbidden_action_avoidance"],
         "evidence_coverage": engine["evidence_coverage"],
-        "explanation_layer": {
-            "model": "gemini-3.6-flash",
-            "fallback_model": "gemini-3.1-flash-lite",
-            "measured_in": "docs/34-llm-explanation-runtime.md",
-            "note": (
-                "설명 문장의 근거 이탈률과 안전 필터 차단율은 이제 셀 수 있으나 "
-                "아직 숫자가 없다. 계측은 2026-08-24 에 넣었고 "
-                "(app/core/observability.py 의 ExplanationMetrics), 유료 실행을 "
-                "하지 않았으므로 분모가 0 이다. 여기 숫자는 탐지 성능이며 "
-                "설명 품질이 아니다."
-            ),
-        },
+        "explanation_layer": _explanation_layer(explanation_probe, dataset_sha256),
     }
 
     if run is None or run.dataset_sha256 != dataset_sha256:
