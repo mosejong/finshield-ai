@@ -154,7 +154,7 @@ git diff --name-only <직전에_배포한_SHA>..<새_태그> -- migrations/
 비어 있으면 코드만 바뀐 것이다.
 
 ```bash
-export FINSHIELD_IMAGE_TAG=v0.1.0
+export FINSHIELD_IMAGE_TAG=v0.3.0
 export FINSHIELD_DOMAIN=finshield-ai.duckdns.org
 export FINSHIELD_ACME_EMAIL=<갱신 실패를 실제로 읽을 주소>
 
@@ -211,6 +211,25 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 | 404 | 아직 옛 이미지다. pull 이 안 됐거나 `up -d` 가 web 을 갈아끼우지 않았다 |
 | 200 + `available: false` | 새 이미지는 떴고 설명 계층만 꺼져 있다 (키 없음) |
 | 200 + 설명 문장 | 완료 |
+
+#### 그 릴리스에서 처음 생긴 경로를 하나 찍는다
+
+위 확인은 **설명 계층**만 본다. 12절에 적은 2026-08-25 의 일은 그것만으로는
+부족하다는 것을 보여준다 — `verify_public_deployment` 27개 검사가 전부 통과한
+상태에서 화면 하나가 통째로 없었다.
+
+그래서 재배포마다 **이번 릴리스에서 처음 들어온 경로**를 하나 골라 같이 찍는다.
+
+```bash
+for p in / /check /check/deposit /learn/wealth; do
+  printf '%-18s %s\n' "$p" \
+    "$(curl -s -o /dev/null -w '%{http_code}' "https://finshield-ai.duckdns.org$p")"
+done
+```
+
+`v0.3.0` 기준으로 넷 다 `200` 이어야 한다. `/check/deposit` 이 `404` 면 web
+이미지가 `bd69925` (#78) 이전이다. 어느 경로를 골라야 하는지는
+`git log --diff-filter=A <직전_태그>..<새_태그> -- web/app/` 으로 찾는다.
 
 ## 4. 무엇을 검사하는가
 
@@ -642,9 +661,43 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 |---|---|---|---|---|
 | `v0.1.0` | `30ba35b` | 2026-08-19 | `finshield-backend` | `sha256:c9c0864ccc28cd5ff500f548b617a3f21200103f3efbd7a1140cd24fc2f00ffe` |
 | `v0.1.0` | `30ba35b` | 2026-08-19 | `finshield-web` | `sha256:38ed9740a6d320fae3b174187246ac5f99202b4da8f383b811502f7e9fb25f15` |
+| `v0.2.0` | `d11bdaf` | 2026-08-23 | `finshield-backend` | `sha256:5c7f6e4eba7e1aa7fac96f6b7db2c0c6f0da8988fa714623e1104fc274692f23` |
+| `v0.2.0` | `d11bdaf` | 2026-08-23 | `finshield-web` | `sha256:529b18bc02d72a4e7e998a257dd8fc3e3c6749b9908adf2fe781e17294500727` |
+| `v0.3.0` | `ec43f86` | 2026-08-25 | `finshield-backend` | `sha256:2337229408dba3cb53d74e538e374eebe69e5f13d97ddab23c0a43703ae77e1e` |
+| `v0.3.0` | `ec43f86` | 2026-08-25 | `finshield-web` | `sha256:99ebf6c6732cf1f4187d0a9e09e16b77960ba8a3d51c33a0964b8c7aebf79d1e` |
 
 `v0.1.0` 은 **태그로 만든 첫 릴리스**다. 그 이전 두 번은 `workflow_dispatch` 라
 `sha-<커밋>` 태그만 붙었다.
+
+**이미지를 만든 것과 배포한 것은 다르다.** 위 표는 만들어진 이미지의 대장이고,
+그중 무엇이 실제로 공개 URL 에서 돌고 있었는지는 아래에서 따로 적는다. 이 둘을
+같은 줄에 적어 두면 "태그를 밀었으니 배포됐겠지" 로 읽히고, 실제로 그렇게 읽어서
+아래의 일이 났다.
+
+### 공개 URL 이 실제로 돌리고 있던 것 (2026-08-25 확인)
+
+`v0.2.0` 을 만든 뒤에도 **VM 은 그것을 받지 않았다.** 밖에서 경로를 찍어 보면
+어느 이미지인지 좁혀진다.
+
+| 경로 | 응답 | 그 경로가 들어온 커밋 |
+|---|---|---|
+| `/learn/wealth` | `200` | `d2ce019` (#34) |
+| `/check/deposit` | `404` | `bd69925` (#78) |
+| `POST /api/proxy/analyze/explanation` | `404` | `c5fca16` (#67) |
+
+`#34` 는 있고 `#67` 은 없는 이미지는 하나뿐이다 —
+`sha-4457f0efa3ec0053ae2b5ab0135167fdec80bc7c` (2026-08-18 빌드), 즉 9-1 이
+"되돌릴 대상" 으로 적어 둔 바로 그 이미지다. 공개 URL 은 `v0.1.0` 도 `v0.2.0` 도
+아니라 **그 이전 이미지를 7일 동안 서비스하고 있었다.**
+
+여기서 배울 것은 두 가지다.
+
+1. **`verify_public_deployment` 는 이 상태를 잡지 못한다.** 27개 검사가 전부
+   통과했는데도 화면의 절반이 없었다. 그 스크립트가 재는 것은 TLS·헤더·포트이지
+   *어떤 빌드가 떠 있는가* 가 아니다. 배포 확인에는 **그 릴리스에서 처음 생긴
+   경로를 하나 골라 찍는 검사**가 따로 있어야 한다.
+2. **릴리스 대장에 배포 칸이 없었다.** 만든 날만 적고 올린 날을 적지 않으면,
+   대장을 보면서도 안 올라간 것을 알 수 없다.
 
 ### 되돌릴 대상
 
@@ -655,8 +708,32 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 `4457f0e..30ba35b` 사이에 `migrations/` 변경이 없으므로 이 되돌리기는 스키마를
 건드리지 않는다. **`alembic downgrade` 는 어느 경우에도 부르지 않는다** (9-1).
 
+`4457f0e..ec43f86` 사이에도 `migrations/` 변경이 없다 (2026-08-25 확인:
+`git diff --name-status 4457f0e ec43f86 -- migrations/` 가 빈 출력). 즉 지금
+밀려 있는 이미지에서 `v0.3.0` 으로 올라가는 것도, 다시 내려오는 것도 스키마를
+건드리지 않는다. 되돌리기는 `FINSHIELD_IMAGE_TAG` 를 이전 값으로 되돌리고
+`up -d` 하는 것으로 끝난다.
+
+`.env.example` 에 그 사이 늘어난 항목은 `FINSHIELD_LLM_PROVIDER`,
+`GEMINI_API_KEY` / `GEMINI_API_KEY_FILE` 셋뿐이고 **셋 다 선택이다.** 비워 두면
+설명 계층이 꺼진 채로 뜨고 `POST /api/v1/analyze/explanation` 이 `200` +
+`available: false` 를 돌려준다. 판정 경로는 영향을 받지 않는다. 그러므로
+**키 없이 먼저 올려도 안전하다** — 키는 그다음에 붙인다 (3-6).
+
 ### 두 이미지 모두 익명 pull 가능하다
 
-2026-08-19 확인. `ghcr.io/mosejong/finshield-backend`, `finshield-web` 둘 다
-토큰 없이 `tags/list` 가 `200` 이므로 VM 에서 `docker login` 이 필요 없다.
-확인 방법은 3-2 에 있다 — **공개 범위는 짐작하지 말고 매번 확인한다.**
+2026-08-25 재확인. `ghcr.io/mosejong/finshield-backend`, `finshield-web` 둘 다
+토큰 없이 `tags/list` 가 `200` 이고 `v0.3.0` manifest 도 익명으로 읽힌다. VM 에서
+`docker login` 이 필요 없다. 확인 방법은 3-2 에 있다 — **공개 범위는 짐작하지 말고
+매번 확인한다.**
+
+### `latest` 는 붙지 않기로 했는데 붙어 있었다
+
+`release.yml` 주석은 "`latest` 를 붙이지 않는다" 라고 적어 두었지만,
+`docker/metadata-action` 의 기본 `flavor` 가 `latest=auto` 라 semver 태그를 밀
+때마다 `latest` 가 따라 붙고 있었다. 2026-08-25 확인 시점에 두 패키지의
+`latest` 는 `v0.3.0` 과 같은 digest 를 가리키고 있었다.
+
+`flavor: latest=false` 를 명시해 앞으로는 붙지 않게 했다. **이미 올라간
+`latest` 태그는 그대로 남아 있으므로 배포에 쓰지 않는다** — 대장에 없는 태그는
+되돌릴 좌표가 되지 못한다.
