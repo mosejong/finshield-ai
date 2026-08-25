@@ -1,0 +1,1189 @@
+{
+  "dataset_id": "fraud_holdout_v1.2",
+  "dataset_sha256": "1c7d42a7747e951217a0692f8e6289d71753ec3d3fc970a81bc5725675975ed7",
+  "judged_at": "2026-08-25T07:22:02+00:00",
+  "judgements": [
+    {
+      "actions": [],
+      "case_id": "fh-1001",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 6592.9451999254525,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1002",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 5503.274000016972,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1003",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 4833.8445000117645,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1004",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1843.418899923563,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1005",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1968.160800053738,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1006",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 3069.0119999926537,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1007",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 4555.981799960136,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1008",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 2162.6644000643864,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1009",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1971.2805999442935,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1010",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1869.5193999446929,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_INSTALL",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_KISA_118"
+      ],
+      "case_id": "fh-1011",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation",
+        "smishing_malware"
+      ],
+      "is_fraud": true,
+      "latency_ms": 4464.7206999361515,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1012",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 4526.636399910785,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1013",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1880.459600011818,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1014",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2131.1572999693453,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1015",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 2123.2623000396416,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1016",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1647.5160999689251,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1017",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2140.9298999933526,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_1394",
+        "CONTACT_112",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1018",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2975.8740999968722,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_1394",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1019",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 4251.14389997907,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1020",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1771.727400016971,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1021",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1738.569299923256,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1022",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2050.1535999355838,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1023",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 2999.30729996413,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1024",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1941.0718999570236,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1025",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1559.2176000354812,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1026",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1909.0281000826508,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1027",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 3071.942299953662,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1028",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 2129.8814000329003,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_1394"
+      ],
+      "case_id": "fh-1029",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 4799.179499968886,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_SHARE_ACCESS",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "CONTACT_1394",
+        "CONTACT_112",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1030",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation",
+        "account_access_request"
+      ],
+      "is_fraud": true,
+      "latency_ms": 4749.77230001241,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "CONTACT_1394",
+        "CONTACT_112",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1031",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1779.596299980767,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_1394",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1032",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1776.762199937366,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_1394",
+        "CONTACT_112"
+      ],
+      "case_id": "fh-1033",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1818.5428000288084,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1034",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1860.3070999961346,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_SHARE_ACCESS",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1035",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "account_access_request"
+      ],
+      "is_fraud": true,
+      "latency_ms": 6261.349100037478,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_SHARE_ACCESS",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1036",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "account_access_request"
+      ],
+      "is_fraud": true,
+      "latency_ms": 4598.540100036189,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_SHARE_ACCESS",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "CONTACT_1394",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1037",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "account_access_request"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2192.1733000781387,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_FORWARD_MONEY",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1038",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "money_mule_transfer"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1899.9191999901086,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "DO_NOT_FORWARD_MONEY",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "STOP_CONTACT"
+      ],
+      "case_id": "fh-1039",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "money_mule_transfer"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1937.6373999984935,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_FORWARD_MONEY",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1040",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "money_mule_transfer"
+      ],
+      "is_fraud": true,
+      "latency_ms": 4950.475399964489,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "VERIFY_BY_KNOWN_CONTACT",
+        "STOP_CONTACT"
+      ],
+      "case_id": "fh-1041",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": true,
+      "latency_ms": 1967.0114000327885,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "VERIFY_BY_KNOWN_CONTACT",
+        "STOP_CONTACT"
+      ],
+      "case_id": "fh-1042",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": true,
+      "latency_ms": 1777.6839999714866,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "CONTACT_112",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1043",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2007.8980999533087,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1044",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "loan_policy_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1874.562699929811,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_1394"
+      ],
+      "case_id": "fh-1045",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "loan_policy_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2063.4608999826014,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1046",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "card_delivery_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2007.5718000298366,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1047",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "card_delivery_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1621.6446000616997,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_1394",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1048",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 4518.514499999583,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1049",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2150.2183000557125,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_FINANCIAL_INSTITUTION"
+      ],
+      "case_id": "fh-1050",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "loan_policy_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 4057.6878999127075,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "PRESERVE_EVIDENCE",
+        "CONTACT_1394"
+      ],
+      "case_id": "fh-1051",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1850.899999961257,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1052",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "loan_policy_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1479.0984999854118,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "CONTACT_1394",
+        "CONTACT_112",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1053",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "smishing_malware"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1747.8547000791878,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1054",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1871.2901999242604,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1055",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1628.5802000202239,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1056",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1881.0279000317678,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1057",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 5613.018499920145,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1058",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1660.1187998894602,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1059",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 4694.057299988344,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1060",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1940.9878000151366,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1061",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 2347.274399944581,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1062",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1534.912700066343,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1063",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 4672.451799968258,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1064",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 2052.1761999698356,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1065",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1927.3119999561459,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1066",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 3324.9336999142542,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [],
+      "case_id": "fh-1067",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1691.6355999419466,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1068",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": false,
+      "latency_ms": 1600.849200040102,
+      "ok": true,
+      "risk_level": "low"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_CLICK",
+        "DO_NOT_INSTALL",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_KISA_118",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1069",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "smishing_malware"
+      ],
+      "is_fraud": true,
+      "latency_ms": 6761.746200034395,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_SHARE_ACCESS",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "CONTACT_1394",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1070",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "smishing_malware"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1880.5564999347553,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1071",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "smishing_malware"
+      ],
+      "is_fraud": true,
+      "latency_ms": 1577.2112999111414,
+      "ok": true,
+      "risk_level": "medium"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_SHARE_ACCESS",
+        "CONTACT_1394",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1072",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "money_mule_transfer"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2137.267099926248,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "CONTACT_1394"
+      ],
+      "case_id": "fh-1073",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "loan_policy_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 8719.51490000356,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "CONTACT_1394",
+        "CONTACT_112",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1074",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "account_access_request"
+      ],
+      "is_fraud": true,
+      "latency_ms": 4251.279700081795,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "CONTACT_112",
+        "CONTACT_1394",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1075",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 5180.374399991706,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_BY_KNOWN_CONTACT"
+      ],
+      "case_id": "fh-1076",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [],
+      "is_fraud": true,
+      "latency_ms": 6552.713799988851,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_SHARE_ACCESS",
+        "VERIFY_OFFICIAL_CHANNEL"
+      ],
+      "case_id": "fh-1077",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation",
+        "account_access_request"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2628.3038000110537,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "DO_NOT_INSTALL",
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1078",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "smishing_malware"
+      ],
+      "is_fraud": true,
+      "latency_ms": 4980.837499955669,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "DO_NOT_FORWARD_MONEY",
+        "CONTACT_FINANCIAL_INSTITUTION",
+        "CONTACT_1394",
+        "PRESERVE_EVIDENCE"
+      ],
+      "case_id": "fh-1079",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "money_mule_transfer"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2008.6104000220075,
+      "ok": true,
+      "risk_level": "high"
+    },
+    {
+      "actions": [
+        "STOP_CONTACT",
+        "VERIFY_OFFICIAL_CHANNEL",
+        "CONTACT_1394",
+        "CONTACT_112"
+      ],
+      "case_id": "fh-1080",
+      "dropped_codes": [],
+      "failure": null,
+      "fraud_types": [
+        "authority_impersonation"
+      ],
+      "is_fraud": true,
+      "latency_ms": 2003.0846999725327,
+      "ok": true,
+      "risk_level": "high"
+    }
+  ],
+  "model": "gemini-3.6-flash",
+  "prompt_id": "fraud_judge_v1",
+  "prompt_sha256": "1fc8d0e92d7e5d5dc78a80e6735207c0c2f4fd2f0912081f1b2459ca0e7cca36",
+  "provider": "google_ai_studio",
+  "temperature": 0.0
+}
