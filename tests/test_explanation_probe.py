@@ -15,11 +15,16 @@
    아니라 조립 계층에 둔 이유를, 반대편에서도 지킨다.
 4. **커밋된 결과 파일이 자기가 잰 셋을 정확히 가리킨다.** 판정 파일에서 이미 한 번
    깨졌던 자리다(`dataset_id` 가 개발셋으로 박혀 있었다).
+5. **어느 지시문에서 나온 숫자인지도 가리킨다.** 셋이 같아도 프롬프트가 다르면 다른
+   숫자다. 2026-08-25 에 프롬프트 v2 를 내면서 v1 의 결과 파일을 덮어썼다면,
+   `docs/34` 13절이 인용하는 값이 조용히 사라지고 문서가 없는 숫자를 가리켰을
+   것이다. 파일 이름과 파일 안의 `prompt_id` 가 서로 맞아야 한다.
 """
 
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
@@ -35,9 +40,19 @@ from app.services.llm.runtime import (
     EXPLANATION_MODEL,
     build_explanation_runtime,
 )
+from app.services.llm.explanation import FRAUD_EXPLANATION_PROMPT_SHA256
+from app.services.llm.prompts import (
+    FRAUD_EXPLANATION_PROMPT_ID,
+    FRAUD_EXPLANATION_PROMPT_V1,
+    FRAUD_EXPLANATION_PROMPT_V1_ID,
+)
 from evaluation.explanation_probe import (
+    EXPLANATION_PROBE_V1_2_BASELINE_PATH,
     EXPLANATION_PROBE_V1_2_PATH,
+    EXPLANATION_PROBE_V1_2_REPEAT_PATH,
+    EXPLANATION_PROBE_V1_3_BASELINE_PATH,
     EXPLANATION_PROBE_V1_3_PATH,
+    EXPLANATION_PROBE_V1_3_REPEAT_PATH,
     ExplanationProbeRun,
     probe_case,
     summarize,
@@ -330,15 +345,99 @@ def test_an_unmeasured_rate_is_none_not_zero() -> None:
     assert report["per_model"][EXPLANATION_FALLBACK_MODEL]["p95_ms"] is None
 
 
-# --- 커밋된 결과가 자기가 잰 셋을 가리키는가 ------------------------------
+# --- 커밋된 결과가 자기가 잰 셋과 지시문을 가리키는가 ----------------------
+
+# 프롬프트 v1 의 sha256. 여기 적어 두는 이유는 `explanation.py` 가 배포 지시문의
+# 값을 적어 두는 이유와 다르다. 저쪽은 "고치면 깨져라" 이고, 이쪽은 **"베껴 둔
+# 사본이 정말 그때 그 글자인가"** 다. v1 결과 파일이 근거로 남으려면, 그 숫자를
+# 만든 지시문이 저장소 안에 한 글자도 다르지 않게 남아 있어야 한다.
+PROMPT_V1_SHA256 = "d687b79c97118a269ba890907343677124bb44ea4347476e35efc98b949f3a48"
+
+#: 커밋된 실행 전부 - (파일, 셋, 지시문 id, 지시문 sha256).
+#:
+#: 반복 실행이 목록에 있는 이유는 그것도 인용되기 때문이다. 한 자릿수를 세는 표에서
+#: 1 과 3 의 차이는 개선일 수도 잡음일 수도 있고, 같은 조건을 한 번 더 잰 파일이
+#: 없으면 어느 쪽인지 말할 방법이 없다.
+COMMITTED_RUNS = [
+    (
+        EXPLANATION_PROBE_V1_2_PATH,
+        HOLDOUT_V1_2_PATH,
+        FRAUD_EXPLANATION_PROMPT_ID,
+        FRAUD_EXPLANATION_PROMPT_SHA256,
+    ),
+    (
+        EXPLANATION_PROBE_V1_2_REPEAT_PATH,
+        HOLDOUT_V1_2_PATH,
+        FRAUD_EXPLANATION_PROMPT_ID,
+        FRAUD_EXPLANATION_PROMPT_SHA256,
+    ),
+    (
+        EXPLANATION_PROBE_V1_3_PATH,
+        HOLDOUT_V1_3_PATH,
+        FRAUD_EXPLANATION_PROMPT_ID,
+        FRAUD_EXPLANATION_PROMPT_SHA256,
+    ),
+    (
+        EXPLANATION_PROBE_V1_3_REPEAT_PATH,
+        HOLDOUT_V1_3_PATH,
+        FRAUD_EXPLANATION_PROMPT_ID,
+        FRAUD_EXPLANATION_PROMPT_SHA256,
+    ),
+    (
+        EXPLANATION_PROBE_V1_2_BASELINE_PATH,
+        HOLDOUT_V1_2_PATH,
+        FRAUD_EXPLANATION_PROMPT_V1_ID,
+        PROMPT_V1_SHA256,
+    ),
+    (
+        EXPLANATION_PROBE_V1_3_BASELINE_PATH,
+        HOLDOUT_V1_3_PATH,
+        FRAUD_EXPLANATION_PROMPT_V1_ID,
+        PROMPT_V1_SHA256,
+    ),
+]
+
+
+def test_preserved_v1_prompt_is_the_one_that_produced_the_baseline() -> None:
+    """`FRAUD_EXPLANATION_PROMPT_V1` 이 v1 결과 파일을 만든 그 글자다.
+
+    프롬프트를 고칠 때 옛 판을 지우지 않고 복사해 두었다. 복사가 정확하지 않으면
+    비교 대상이 사라진다 - 나아졌다는 말은 무엇과 비교했는지가 남아 있을 때만
+    확인 가능한 주장이다. 여기서는 계산한 값이 **먼저 박혀 있던** 값과 맞는지를
+    보므로, 계산해서 항상 통과하는 검사가 아니다.
+    """
+    digest = sha256(FRAUD_EXPLANATION_PROMPT_V1.encode("utf-8")).hexdigest()
+
+    assert digest == PROMPT_V1_SHA256
+    assert FRAUD_EXPLANATION_PROMPT_V1_ID != FRAUD_EXPLANATION_PROMPT_ID
+
+
+@pytest.mark.parametrize(
+    ("path", "prompt_id", "prompt_sha256"),
+    [(run[0], run[2], run[3]) for run in COMMITTED_RUNS],
+    ids=[run[0].stem for run in COMMITTED_RUNS],
+)
+def test_probe_runs_name_the_prompt_they_actually_ran_under(
+    path: Path, prompt_id: str, prompt_sha256: str
+) -> None:
+    """파일 이름·`prompt_id`·`prompt_sha256` 이 같은 지시문을 가리킨다.
+
+    이름이 필요한 이유는 사람이 먼저 읽는 것이 이름이기 때문이고, sha256 이 필요한
+    이유는 이름은 손으로 붙이기 때문이다. 둘 중 하나만으로는, 같은 셋을 다른
+    지시문으로 잰 두 파일이 서로를 덮어쓰는 것을 막지 못한다.
+    """
+    run = ExplanationProbeRun.model_validate_json(path.read_text(encoding="utf-8"))
+    suffix = "prompt-v1" if prompt_id == FRAUD_EXPLANATION_PROMPT_V1_ID else "prompt-v2"
+
+    assert suffix in path.name
+    assert run.prompt_id == prompt_id
+    assert run.prompt_sha256 == prompt_sha256
 
 
 @pytest.mark.parametrize(
     ("path", "dataset"),
-    [
-        (EXPLANATION_PROBE_V1_2_PATH, HOLDOUT_V1_2_PATH),
-        (EXPLANATION_PROBE_V1_3_PATH, HOLDOUT_V1_3_PATH),
-    ],
+    [(run[0], run[1]) for run in COMMITTED_RUNS],
+    ids=[run[0].stem for run in COMMITTED_RUNS],
 )
 def test_probe_runs_name_the_dataset_they_actually_probed(
     path: Path, dataset: Path
@@ -360,7 +459,9 @@ def test_probe_runs_name_the_dataset_they_actually_probed(
 
 
 @pytest.mark.parametrize(
-    "path", [EXPLANATION_PROBE_V1_2_PATH, EXPLANATION_PROBE_V1_3_PATH]
+    "path",
+    [run[0] for run in COMMITTED_RUNS],
+    ids=[run[0].stem for run in COMMITTED_RUNS],
 )
 def test_no_explanation_text_was_committed(path: Path) -> None:
     """결과 파일에 모델이 만든 문장이 없다.

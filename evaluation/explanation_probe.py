@@ -75,11 +75,52 @@ from evaluation.fraud_golden import CASE_ID_PATTERN
 
 #: 2026-08-25 에 잰 두 셋. 판정 결과와 마찬가지로 셋마다 파일을 나눈다 — sha256 이
 #: 다르고, 한 파일에 섞으면 어느 셋의 숫자인지 구분할 수 없다.
+#:
+#: **이름에 지시문 판이 들어간다.** 셋이 같아도 프롬프트가 다르면 다른 숫자다.
+#: 프롬프트 v2 를 만든 날 이 파일들을 덮어썼다면, `docs/34` 13절이 인용하는 값이
+#: 조용히 사라지고 문서가 없는 숫자를 가리켰을 것이다.
+_RESULTS = Path(__file__).with_name("results")
+
+#: 배포된 지시문으로 잰 것. 벤치마크 보고서가 쓰는 값이다.
 EXPLANATION_PROBE_V1_2_PATH = (
-    Path(__file__).with_name("results") / "explanation-probe-fraud-holdout-v1.2.json"
+    _RESULTS / "explanation-probe-fraud-holdout-v1.2-prompt-v2.json"
 )
 EXPLANATION_PROBE_V1_3_PATH = (
-    Path(__file__).with_name("results") / "explanation-probe-fraud-holdout-v1.3.json"
+    _RESULTS / "explanation-probe-fraud-holdout-v1.3-prompt-v2.json"
+)
+
+#: 같은 지시문·같은 셋을 한 번 더 잰 것. **표가 실행마다 얼마나 흔들리는지 모르면
+#: 두 지시문의 차이가 개선인지 잡음인지 말할 수 없다.** temperature 0.0 은 결정론을
+#: 보장하지 않고, 여기서 세는 값들은 한 자릿수다 — 1 과 3 의 차이에 이야기를 붙이기
+#: 전에 같은 조건이 얼마나 움직이는지를 먼저 봐야 한다.
+EXPLANATION_PROBE_V1_2_REPEAT_PATH = (
+    _RESULTS / "explanation-probe-fraud-holdout-v1.2-prompt-v2-repeat.json"
+)
+EXPLANATION_PROBE_V1_3_REPEAT_PATH = (
+    _RESULTS / "explanation-probe-fraud-holdout-v1.3-prompt-v2-repeat.json"
+)
+
+#: 직전 지시문으로 잰 것. 비교 대상으로만 남는다 — 이 숫자가 프롬프트 v2 를 부른
+#: 근거이므로, 고친 뒤의 값만 남기면 무엇이 나아졌는지 아무도 확인할 수 없다.
+EXPLANATION_PROBE_V1_2_BASELINE_PATH = (
+    _RESULTS / "explanation-probe-fraud-holdout-v1.2-prompt-v1.json"
+)
+EXPLANATION_PROBE_V1_3_BASELINE_PATH = (
+    _RESULTS / "explanation-probe-fraud-holdout-v1.3-prompt-v1.json"
+)
+
+#: 배포된 지시문에서 나온 실행 전부. 보고서가 쓸 수 있는 것은 이쪽뿐이다.
+DEPLOYED_PROMPT_RUNS = (
+    EXPLANATION_PROBE_V1_2_PATH,
+    EXPLANATION_PROBE_V1_2_REPEAT_PATH,
+    EXPLANATION_PROBE_V1_3_PATH,
+    EXPLANATION_PROBE_V1_3_REPEAT_PATH,
+)
+
+#: 직전 지시문에서 나온 실행. 문서가 인용하는 값이며 보고서는 쓰지 않는다.
+BASELINE_PROMPT_RUNS = (
+    EXPLANATION_PROBE_V1_2_BASELINE_PATH,
+    EXPLANATION_PROBE_V1_3_BASELINE_PATH,
 )
 
 
