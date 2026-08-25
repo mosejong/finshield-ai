@@ -45,7 +45,7 @@ MAX_EXPLANATION_CHARS = 600
 # 증명하지 못한다 - 이 저장소가 `[ -w ]` 와 백업 SQL 검사에서 이미 두 번 밟은
 # 함정이다. 프롬프트를 고치면 이 상수가 안 맞아 테스트가 깨지는 것이 목적이다.
 FRAUD_EXPLANATION_PROMPT_SHA256 = (
-    "d687b79c97118a269ba890907343677124bb44ea4347476e35efc98b949f3a48"
+    "c7532280daf58884020ccda3e025c3ff2c5e3ad2b23c6881555d4a561b9ed76b"
 )
 
 

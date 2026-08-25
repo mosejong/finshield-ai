@@ -180,7 +180,7 @@ def test_message_is_truncated_to_the_contract_limit(response: AnalyzeResponse) -
     contract = LlmContract(
         provider="stub",
         model="stub-1",
-        prompt_id="fraud_explanation_v1",
+        prompt_id="fraud_explanation_v2",
         prompt_sha256=FRAUD_EXPLANATION_PROMPT_SHA256,
         max_input_chars=50,
         timeout_seconds=8.0,

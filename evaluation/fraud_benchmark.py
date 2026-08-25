@@ -7,6 +7,8 @@ from math import ceil
 from app.domain.fraud.signals import detect_legacy_signals
 from app.schemas.analysis import AnalyzeResponse
 from app.services.fraud_analysis import analyze_fraud
+from app.services.llm.explanation import FRAUD_EXPLANATION_PROMPT_SHA256
+from app.services.llm.prompts import FRAUD_EXPLANATION_PROMPT_ID
 from evaluation.explanation_probe import ExplanationProbeRun, summarize
 from evaluation.fraud_golden import FraudGoldenCase, RISK_RANK, is_held_out
 from evaluation.llm_judge import LlmJudgement, LlmJudgeRun
@@ -205,6 +207,11 @@ def _explanation_layer(
     `stale` 을 따로 두는 이유는 판정 결과와 같다. 다른 셋에서 잰 설명 품질을 이 셋의
     표에 붙이면, 숫자는 있는데 아무 셋의 것도 아니게 된다.
 
+    **지시문이 바뀌어도 `stale` 이다.** 셋이 같아도 프롬프트가 다르면 다른 숫자다.
+    2026-08-25 에 프롬프트 v2 를 내면서 이 검사가 없었다면, 보고서가 v1 의 값을
+    계속 `measured` 로 내놓았을 것이다. 벤치마크가 스스로 낡았다고 말하지 못하면
+    낡은 숫자를 읽는 쪽은 그것이 낡았다는 사실 자체를 모른다.
+
     **여기 숫자는 탐지 성능이 아니다.** 위 칸들과 분모가 다르다 - 이쪽은 사례가
     아니라 **시도**를 세고, 재는 것은 "모델이 맞혔는가" 가 아니라 "모델이 우리
     계약을 어겼는가" 다.
@@ -231,6 +238,14 @@ def _explanation_layer(
             "status": "stale",
             "reason": "설명 계층 실행이 다른 셋에서 나왔다.",
             "probe_dataset_id": probe.dataset_id,
+        }
+    if probe.prompt_sha256 != FRAUD_EXPLANATION_PROMPT_SHA256:
+        return {
+            **base,
+            "status": "stale",
+            "reason": "설명 계층 실행이 다른 지시문에서 나왔다.",
+            "probe_prompt_id": probe.prompt_id,
+            "deployed_prompt_id": FRAUD_EXPLANATION_PROMPT_ID,
         }
     return {
         **base,
