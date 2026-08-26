@@ -45,7 +45,11 @@ from app.clients.google_ai_studio import (
 from app.core.observability import explanation_metrics
 from app.schemas.analysis import AnalyzeResponse
 from app.services.llm.contract import LlmContract
-from app.services.llm.explanation import explain_analysis, fraud_explanation_contract
+from app.services.llm.explanation import (
+    explain_analysis,
+    fraud_explanation_contract,
+    has_grounded_evidence,
+)
 from app.services.llm.outcomes import ExplanationOutcome
 from app.services.llm.provider import LlmProvider, StubProvider
 
@@ -197,6 +201,18 @@ def explain_with_fallback(
     `evaluation/` 을 한 번 돌릴 때마다 운영 지표가 수십 건씩 오염된다. 조립하는
     자리는 요청 경로에만 있다.
     """
+    # 근거가 없으면 아무 모델도 부르지 않는다. 시도가 0 이므로 `observe_attempt`
+    # 도 부르지 않는다 — 일어나지 않은 시도를 세면 대체 모델 사용률과 지연 분포가
+    # 전부 틀어진다.
+    #
+    # 여기가 루프 **앞**인 것이 요점이다. 근거를 보고 분기하지, 실패 사유를 보고
+    # 분기하지 않는다. 사유로 분기하기 시작하면 어떤 실패에서 대체 모델을 부를지
+    # 말지가 코드 곳곳에 흩어지고, 그 규칙이 맞는지는 잴 숫자가 없다.
+    if not has_grounded_evidence(response):
+        outcome = ExplanationOutcome.NOT_ASKED_NO_EVIDENCE
+        explanation_metrics.observe_result(outcome=outcome.value, attempts=0)
+        return ExplanationResult(text=None, model=None, outcome=outcome)
+
     attempts = 0
     outcome = ExplanationOutcome.UNSPECIFIED
     for contract in runtime.contracts:

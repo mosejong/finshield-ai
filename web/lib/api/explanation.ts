@@ -29,12 +29,20 @@ import { apiMode } from "@/lib/api/mode";
 const EXPLANATION_TIMEOUT_MS = 25_000;
 
 const OFF: Explanation = { status: "off", text: null, model: null };
+const NOT_ASKED: Explanation = { status: "not_asked", text: null, model: null };
 const FAILED: Explanation = { status: "failed", text: null, model: null };
 
-/** 백엔드 응답 → 화면 상태. `available` 과 `explanation` 을 합치지 않는다. */
+/**
+ * 백엔드 응답 → 화면 상태. `available`·`asked`·`explanation` 을 합치지 않는다.
+ *
+ * 순서가 의미를 갖는다. 꺼진 것 → 안 물어본 것 → 물어봤는데 못 받은 것. 마지막
+ * 줄만 `failed` 다. 이 셋을 `explanation === null` 하나로 접으면 근거가 없는
+ * 판정마다(실측 164건 중 61건) 화면이 실패했다고 말한다.
+ */
 export function toExplanation(backend: unknown): Explanation {
   const parsed = BackendExplanationResponseSchema.parse(backend);
   if (!parsed.available) return OFF;
+  if (!parsed.asked) return NOT_ASKED;
   if (!parsed.explanation) return FAILED;
   return ExplanationSchema.parse({
     status: "ready",

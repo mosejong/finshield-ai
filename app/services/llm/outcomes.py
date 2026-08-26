@@ -91,6 +91,19 @@ class ExplanationOutcome(StrEnum):
     REJECTED_CONTRADICTS_VERDICT = "rejected_contradicts_verdict"
     REJECTED_INVENTED_CONTACT = "rejected_invented_contact"
 
+    # --- 물어보지 않았다 ---
+    #
+    # 실패가 아니다. 거부도 차단도 아니다. **근거 세 칸이 전부 비어서 물어볼 것이
+    # 없었던 경우**다. `low` 이고 신호도 행동도 출처도 없으면 모델이 받는 근거
+    # 블록이 `- 없음` 셋뿐이고, 그때 모델이 내놓는 어떤 사실 주장도 정의상 근거
+    # 밖이다. 2026-08-25 에 `fh-1007` 이 그것을 보여 줬다 — 모델은 "이것은 112
+    # 안내입니다" 라고 **문자가 무엇인지 인증**했고, 엔진은 그런 말을 한 적이 없다.
+    #
+    # 이 칸을 따로 두는 이유는 세 상태가 화면에서 다르게 보여야 하기 때문이다.
+    # 계층이 꺼진 것, 물어봤는데 못 받은 것, 물어보지 않은 것. 실패로 세면 "설명을
+    # 불러오지 못했습니다" 가 뜨는데, 여기서는 아무것도 실패하지 않았다.
+    NOT_ASKED_NO_EVIDENCE = "not_asked_no_evidence"
+
     # --- 모르는 것을 담는 칸 ---
     #
     # 사유 없이 올라온 `LlmUnavailable`. `app/` 안의 코드는 이 값을 만들지 않고,
