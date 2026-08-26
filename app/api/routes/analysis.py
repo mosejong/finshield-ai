@@ -6,6 +6,7 @@ from app.schemas.analysis import (
     ExplanationResponse,
 )
 from app.services.fraud_analysis import analyze_fraud
+from app.services.llm.outcomes import ExplanationOutcome
 from app.services.llm.runtime import explain_with_fallback, explanation_runtime
 
 router = APIRouter(tags=["analysis"])
@@ -36,6 +37,7 @@ def explain(request: AnalyzeRequest) -> ExplanationResponse:
     result = explain_with_fallback(response, request.text, runtime=runtime)
     return ExplanationResponse(
         available=True,
+        asked=result.outcome is not ExplanationOutcome.NOT_ASKED_NO_EVIDENCE,
         explanation=result.text,
         model=result.model,
     )

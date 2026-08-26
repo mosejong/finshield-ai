@@ -5,9 +5,15 @@ import { toExplanation } from "@/lib/api/explanation";
 /**
  * 설명 응답을 화면 상태로 옮기는 부분만 본다.
  *
- * 여기서 지키려는 것은 하나다 - **꺼진 것과 실패한 것을 섞지 않는다.** 둘을
- * 합치면 설명 계층을 켜지 않은 배포에서 사용자가 매번 "설명을 불러오지
- * 못했습니다" 를 보게 되고, 반대로 켜 놓고 실패한 것은 조용히 사라진다.
+ * 여기서 지키려는 것은 하나다 - **서로 다른 세 가지 '문장이 없다' 를 섞지
+ * 않는다.**
+ *
+ *   off        설명 계층을 켜지 않은 배포다
+ *   not_asked  근거가 없어 백엔드가 모델을 부르지 않았다
+ *   failed     불렀는데 문장을 받지 못했다
+ *
+ * 섞으면 세 경우 모두 "설명을 불러오지 못했습니다" 가 뜬다. 가운데 줄은 실측
+ * 164건 중 61건이고, 그 61건에서는 **아무것도 실패하지 않았다.**
  */
 
 describe("toExplanation", () => {
@@ -19,12 +25,33 @@ describe("toExplanation", () => {
     });
   });
 
-  it("켜져 있는데 문장이 없으면 failed 다", () => {
-    expect(toExplanation({ available: true, explanation: null, model: null })).toEqual({
+  it("물어봤는데 문장이 없으면 failed 다", () => {
+    expect(
+      toExplanation({ available: true, asked: true, explanation: null, model: null }),
+    ).toEqual({
       status: "failed",
       text: null,
       model: null,
     });
+  });
+
+  it("근거가 없어 안 물어본 것은 failed 가 아니다", () => {
+    // 위험 신호도 권고 행동도 공식 근거도 없는 판정에서는 백엔드가 모델을 부르지
+    // 않는다. 실패로 옮기면 화면이 사과를 하는데, 사과할 일이 없다 - 사용자가 읽을
+    // 문장은 이미 결정론 요약이 채우고 있다.
+    expect(
+      toExplanation({ available: true, asked: false, explanation: null, model: null }),
+    ).toEqual({
+      status: "not_asked",
+      text: null,
+      model: null,
+    });
+  });
+
+  it("asked 가 없는 옛 응답은 물어본 것으로 읽는다", () => {
+    // 이 필드가 생기기 전의 백엔드는 언제나 물어봤다. 배포 순서가 어긋난 잠깐
+    // 동안 없던 상태가 생기지 않게 한다.
+    expect(toExplanation({ available: true, explanation: null }).status).toBe("failed");
   });
 
   it("문장이 오면 답한 모델까지 함께 남긴다", () => {

@@ -37,11 +37,24 @@ export function WhyRiskyPanel({
 }
 
 /**
- * 설명 계층이 꺼진 배포에서는 아무것도 그리지 않는다. "설명 없음" 을 보여주는
- * 것은 사용자에게 의미가 없다 - 켜 놓은 곳에서 실패한 것과는 다르다.
+ * 두 경우에 아무것도 그리지 않는다.
+ *
+ * `off` - 설명 계층이 꺼진 배포다. "설명 없음" 을 보여주는 것은 사용자에게 의미가
+ * 없다.
+ *
+ * `not_asked` - 계층은 켜져 있지만 이 판정에 옮겨 쓸 위험 신호도 권고 행동도 공식
+ * 근거도 없어서 백엔드가 모델을 부르지 않았다. 이때 "쉬운 말로 다시 설명하면" 이라는
+ * 제목만 남기고 그 아래를 비우면 뭔가 실패한 것처럼 보이는데, 실패한 것이 없다.
+ * 위쪽 `paragraphs` 가 이미 "명시적인 위험 신호가 확인되지 않았습니다" 를 말하고
+ * 있으므로 여기서 덧붙일 문장도 없다.
+ *
+ * 두 상태를 하나로 합치지 않는 것은 계약 쪽 이야기다. 화면에서 같은 모양이라고
+ * 해서 같은 일이 아니고, 나중에 한쪽만 다르게 그리게 되는 날 합쳐 둔 것을 다시
+ * 갈라내야 한다.
  */
 function ExplanationBlock({ explanation }: { explanation: Explanation | null }) {
   if (explanation?.status === "off") return null;
+  if (explanation?.status === "not_asked") return null;
 
   return (
     <div className="mt-1 border-t border-border pt-3">

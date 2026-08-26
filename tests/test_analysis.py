@@ -77,8 +77,42 @@ def test_the_explanation_comes_back_when_the_layer_is_on(monkeypatch) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["available"] is True
+    assert body["asked"] is True
     assert body["explanation"]
     assert body["model"] == "stub"
+
+
+def test_a_verdict_with_no_evidence_is_not_reported_as_a_failed_explanation(
+    monkeypatch,
+) -> None:
+    """안 물어본 것과 물어봤는데 못 받은 것은 다른 응답이다.
+
+    위험 신호도 권고 행동도 공식 근거도 없는 판정에서는 모델을 부르지 않는다. 근거가
+    빈 채로 문장을 요구하면 모델이 없는 연락처를 만들어 내기 때문이고, 실측으로
+    held-out 164건 중 61건이 그 모양이었다(`docs/34` 15절).
+
+    그 61건에 `explanation: null` 만 내려보내면 프론트가 "설명을 불러오지
+    못했습니다" 를 그린다. **아무것도 실패하지 않았는데.** 게다가 사용자가 읽을
+    문장은 이미 결정론 요약이 채우고 있어서, 그 자리에 필요한 것은 사과가 아니라
+    침묵이다. 그래서 `asked` 가 응답에 있다.
+    """
+    monkeypatch.setenv("FINSHIELD_LLM_PROVIDER", "stub")
+    harmless = "이번 달 관리비 고지서가 발송되었습니다."
+
+    verdict = analyze_fraud(AnalyzeRequest(text=harmless))
+    # 아래 검사가 의미를 가지려면 필요하다.
+    assert not verdict.signals and not verdict.actions and not verdict.official_sources
+
+    response = client.post("/api/v1/analyze/explanation", json={"text": harmless})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["asked"] is False
+    assert body["explanation"] is None
+    assert body["model"] is None
+    # 화면이 비지 않는다는 근거. 이 문장이 "왜 위험한지" 블록을 채운다.
+    assert verdict.summary
 
 
 def test_the_client_cannot_supply_the_verdict_it_wants_explained(monkeypatch) -> None:

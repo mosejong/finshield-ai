@@ -1,4 +1,5 @@
 {
+  "call_policy": "ask_always",
   "cases": [
     {
       "attempts": [

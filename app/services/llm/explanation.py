@@ -81,23 +81,60 @@ def fraud_explanation_contract(
     )
 
 
+#: 빈 근거 칸에 들어가는 값. 여기 한 곳에서만 정한다 — `has_grounded_evidence` 가
+#: 이 값과 비교해서 물어볼지를 정하므로, 두 자리에 따로 적으면 언젠가 어긋난다.
+_EMPTY_BLOCK = "- 없음"
+
+
 def _grounded_blocks(response: AnalyzeResponse) -> tuple[str, str, str]:
-    signals = "\n".join(f"- {signal.label}" for signal in response.signals) or "- 없음"
+    signals = (
+        "\n".join(f"- {signal.label}" for signal in response.signals) or _EMPTY_BLOCK
+    )
     actions = (
         "\n".join(
             f"- ({action.priority}순위) {action.title} — {action.reason}"
             for action in response.actions
         )
-        or "- 없음"
+        or _EMPTY_BLOCK
     )
     sources = (
         "\n".join(
             f"- {source.organization}: {source.title}"
             for source in response.official_sources
         )
-        or "- 없음"
+        or _EMPTY_BLOCK
     )
     return signals, actions, sources
+
+
+def has_grounded_evidence(response: AnalyzeResponse) -> bool:
+    """모델에게 보여 줄 근거가 하나라도 있는가.
+
+    **판단의 근거는 실패 사유가 아니라 근거 자체다.** 거부당한 뒤에 "아, 근거가
+    없었구나" 로 되돌아가면 이미 호출값을 치른 뒤이고, 어떤 사유로 되돌아갈지도
+    정해야 한다. 그건 `explain_with_fallback` 이 지키는 규칙(사유는 세기 위한
+    것이지 분기하기 위한 것이 아니다)을 깨는 자리다. 부르기 전에 근거를 보면
+    그 규칙을 건드리지 않는다.
+
+    `_grounded_blocks` 에서 파생시키는 이유는 어긋남을 막기 위해서다. 모델에게
+    보여 주는 것, 출력 검증의 기준, 물어볼지 말지의 판단 — 셋이 같은 함수에서
+    나와야 한다. 따로 계산하면 언젠가 "보여 준 것은 비었는데 물어보기는 했다" 가
+    된다.
+    """
+    return any(block != _EMPTY_BLOCK for block in _grounded_blocks(response))
+
+
+#: 언제 모델을 부르는지에 붙인 이름. **프롬프트 sha256 과 같은 목적이다.**
+#:
+#: 프로브 결과 파일은 셋과 지시문을 적어 두지만, 같은 셋·같은 지시문이라도 "근거가
+#: 비어도 물어봤다" 와 "비면 안 물어봤다" 는 완전히 다른 표를 만든다. 적어 두지
+#: 않으면 벤치마크가 옛 실행을 `measured` 로 계속 내놓고, 읽는 쪽은 그 표가 지금
+#: 배포된 것과 다른 규칙에서 나왔다는 사실 자체를 모른다. 2026-08-25 에 지시문
+#: sha256 검사가 막아 준 것과 정확히 같은 종류의 구멍이다.
+EXPLANATION_CALL_POLICY = "skip_when_no_evidence"
+
+#: 이 규칙이 들어오기 전의 이름. 저장소에 남아 있는 실행들이 이것으로 읽힌다.
+EXPLANATION_CALL_POLICY_ASK_ALWAYS = "ask_always"
 
 
 def build_grounded_text(response: AnalyzeResponse) -> str:
