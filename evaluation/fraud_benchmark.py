@@ -7,7 +7,10 @@ from math import ceil
 from app.domain.fraud.signals import detect_legacy_signals
 from app.schemas.analysis import AnalyzeResponse
 from app.services.fraud_analysis import analyze_fraud
-from app.services.llm.explanation import FRAUD_EXPLANATION_PROMPT_SHA256
+from app.services.llm.explanation import (
+    EXPLANATION_CALL_POLICY,
+    FRAUD_EXPLANATION_PROMPT_SHA256,
+)
 from app.services.llm.prompts import FRAUD_EXPLANATION_PROMPT_ID
 from evaluation.explanation_probe import ExplanationProbeRun, summarize
 from evaluation.fraud_golden import FraudGoldenCase, RISK_RANK, is_held_out
@@ -212,6 +215,11 @@ def _explanation_layer(
     계속 `measured` 로 내놓았을 것이다. 벤치마크가 스스로 낡았다고 말하지 못하면
     낡은 숫자를 읽는 쪽은 그것이 낡았다는 사실 자체를 모른다.
 
+    **언제 부르는지가 바뀌어도 `stale` 이다.** 같은 날 근거가 비면 아예 부르지 않게
+    바꿨는데, 그 규칙 앞뒤는 셋도 지시문도 같으면서 표만 다르다 — 호출이 37% 줄고,
+    운영에서는 일어나지 않을 거부가 옛 표에는 남아 있다. 낡음을 말하는 검사를 판마다
+    새로 짜지 않으려면, **구성의 각 축이 실행 파일 안에 이름으로 남아 있어야 한다.**
+
     **여기 숫자는 탐지 성능이 아니다.** 위 칸들과 분모가 다르다 - 이쪽은 사례가
     아니라 **시도**를 세고, 재는 것은 "모델이 맞혔는가" 가 아니라 "모델이 우리
     계약을 어겼는가" 다.
@@ -247,12 +255,21 @@ def _explanation_layer(
             "probe_prompt_id": probe.prompt_id,
             "deployed_prompt_id": FRAUD_EXPLANATION_PROMPT_ID,
         }
+    if probe.call_policy != EXPLANATION_CALL_POLICY:
+        return {
+            **base,
+            "status": "stale",
+            "reason": "설명 계층 실행이 다른 호출 정책에서 나왔다.",
+            "probe_call_policy": probe.call_policy,
+            "deployed_call_policy": EXPLANATION_CALL_POLICY,
+        }
     return {
         **base,
         "status": "measured",
         "probed_at": probe.probed_at,
         "models": list(probe.contracts),
         "prompt_id": probe.prompt_id,
+        "call_policy": probe.call_policy,
         **summarize(probe),
     }
 

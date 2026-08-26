@@ -37,7 +37,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app.services.fraud_analysis import analyze_fraud
-from app.services.llm.explanation import MAX_EXPLANATION_CHARS
+from app.services.llm.explanation import (
+    EXPLANATION_CALL_POLICY,
+    MAX_EXPLANATION_CHARS,
+)
 from app.services.llm.runtime import (
     PROVIDER_SETTING,
     LlmRuntimeConfigurationError,
@@ -119,6 +122,7 @@ def main() -> int:
         contracts=models,
         prompt_id=first.prompt_id,
         prompt_sha256=first.prompt_sha256,
+        call_policy=EXPLANATION_CALL_POLICY,
         temperature=first.temperature,
         max_chars=MAX_EXPLANATION_CHARS,
         cases=tuple(probed),
@@ -135,7 +139,11 @@ def main() -> int:
     print(f"기록: {args.output} ({len(run.cases)}건)")
     # 사유의 **종류**만 찍는다. 설명 문장은 찍지 않는다.
     print(
-        f"  설명 성공 {report['explained']}/{report['cases']} "
+        f"  물어본 건수 {report['asked']}/{report['cases']} "
+        f"(근거가 없어 안 부름 {report['not_asked_no_evidence']}건)"
+    )
+    print(
+        f"  설명 성공 {report['explained']}/{report['asked']} "
         f"({report['explained_rate']}), 대체 모델 {report['fell_back_to_second_model']}건"
     )
     print(f"  근거 이탈 {report['grounding_departures']}건 "

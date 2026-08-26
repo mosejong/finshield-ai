@@ -60,11 +60,15 @@ from collections.abc import Callable
 from pathlib import Path
 from time import perf_counter
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.analysis import AnalyzeResponse
 from app.services.llm.contract import LlmContract
-from app.services.llm.explanation import explain_analysis
+from app.services.llm.explanation import (
+    EXPLANATION_CALL_POLICY_ASK_ALWAYS,
+    explain_analysis,
+    has_grounded_evidence,
+)
 from app.services.llm.outcomes import (
     BLOCKED_OUTCOMES,
     REJECTION_OUTCOMES,
@@ -81,11 +85,24 @@ from evaluation.fraud_golden import CASE_ID_PATTERN
 #: 조용히 사라지고 문서가 없는 숫자를 가리켰을 것이다.
 _RESULTS = Path(__file__).with_name("results")
 
-#: 배포된 지시문으로 잰 것. 벤치마크 보고서가 쓰는 값이다.
+#: 배포된 구성으로 잰 것. 벤치마크 보고서가 쓰는 값이다.
+#:
+#: **이름에 호출 정책도 들어간다.** 2026-08-25 에 근거가 비면 아예 부르지 않게
+#: 바꿨고, 같은 셋·같은 지시문이라도 그 규칙 앞뒤는 다른 표다. 지시문 판만 이름에
+#: 넣고 정책을 빼면 다음에 같은 자리에서 같은 실수를 한다.
 EXPLANATION_PROBE_V1_2_PATH = (
-    _RESULTS / "explanation-probe-fraud-holdout-v1.2-prompt-v2.json"
+    _RESULTS / "explanation-probe-fraud-holdout-v1.2-prompt-v2-skip-empty.json"
 )
 EXPLANATION_PROBE_V1_3_PATH = (
+    _RESULTS / "explanation-probe-fraud-holdout-v1.3-prompt-v2-skip-empty.json"
+)
+
+#: 근거가 비어도 물어보던 시절의 실행. 같은 지시문이므로 **정확히 이 한 규칙만**
+#: 다른 비교 대상이다. `docs/34` 14절이 인용하는 값이라 이름을 바꾸지 않는다.
+EXPLANATION_PROBE_V1_2_ASK_ALWAYS_PATH = (
+    _RESULTS / "explanation-probe-fraud-holdout-v1.2-prompt-v2.json"
+)
+EXPLANATION_PROBE_V1_3_ASK_ALWAYS_PATH = (
     _RESULTS / "explanation-probe-fraud-holdout-v1.3-prompt-v2.json"
 )
 
@@ -93,10 +110,10 @@ EXPLANATION_PROBE_V1_3_PATH = (
 #: 두 지시문의 차이가 개선인지 잡음인지 말할 수 없다.** temperature 0.0 은 결정론을
 #: 보장하지 않고, 여기서 세는 값들은 한 자릿수다 — 1 과 3 의 차이에 이야기를 붙이기
 #: 전에 같은 조건이 얼마나 움직이는지를 먼저 봐야 한다.
-EXPLANATION_PROBE_V1_2_REPEAT_PATH = (
+EXPLANATION_PROBE_V1_2_ASK_ALWAYS_REPEAT_PATH = (
     _RESULTS / "explanation-probe-fraud-holdout-v1.2-prompt-v2-repeat.json"
 )
-EXPLANATION_PROBE_V1_3_REPEAT_PATH = (
+EXPLANATION_PROBE_V1_3_ASK_ALWAYS_REPEAT_PATH = (
     _RESULTS / "explanation-probe-fraud-holdout-v1.3-prompt-v2-repeat.json"
 )
 
@@ -109,19 +126,25 @@ EXPLANATION_PROBE_V1_3_BASELINE_PATH = (
     _RESULTS / "explanation-probe-fraud-holdout-v1.3-prompt-v1.json"
 )
 
-#: 배포된 지시문에서 나온 실행 전부. 보고서가 쓸 수 있는 것은 이쪽뿐이다.
-DEPLOYED_PROMPT_RUNS = (
+#: 배포된 구성에서 나온 실행. 보고서가 `measured` 로 쓸 수 있는 것은 이쪽뿐이다.
+DEPLOYED_RUNS = (
     EXPLANATION_PROBE_V1_2_PATH,
-    EXPLANATION_PROBE_V1_2_REPEAT_PATH,
     EXPLANATION_PROBE_V1_3_PATH,
-    EXPLANATION_PROBE_V1_3_REPEAT_PATH,
 )
 
-#: 직전 지시문에서 나온 실행. 문서가 인용하는 값이며 보고서는 쓰지 않는다.
-BASELINE_PROMPT_RUNS = (
+#: 지금과 다른 구성에서 나온 실행 전부. 문서가 인용하는 값이며, 보고서에 붙으면
+#: `stale` 이 된다 — 셋이 같아도 지시문이나 호출 정책이 다르면 다른 숫자다.
+SUPERSEDED_RUNS = (
+    EXPLANATION_PROBE_V1_2_ASK_ALWAYS_PATH,
+    EXPLANATION_PROBE_V1_2_ASK_ALWAYS_REPEAT_PATH,
+    EXPLANATION_PROBE_V1_3_ASK_ALWAYS_PATH,
+    EXPLANATION_PROBE_V1_3_ASK_ALWAYS_REPEAT_PATH,
     EXPLANATION_PROBE_V1_2_BASELINE_PATH,
     EXPLANATION_PROBE_V1_3_BASELINE_PATH,
 )
+
+#: 저장소에 있는 실행 전부. 개인정보 검사는 하나도 빠뜨리지 않아야 한다.
+COMMITTED_RUNS = DEPLOYED_RUNS + SUPERSEDED_RUNS
 
 
 class ProbeAttempt(BaseModel):
@@ -163,6 +186,31 @@ class ProbeCase(BaseModel):
     def explained(self) -> bool:
         return self.outcome is ExplanationOutcome.OK
 
+    @property
+    def asked(self) -> bool:
+        """모델을 한 번이라도 불렀는가.
+
+        안 부른 것과 불렀는데 못 받은 것은 다른 일이다. 둘을 `explained is False`
+        하나로 뭉치면 설명 성공률의 분모에 **애초에 물어보지 않은 건수**가 들어가서
+        모델이 실패한 것처럼 읽힌다.
+        """
+        return self.outcome is not ExplanationOutcome.NOT_ASKED_NO_EVIDENCE
+
+    @model_validator(mode="after")
+    def _attempts_match_asked(self) -> ProbeCase:
+        """물어보지 않았으면 시도가 없고, 물어봤으면 시도가 있다.
+
+        `ExplanationAttempt` 가 문장과 사유의 짝을 강제하는 것과 같은 이유다. 이
+        파일은 손으로 고쳐지고 손으로 읽히는 결과를 만들며, 두 값이 어긋난 채로
+        저장되면 그 파일에서 계산한 모든 비율이 조용히 틀린다.
+        """
+        if bool(self.attempts) is not self.asked:
+            raise ValueError(
+                f"{self.case_id}: outcome={self.outcome.value} 인데 "
+                f"시도가 {len(self.attempts)}건이다"
+            )
+        return self
+
 
 class ExplanationProbeRun(BaseModel):
     """한 번의 실행 전체.
@@ -180,6 +228,9 @@ class ExplanationProbeRun(BaseModel):
     contracts: tuple[str, ...]
     prompt_id: str
     prompt_sha256: str
+    #: 언제 모델을 불렀는가. 기본값은 이 규칙이 생기기 전의 이름이라, 저장소에 이미
+    #: 있는 실행 파일들이 고쳐 쓰지 않아도 자기가 무엇이었는지 말하게 된다.
+    call_policy: str = EXPLANATION_CALL_POLICY_ASK_ALWAYS
     temperature: float
     max_chars: int
     cases: tuple[ProbeCase, ...]
@@ -198,7 +249,19 @@ def probe_case(
 
     멈추는 규칙이 `explain_with_fallback` 과 같아야 한다. 여기서 전부 시도해 버리면
     대체 모델 호출 수가 운영보다 부풀고, 그 숫자로 비용을 예측할 수 없게 된다.
+
+    **시작하는 규칙도 같아야 한다.** 근거가 비면 운영은 아무 모델도 부르지 않는다.
+    프로브가 그래도 물어보면 여기 표는 배포된 것보다 37% 더 많은 호출과, 운영에서는
+    일어나지 않을 거부를 담게 된다. 두 루프가 어긋나지 않는지는 테스트가 본다.
     """
+    if not has_grounded_evidence(response):
+        return ProbeCase(
+            case_id=case_id,
+            risk_level=response.risk_level,
+            attempts=(),
+            outcome=ExplanationOutcome.NOT_ASKED_NO_EVIDENCE,
+        )
+
     attempts: list[ProbeAttempt] = []
     outcome = ExplanationOutcome.UNSPECIFIED
     for contract in contracts:
@@ -261,10 +324,17 @@ def summarize(run: ExplanationProbeRun) -> dict[str, object]:
     total = len(cases)
     attempts = [attempt for case in cases for attempt in case.attempts]
 
-    explained = sum(1 for case in cases if case.explained)
-    fell_back = sum(1 for case in cases if len(case.attempts) > 1)
-    # 대체 모델까지 갔는데도 못 낸 경우. 여기가 사용자에게 빈 화면이 나간 건수다.
-    unexplained = [case for case in cases if not case.explained]
+    # **분모는 물어본 건수다.** 근거가 없어 부르지 않은 사례를 설명 성공률의 분모에
+    # 넣으면, 아무 모델도 실패하지 않은 회차에서 성공률이 63% 로 떨어진다. 그 숫자는
+    # 모델에 대해 아무것도 말하지 않으면서 모델이 나빠진 것처럼 읽힌다.
+    asked = [case for case in cases if case.asked]
+    not_asked = total - len(asked)
+
+    explained = sum(1 for case in asked if case.explained)
+    fell_back = sum(1 for case in asked if len(case.attempts) > 1)
+    # 물어봤는데 대체 모델까지 가서도 못 낸 경우. 여기가 사용자에게 빈 화면이 나간
+    # 건수다 — 안 물어본 건은 화면이 비지 않는다. 결정론 요약이 이미 채우고 있다.
+    unexplained = [case for case in asked if not case.explained]
 
     per_model: dict[str, dict[str, object]] = {}
     for model in run.contracts:
@@ -297,11 +367,15 @@ def summarize(run: ExplanationProbeRun) -> dict[str, object]:
 
     return {
         "cases": total,
+        # 물어본 건수와 안 물어본 건수. 아래 비율들의 분모가 여기서 나온다.
+        "asked": len(asked),
+        "not_asked_no_evidence": not_asked,
+        "not_asked_rate": _rate(not_asked, total),
         "attempts": len(attempts),
         "explained": explained,
-        "explained_rate": _rate(explained, total),
+        "explained_rate": _rate(explained, len(asked)),
         "fell_back_to_second_model": fell_back,
-        "fallback_rate": _rate(fell_back, total),
+        "fallback_rate": _rate(fell_back, len(asked)),
         "unexplained": [
             {"case_id": case.case_id, "outcome": case.outcome.value}
             for case in unexplained
