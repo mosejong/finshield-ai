@@ -170,13 +170,18 @@ def explain_analysis(
     neutralized = neutralize_instructions(minimized.text)
     signals, actions, sources = _grounded_blocks(response)
 
+    # 한 번 잘라서 두 곳에 쓴다. 모델에게 보내는 것과 출력 검증의 허용 목록이
+    # **같은 문자열**이어야 한다 - 여기서 어긋나면 모델이 읽을 수 없었던 숫자를
+    # 검증기가 허용하거나, 모델이 읽은 숫자를 검증기가 거부한다.
+    shown_message = neutralized.text[: contract.max_input_chars]
+
     prompt = FRAUD_EXPLANATION_PROMPT.format(
         risk_level=response.risk_level,
         scenario=response.scenario.value,
         signals=signals,
         actions=actions,
         sources=sources,
-        message=neutralized.text[: contract.max_input_chars],
+        message=shown_message,
     )
 
     # 예외의 사유를 그대로 옮긴다. 여기서 다시 판단하지 않는 것이 중요하다 -
@@ -190,6 +195,7 @@ def explain_analysis(
         text = validate_explanation(
             raw,
             grounded_text=build_grounded_text(response),
+            message_text=shown_message,
             max_chars=MAX_EXPLANATION_CHARS,
             risk_level=response.risk_level,
         )

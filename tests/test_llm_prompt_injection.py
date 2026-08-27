@@ -26,6 +26,7 @@ from app.services.llm.untrusted import (
     contains_instruction,
     neutralize_instructions,
 )
+from app.services.llm.outcomes import ExplanationOutcome
 from app.services.llm.validation import (
     LlmOutputRejected,
     contradicts_verdict,
@@ -244,6 +245,29 @@ def test_narrowing_never_costs_detection() -> None:
 
 # --- 출력이 판정과 어긋나면 버린다 ---
 
+
+# 안심 문구 검사만 보는 아래 테스트들이 쓰는 근거와 문자.
+#
+# 예전에는 둘 다 `""` 였다. 근거 밖 주장 검사(2026-08-27)가 생기면서 빈 근거는
+# **현실에 없는 입력**이 됐다 - 설명 계층은 근거 세 칸이 전부 비면 모델을 부르지
+# 않는다(`skip_when_no_evidence`). 빈 근거로 계속 재면 "1394 로 전화하시면
+# 안심하고 상담받으실 수 있습니다" 같은 정상 문장이 안심 문구 때문이 아니라
+# **근거가 비었기 때문에** 거부되고, 그러면 이 테스트들은 통과하든 실패하든
+# 자기가 재려던 것을 재지 않는다.
+REASSURANCE_GROUNDED = "\n".join(
+    [
+        "- 기관을 사칭하는 표현",
+        "- 송금을 요구하는 표현",
+        "- (1순위) 상대방과의 연락을 중단하세요",
+        "- (2순위) 공식 대표번호로 사실을 확인하세요",
+        "- (3순위) 보이스피싱 통합신고대응센터 1394에 상담하세요",
+        "- 금융보안원: 보이스피싱 대응 안내",
+        "- 경찰청: 사이버범죄 신고시스템",
+    ]
+)
+REASSURANCE_MESSAGE = "[금융감독원] 계좌가 범죄에 연루되었습니다. 안전계좌로 이체하세요."
+
+
 REASSURING_OUTPUTS = [
     "이 문자는 안전합니다.",
     "받으신 메시지는 정상입니다.",
@@ -278,17 +302,28 @@ def test_reassuring_output_is_rejected_when_the_verdict_is_risky(
 
     사용자가 제일 먼저 읽는 것은 위험 수준 배지가 아니라 그 밑의 문장이다.
     """
-    with pytest.raises(LlmOutputRejected):
+    with pytest.raises(LlmOutputRejected) as rejected:
         validate_explanation(
-            output, grounded_text="", max_chars=600, risk_level=risk_level
+            output,
+            grounded_text=REASSURANCE_GROUNDED,
+            message_text=REASSURANCE_MESSAGE,
+            max_chars=600,
+            risk_level=risk_level,
         )
+    # 사유까지 본다. 거부만 확인하면 근거 밖 주장 검사가 먼저 걸려도 통과하고,
+    # 그러면 이 테스트는 자기가 재려던 것을 재지 않은 채로 초록불이 된다.
+    assert rejected.value.outcome is ExplanationOutcome.REJECTED_CONTRADICTS_VERDICT
 
 
 @pytest.mark.parametrize("output", REASSURING_OUTPUTS)
 def test_the_same_output_is_allowed_when_the_verdict_is_low(output: str) -> None:
     """`low` 에서 "위험하지 않습니다" 는 맞는 말이다."""
     assert validate_explanation(
-        output, grounded_text="", max_chars=600, risk_level="low"
+        output,
+        grounded_text=REASSURANCE_GROUNDED,
+        message_text=REASSURANCE_MESSAGE,
+        max_chars=600,
+        risk_level="low",
     )
 
 
@@ -327,7 +362,11 @@ def test_legitimate_warnings_are_not_mistaken_for_reassurance(output: str) -> No
     권고 문장의 "안전합니다" 는 통과시킨다.
     """
     assert validate_explanation(
-        output, grounded_text="", max_chars=600, risk_level="high"
+        output,
+        grounded_text=REASSURANCE_GROUNDED,
+        message_text=REASSURANCE_MESSAGE,
+        max_chars=600,
+        risk_level="high",
     )
 
 

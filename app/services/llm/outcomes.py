@@ -26,7 +26,7 @@ stopped early: SAFETY")` 처럼. 그 문장은 아무도 읽지 않는다 — `e
 `validation.py` 안에서 우리가 던진다. 남이 던질 수 있는 예외는 사유를 요구할 수
 없고, 우리만 던지는 예외는 요구할 수 있다.
 
-거부 사유를 한 칸으로 뭉치지 않은 이유도 적어 둔다. `validation.py` 는 여섯 가지를
+거부 사유를 한 칸으로 뭉치지 않은 이유도 적어 둔다. `validation.py` 는 열 가지를
 잡는데, 그중 **없는 연락처를 지어낸 경우**는 이 서비스가 낼 수 있는 가장 나쁜
 출력이다(사용자가 그 번호로 전화를 건다). 여섯을 `output_rejected` 하나로 세면
 그 숫자가 길이 초과에 묻힌다. 나눠 두면 `rejected_invented_contact` 하나만 보고도
@@ -91,6 +91,25 @@ class ExplanationOutcome(StrEnum):
     REJECTED_CONTRADICTS_VERDICT = "rejected_contradicts_verdict"
     REJECTED_INVENTED_CONTACT = "rejected_invented_contact"
 
+    # 아래 넷은 2026-08-27 에 늘었다. 그전까지 근거와 **대조**하는 대상은 연락처
+    # 하나뿐이었고, 근거에 없는 기관·법령·기한·비율·약속을 지어낸 문장 18개를
+    # 넣었을 때 18개가 모두 통과했다(`docs/34` 17절).
+    #
+    # 넷으로 나눈 기준은 이 파일이 처음부터 쓰던 기준 그대로다 — **경보가 다르면
+    # 나누고 같으면 합친다.** `rejected_ungrounded_org` 는 사용자가 없는 기관을
+    # 찾아가게 만드는 출력이라 `rejected_invented_contact` 와 같은 급이고,
+    # `rejected_law_citation` 이 0 이 아니면 프롬프트가 새는 것이며,
+    # `rejected_ungrounded_number` 는 모델을 바꿨을 때 제일 먼저 오를 칸이다.
+    #
+    # 반대로 결과 약속과 적격성 단정을 **한 칸에** 둔 것도 같은 기준이다. "은행이
+    # 손실을 부담하게 됩니다" 와 "구제 신청 자격이 있습니다" 는 사유가 다르게
+    # 보이지만, 운영에서 보면 둘 다 "엔진이 하지 않은 약속을 모델이 했다" 이고
+    # 대응도 같다. 나눠 봐야 두 칸을 늘 함께 읽게 된다.
+    REJECTED_UNGROUNDED_ORG = "rejected_ungrounded_org"
+    REJECTED_LAW_CITATION = "rejected_law_citation"
+    REJECTED_UNGROUNDED_NUMBER = "rejected_ungrounded_number"
+    REJECTED_UNGROUNDED_PROMISE = "rejected_ungrounded_promise"
+
     # --- 물어보지 않았다 ---
     #
     # 실패가 아니다. 거부도 차단도 아니다. **근거 세 칸이 전부 비어서 물어볼 것이
@@ -121,6 +140,10 @@ REJECTION_OUTCOMES = frozenset(
         ExplanationOutcome.REJECTED_RRN,
         ExplanationOutcome.REJECTED_CONTRADICTS_VERDICT,
         ExplanationOutcome.REJECTED_INVENTED_CONTACT,
+        ExplanationOutcome.REJECTED_UNGROUNDED_ORG,
+        ExplanationOutcome.REJECTED_LAW_CITATION,
+        ExplanationOutcome.REJECTED_UNGROUNDED_NUMBER,
+        ExplanationOutcome.REJECTED_UNGROUNDED_PROMISE,
     }
 )
 
