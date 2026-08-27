@@ -1469,6 +1469,109 @@ def test_a_relative_who_only_says_hello_is_not_a_signal(text: str) -> None:
 @pytest.mark.parametrize(
     "text",
     [
+        # held-out v1.2 `fh-1042`. 자기지목이 `나야` 가 아니라 주어로 온
+        # 맨 `나` 이고, 뒤에 바로 상황 서술이 붙는다.
+        "엄마 나 지금 밖인데 카드가 안 돼서 그래. 이따 줄 테니까 200만 원만 보내 줄 수 있어?",
+        # 같은 어형의 다른 호칭. `fh-1042` 한 건에 맞춘 것이 아님을 여기서 본다.
+        "형 나 지금 급한데 50만원만 보내줘",
+    ],
+)
+def test_a_bare_first_person_subject_after_a_kinship_term_is_the_same_form(
+    text: str,
+) -> None:
+    """**`나야` 는 서술어가 붙은 자기지목이고, `나` 는 주어로 온 자기지목이다.**
+
+    어휘에 `나야`·`저예요` 만 적혀 있었다. 둘 다 그 자체로 "나다" 라는 문장인데,
+    자기지목은 주어로도 온다. `fh-1042` 는 그 자리에서 빠졌다.
+
+    이 건은 두 게이트가 서로를 기다린 것으로 적혀 있었지만 실제로 막고 있던
+    것은 하나였다 - 요구 판정(`보내 줄 수 있어`)은 이미 통과했다. 그래서
+    고칠 곳도 하나다.
+    """
+    codes = [signal["code"] for signal in analyze(text)["signals"]]
+
+    assert "familiar_person_claim" in codes
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 조사 `-나`(선택). 한국어에서 조사는 붙여 쓰므로 공백 하나가 조사와
+        # 대명사를 가른다. 앞 공백을 요구하지 않으면 이 두 줄이 켜진다.
+        "엄마나 아빠한테 물어보고 알려 줄래?",
+        "형이나 누나한테 먼저 물어봐 줄래?",
+        # `나` 로 시작하는 낱말. 뒤 공백을 요구하지 않으면 켜진다.
+        "엄마 나중에 전화할게. 택배 오면 받아 줘.",
+        "아빠 나가신다고 전해 줘.",
+    ],
+)
+def test_a_particle_or_a_longer_word_starting_with_na_is_not_self_reference(
+    text: str,
+) -> None:
+    """맨 `나` 를 어휘에 넣을 때 치르는 값이 이 네 줄이다.
+
+    넷 다 **요구가 붙어 있다.** 요구 게이트는 통과하므로, 이들을 막는 것은
+    자기지목 어형의 공백 조건뿐이다. 조건이 풀리면 여기서 바로 드러난다.
+    """
+    codes = [signal["code"] for signal in analyze(text)["signals"]]
+
+    assert "familiar_person_claim" not in codes
+
+
+def test_a_bare_jeo_is_not_self_reference_because_it_is_also_a_determiner() -> None:
+    """**`나` 는 넣고 `저` 는 넣지 않은 이유.**
+
+    `저` 는 지시관형사와 형태가 같다. "엄마 저 앱 설치해야 돼?" 는 자식이
+    부모에게 묻는 정상 문장인데 요구 게이트를 통과한다. `나` 에는 그 짝이
+    없다 - 1인칭 말고 다른 품사가 없다.
+
+    자기지목에 서술어가 붙은 `저예요`·`저야` 는 그대로 둔다. 그쪽은
+    지시관형사로 읽힐 여지가 없다.
+    """
+    codes = [signal["code"] for signal in analyze("엄마 저 앱 설치해야 돼?")["signals"]]
+
+    assert "familiar_person_claim" not in codes
+
+
+def test_a_real_family_request_and_an_impersonation_are_the_same_form() -> None:
+    """**이 규칙이 분리하지 못하는 자리를 적어 둔다.**
+
+    held-out v0.5 `fh-351` 은 진짜 가족의 소액 요청으로 라벨돼 있고, v1.3
+    `fh-1127` 은 사칭으로 라벨돼 있다. 두 문장은 **같은 어형**이다 - 호칭,
+    자기지목, 사정, 금액, 송금 요구, 곧 갚겠다는 약속. 다른 것은 `나`/`나야`
+    와 금액뿐이다.
+
+    `fh-1127` 은 이 변경 전에도 켜졌다. `fh-351` 이 통과하고 있던 이유는
+    원칙이 아니라 `나` 가 어휘에 없다는 사고였다. 그래서 이 변경은 오탐을
+    새로 만든 것이 아니라 **이미 있던 비일관을 드러낸 것**이다.
+
+    금액으로 가르지 않는다. 실제 메신저 피싱은 소액부터 시작하고, 금액을
+    면제 조건으로 만들면 그 수법이 바로 그 구멍으로 들어온다.
+
+    그래서 사칭 쪽 재현율을 택했다. 틀렸을 때 사용자가 치르는 값이
+    **원래 알던 번호로 거는 전화 한 통**이기 때문이다. 반대쪽 값은 200만원
+    이다. 이 판단이 바뀌면 이 테스트가 먼저 깨진다.
+    """
+    real_family = analyze("누나 나 오늘 지갑 두고 왔어. 점심값 만 원만 보내 줘. 저녁에 바로 갚을게.")
+    impersonation = analyze("형 나야. 급하게 쓸 데가 있는데 200만원만 보내 줄 수 있어? 이따 바로 줄게.")
+
+    assert [s["code"] for s in real_family["signals"]] == [
+        s["code"] for s in impersonation["signals"]
+    ]
+    assert real_family["risk_level"] == impersonation["risk_level"]
+    assert [a["code"] for a in real_family["actions"]] == [
+        a["code"] for a in impersonation["actions"]
+    ]
+    # 지목하는 행동이 전화 한 통이라는 것이 위 판단의 전제다.
+    assert [a["code"] for a in real_family["actions"]] == [
+        "STOP_CONTACT",
+        "VERIFY_BY_KNOWN_CONTACT",
+    ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
         # held-out v1.3 `fh-1151`·`fh-1152`. 제도 이름은 같고 창구가 다르다.
         "햇살론유스는 서민금융진흥원 앱이나 서민금융통합지원센터에서 신청하실 수 있습니다.",
         "정책 자금 상담은 가까운 서민금융통합지원센터 방문으로 가능합니다.",
