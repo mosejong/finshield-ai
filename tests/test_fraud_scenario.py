@@ -1603,3 +1603,141 @@ def test_a_policy_loan_that_asks_for_a_guarantee_fee_is_not_excused_by_a_counter
     ]
 
     assert "loan_policy_offer" in codes
+
+# ---------------------------------------------------------------------------
+# 계좌를 목적지로 댄 납부 요구 (v1.4)
+#
+# 값을 치를 문장이 먼저다. 이 회차의 위험은 **진짜 고지서를 사기로 부르는
+# 것**이고, 그 문장들은 926건 셋 안에 하나도 없었다. 셋 안의 정상 `납부`
+# 사례는 전부 명사형(`납부 내역`·`납부 기한`)이라 값이 보이지 않는다.
+# ---------------------------------------------------------------------------
+
+
+REAL_BILLS_THAT_ORDER_PAYMENT = (
+    "국민건강보험공단입니다. 8월분 보험료를 다음 달 10일까지 납부하셔야 합니다.",
+    "국세청 홈택스 안내입니다. 종합소득세는 5월 31일까지 납부하셔야 합니다.",
+    "경찰청입니다. 교통 범칙금은 기한 내에 납부하셔야 가산금이 붙지 않습니다.",
+    "우체국입니다. 요금은 창구에서 납부하시면 됩니다.",
+    "국민연금공단입니다. 지역가입자 보험료를 납부하시면 가입 기간에 반영됩니다.",
+    "세무서입니다. 부가가치세는 신고 기한 내에 납부하셔야 합니다.",
+    "관리사무소입니다. 8월 관리비를 25일까지 납부해 주시기 바랍니다.",
+    "학교 행정실입니다. 등록금은 지정 기한까지 납부해야 수강신청이 유지됩니다.",
+    "아파트 관리비 자동이체 신청 전에는 고지서로 직접 납부하세요.",
+    "통신요금 미납 안내입니다. 이번 주까지 납부해 주시면 이용 정지가 해제됩니다.",
+)
+
+
+@pytest.mark.parametrize("text", REAL_BILLS_THAT_ORDER_PAYMENT)
+def test_a_real_bill_ordering_payment_is_not_a_transfer_demand(text: str) -> None:
+    """**진짜 고지서는 납부를 시킨다.**
+
+    `납부` 를 `money_transfer_request` 의 어휘에 그냥 넣으면 926건 셋의
+    점수는 그대로다(미탐 11 -> 10, 오탐 6 -> 6). 셋이 이 값을 갖고 있지
+    않아서 그렇다. 위 열 문장을 직접 넣어 재 보면 여섯 건이 곧장 `high` +
+    사기 유형이 된다 - 건강보험공단·국세청·경찰청·우체국·국민연금공단·
+    세무서의 평범한 고지 문자다.
+
+    셋이 조용한 것은 이 어휘가 안전하다는 뜻이 아니라 **셋이 안 물어봤다는**
+    뜻이었다. 그래서 어휘가 아니라 목적지로 갈랐고, 이 열 문장이 그 결정의
+    값이다.
+    """
+    codes = [signal["code"] for signal in analyze(text)["signals"]]
+
+    assert "money_transfer_request" not in codes, text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 허용이지 요구가 아니다. `납부(하|해)` 로 열어 두면 전부 걸린다.
+        "국세는 가상계좌로 납부하셔도 됩니다. 홈택스에서 계좌번호를 확인하세요.",
+        "학원비는 등록하신 계좌에 납부하시면 됩니다.",
+        "지방세는 위택스에서 조회한 전용 계좌로 납부할 수 있습니다.",
+        "보험료를 자동이체 계좌에 잔액을 남겨 두시면 매월 자동 납부됩니다.",
+        # 예방·금지·과거·질문. 계좌와 납부가 한 절에 있어도 요구가 아니다.
+        "모르는 계좌로 납부해 달라는 문자는 사기입니다. 절대 응하지 마세요.",
+        "안내받은 계좌로 납부하지 마시고 고지서의 가상계좌를 이용하세요.",
+        "지난달 관리비는 이미 지정 계좌로 납부했습니다.",
+        "관리비를 이 계좌로 납부해도 되나요?",
+    ],
+)
+def test_being_allowed_to_pay_into_an_account_is_not_a_demand(text: str) -> None:
+    """어미를 요구형으로 좁힌 값이 여기 있다.
+
+    처음 안은 `납부(하|해)` 였고 926건 셋에서는 위 안과 점수가 같았다.
+    다른 것은 셋 밖에서 드러났다 - 허용·금지·과거·질문이 전부 요구가 된다.
+    어형이 요구를 품고 있어야 `patterns` 자리에 둘 수 있다.
+    """
+    codes = [signal["code"] for signal in analyze(text)["signals"]]
+
+    assert "money_transfer_request" not in codes, text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "관리사무소입니다. 8월 관리비는 아래 계좌로 납부해 주시기 바랍니다.",
+        "동호회 회비는 총무 계좌로 납부해 주세요.",
+    ],
+)
+def test_a_normal_message_naming_an_account_to_pay_into_is_raised_but_not_named(
+    text: str,
+) -> None:
+    """**이 회차가 실제로 치르는 값이다.**
+
+    문자에 계좌를 적고 그리로 내라는 정상 안내는 있다. 관리사무소 관리비와
+    동호회 회비가 그렇고, 두 문장은 `low` 에서 `medium` 으로 오른다.
+
+    올라가는 것을 값으로 적어 두되 숨기지는 않는다. 사칭 관리비 문자는
+    글자 그대로 같은 모양이고, 등급이 오른 뒤에도 **유형은 서지 않는다** -
+    이진 판정은 정상 그대로다. 사용자에게 "사기입니다"라고 말하지 않고
+    "확인해 보라"고만 말하는 자리가 여기다.
+    """
+    body = analyze(text)
+    codes = [signal["code"] for signal in body["signals"]]
+
+    assert "money_transfer_request" in codes, text
+    assert body["fraud_types"] == [], text
+
+
+def test_a_prosecutor_claim_that_orders_payment_into_an_account_is_caught() -> None:
+    """held-out v1.2 `fh-806`. 검찰 사칭의 교과서인데 신호가 하나도 없었다.
+
+    두 게이트가 서로를 기다렸다. `지검` 은 민감 요구가 있어야 켜지는 조건부
+    자칭 어휘이고, 민감 요구 쪽은 `납부` 를 몰랐다. 목적지를 댄 납부 요구가
+    `money_transfer_request` 를 켜면서 자칭 게이트가 함께 열린다.
+
+    이 사례가 위험한 이유는 등급이 아니라 `state` 다. `received_only` 로
+    들어오면 아직 아무 일도 일어나지 않아 상태가 등급을 올려 주지 않는다.
+    문장만으로 켜지지 않으면 사용자는 `low` 를 본다.
+    """
+    body = analyze(
+        "서울중앙지검입니다. 변호사 선임은 하시면 안 됩니다. "
+        "보증금을 국고 계좌로 납부하셔야 합니다."
+    )
+    codes = {signal["code"] for signal in body["signals"]}
+
+    assert {"authority_impersonation", "money_transfer_request"} <= codes
+    assert "authority_impersonation" in body["fraud_types"]
+    assert body["risk_level"] == "high"
+
+
+def test_what_the_payment_destination_gate_does_not_fix() -> None:
+    """이 회차가 **고치지 않은 것**을 적어 둔다.
+
+    "경찰청입니다. 교통 범칙금은 기한 내에 납부하셔야 가산금이 붙지
+    않습니다." 는 이 회차 전에도 후에도 `authority_impersonation` 이 켜진다.
+    `경찰` 이 언급만으로 켜는 무조건 층에 있기 때문이고, 실제로 경찰청은
+    범칙금 문자를 보낸다(교통민원24). 목적지 게이트와는 무관한 별개의 값이다.
+
+    통과하는 테스트로 적는다. 뒤 회차가 이것을 고치면 이 테스트가 깨지고,
+    깨지는 것이 진전이다.
+    """
+    body = analyze(
+        "경찰청입니다. 교통 범칙금은 기한 내에 납부하셔야 가산금이 붙지 않습니다."
+    )
+
+    assert body["fraud_types"] == ["authority_impersonation"]
+    assert "money_transfer_request" not in {
+        signal["code"] for signal in body["signals"]
+    }
