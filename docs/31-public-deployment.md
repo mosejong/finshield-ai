@@ -867,6 +867,7 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 | 2026-08-18 | `sha-4457f0e…` | 3-4 최초 기동 | — |
 | 2026-08-25 | `v0.3.0` | 3-6 재배포 | `/check/deposit` `200`, `POST /api/proxy/analyze` `200`, `.../explanation` `200 status: ready` |
 | ~~2026-08-26~~ | ~~`v0.4.0`~~ | **올라간 적 없음** | 2026-09-04 확인 — 바로 아래 |
+| 2026-09-04 | `v0.5.0` | 3-6 재배포 | 근거 없는 문장에 `status: not_asked`, held-out v1.0 `fh-806` 에 `level: high` + 신호 2종, 실제 관리비 고지에 `level: low`, `verify_public_deployment` 27/27 |
 
 `v0.4.0` 줄에는 **취소선을 쳤다.** 2026-08-26 에 이 줄을 미리 적어 두고 확인 칸을
 `*(배포 후 채운다)*` 로 비워 두었는데, 2026-09-04 에 밖에서 찍어 보니 그 배포는
@@ -906,6 +907,30 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 같다 — 릴리스는 태그 push 로 자동인데 재배포는 사람이 Cloud Shell 에서 손으로
 하는 일이라, **자동인 쪽만 일어나고 손으로 하는 쪽이 빠진다.** 대장을 두 개로
 나눠 둔 것이 이 격차를 보이게 하는 유일한 장치다.
+
+#### 2026-09-04 재배포 (`v0.3.0` → `v0.5.0`)
+
+열흘 만에 올렸다. 마이그레이션도 compose 변경도 없어 **순수 이미지 교체**였다
+(`git diff --name-only v0.3.0..main -- migrations/ alembic.ini` 가 비어 있고,
+`compose*.yaml` 과 두 `Dockerfile` 도 마찬가지다). 백엔드가 읽는 환경변수에도
+새로 생긴 것이 없다.
+
+`pull` 이 127초, 스택 전체 교체가 134초. `migration` 은 이미 head 라 no-op 으로
+끝났다. `images` 의 IMAGE ID 가 12절 릴리스 대장의 digest 앞 12자리와 일치했다 —
+`11426233598f`(backend), `fd95124c5a95`(web).
+
+밖에서 찍은 것:
+
+| 찍은 것 | 받은 답 | 뜻 |
+|---|---|---|
+| 근거 없는 관리비 문장 → `/explanation` | `status: not_asked`, `text: null` | `v0.4.0` 이상. **모델을 안 부른다** |
+| held-out v1.0 `fh-806` → `/analyze` | `level: high`, 신호 `authority_impersonation`·`money_transfer_request` | #109 이상. 열흘 전에는 `low` + `signals: []` 였다 |
+| 실제 관리비 고지(`납부 기한` 포함) | `level: low`, 신호 없음 | 결제 목적지 게이트가 **정상 쪽에서 값을 치르지 않았다** |
+| `verify_public_deployment --domain finshield-ai.duckdns.org` | 27/27, 실패 0 | TLS 73일 남음(만료 2026-11-16), 내부 포트 셋 다 닫힘 |
+
+세 번째 줄이 이 배포에서 제일 확인하고 싶었던 것이다. #109 는 셋 안에서 공짜로
+보였던 어휘 추가를 셋 밖의 진짜 고지 문자로 반증하고 목적지 조건으로 바꾼
+회차였는데, 그 판단이 운영에서도 같은지는 여기서만 확인된다.
 
 2026-08-25 재배포에서 실제로 일어난 일을 순서대로 적어 둔다. 이미지 교체
 자체는 한 번에 됐고, 시간을 쓴 것은 그다음이다.
