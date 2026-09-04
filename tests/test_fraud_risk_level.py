@@ -12,6 +12,8 @@ from app.domain.fraud.policy import (
     SIGNAL_MINIMUM_RISK,
     STATE_MINIMUM_RISK,
     determine_risk_level,
+    score_ceiling_for_level,
+    score_floor_for_level,
 )
 from app.domain.fraud.signals import SENSITIVE_REQUEST_SIGNALS
 from app.schemas.analysis import RiskSignal, UserState
@@ -134,3 +136,41 @@ def test_no_signals_and_no_state_is_low() -> None:
 def test_every_state_has_a_minimum_risk() -> None:
     """상태가 추가되면 KeyError 로 죽는 대신 여기서 먼저 드러난다."""
     assert set(STATE_MINIMUM_RISK) == set(UserState)
+
+
+def test_the_compatibility_score_alone_cannot_raise_the_level() -> None:
+    """canonical 신호도 없고 한 일도 없으면 legacy 점수는 혼자 등급을 못 만든다.
+
+    이 자리에서 medium 을 선언하면 화면에 신호도 유형도 행동도 근거도 없이
+    `주의` 라는 머리말과 "신호는 확인되지 않았습니다" 라는 본문이 함께 뜬다.
+    사용자가 할 수 있는 일이 한 줄도 없는 경고다.
+    """
+    assert determine_risk_level(35, [], UserState.RECEIVED_ONLY) == "low"
+    assert determine_risk_level(70, [], UserState.RECEIVED_ONLY) == "low"
+    assert determine_risk_level(100, [], UserState.RECEIVED_ONLY) == "low"
+
+
+def test_the_empty_evidence_exception_is_the_only_one() -> None:
+    """예외는 **둘 다 비었을 때만** 열린다. 하나라도 있으면 종전 그대로다."""
+    assert (
+        determine_risk_level(35, [NEUTRAL_SIGNAL], UserState.RECEIVED_ONLY) == "medium"
+    )
+    assert determine_risk_level(70, [NEUTRAL_SIGNAL], UserState.RECEIVED_ONLY) == "high"
+    for state in UserState:
+        if state is UserState.RECEIVED_ONLY:
+            continue
+        # 이미 한 일이 있으면 화면에 실릴 것이 있다. 점수를 버리지 않는다.
+        assert determine_risk_level(35, [], state) != "low"
+
+
+@pytest.mark.parametrize(
+    ("level", "floor", "ceiling"),
+    [("low", 0, 34), ("medium", 35, 69), ("high", 70, 100)],
+)
+def test_score_bands_are_fixed_on_both_sides(
+    level: str, floor: int, ceiling: int
+) -> None:
+    """점수는 등급의 띠 안에 있다. 바닥만 있으면 반대쪽으로 새어 나간다."""
+    assert score_floor_for_level(level) == floor
+    assert score_ceiling_for_level(level) == ceiling
+    assert score_floor_for_level(level) <= score_ceiling_for_level(level)

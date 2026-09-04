@@ -522,7 +522,7 @@ PYTHONPATH=. python -m scripts.evaluate_fraud_engine \
 
 ### 7.7 자동화 검증
 
-`pytest -q` 기준 **1,247 passed, 2 skipped** (2026-09-04). CI는 테스트, 품질
+`pytest -q` 기준 **1,256 passed, 2 skipped** (2026-09-04). CI는 테스트, 품질
 게이트, 의존성 해시 잠금 검사, 프론트엔드 빌드·타입·린트·테스트, 컨테이너 런타임
 검증을 모두 돌린다.
 

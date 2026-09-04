@@ -1741,3 +1741,52 @@ def test_what_the_payment_destination_gate_does_not_fix() -> None:
     assert "money_transfer_request" not in {
         signal["code"] for signal in body["signals"]
     }
+
+
+def test_a_prevention_notice_is_not_a_warning_with_nothing_behind_it() -> None:
+    """계좌 대여를 **말리는** 안내문이 `주의` 를 달고 나가던 것을 고쳤다.
+
+    held-out `fh-061` 이다. `LEGACY_RULES` 의 `account_access` 가 "통장"·
+    "체크카드" 를 보고 35점을 켰고, 그 점수 하나로 medium 이 됐다. 같은
+    문장을 본 canonical 규칙은 아무것도 켜지 않았다 - 정확한 쪽이 조용하고
+    거친 쪽이 혼자 말한 것이다.
+
+    사용자가 받던 화면에는 신호도 유형도 행동도 근거도 없었다. `주의` 라는
+    머리말과 "명시적인 사기 위험 신호는 확인되지 않았습니다" 라는 본문이
+    같이 떴고, 할 일은 한 줄도 없었다. 등급은 그 자리에서 아무 말도 하지
+    않는 것이 정직하다.
+    """
+    body = analyze(
+        "통장이나 체크카드를 빌려주면 본인도 처벌받을 수 있습니다. "
+        "어떤 이유로도 전달하지 마세요."
+    )
+
+    assert body["risk_level"] == "low"
+    # 점수도 같이 내려온다. 35 만 남으면 모순이 방향만 바꿔 되살아난다.
+    assert body["risk_score"] == 0
+    assert body["signals"] == []
+    assert body["fraud_types"] == []
+    assert body["actions"] == []
+
+
+def test_a_level_above_low_always_has_something_on_screen() -> None:
+    """등급을 올렸으면 그 등급을 설명하는 것이 화면에 하나는 있어야 한다.
+
+    설명은 셋 중 하나에서 온다 - 감지된 신호, 사용자가 이미 한 일에서
+    나오는 행동, 그리고 그 둘이 만드는 유형·근거. 셋 다 비었는데 등급만
+    올라가면 사용자는 무엇을 조심해야 하는지도, 무엇을 해야 하는지도
+    모르는 채 색깔 하나만 받는다.
+    """
+    corpus = [
+        ("통장이나 체크카드를 빌려주면 본인도 처벌받을 수 있습니다.", "received_only"),
+        ("직원이 통장이나 카드를 요구하는 일은 없습니다. 신고해 주세요.", "received_only"),
+        ("짧은 안내입니다.", "installed_app"),
+        ("모르는 입금이 있어 거래 내역만 확인했습니다.", "received_unknown_money"),
+        ("검찰 수사관입니다. 지금 바로 안전계좌로 송금해 주세요.", "received_only"),
+    ]
+
+    for text, state in corpus:
+        body = analyze(text, state)
+        if body["risk_level"] == "low":
+            continue
+        assert body["signals"] or body["actions"], (text, state)
