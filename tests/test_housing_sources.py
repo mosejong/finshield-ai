@@ -5,12 +5,13 @@
 """
 
 import json
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.clock import today_kst
 from app.domain.housing.policy import ACTION_POLICIES
 from app.domain.housing.sources import (
     HOUSING_SOURCE_DATA_PATH,
@@ -42,7 +43,7 @@ def source_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def test_future_retrieved_at_is_rejected(source_file) -> None:
     original, write = source_file
     records = [dict(record) for record in original]
-    records[0]["retrieved_at"] = (date.today() + timedelta(days=1)).isoformat()
+    records[0]["retrieved_at"] = (today_kst() + timedelta(days=1)).isoformat()
     write(records)
 
     with pytest.raises(OfficialSourceDataError, match="future retrieved_at"):
@@ -64,7 +65,7 @@ def test_old_source_is_reported_stale_but_still_usable(source_file) -> None:
     original, write = source_file
     records = [dict(record) for record in original]
     records[0]["retrieved_at"] = (
-        date.today() - timedelta(days=HOUSING_SOURCE_REVIEW_INTERVAL_DAYS + 1)
+        today_kst() - timedelta(days=HOUSING_SOURCE_REVIEW_INTERVAL_DAYS + 1)
     ).isoformat()
     write(records)
 

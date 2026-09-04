@@ -11,6 +11,7 @@ from datetime import date, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.clock import today_kst
 from app.domain.housing.deposit_risk import compute_protection, compute_ratio
 from app.domain.housing.policy import (
     ACTION_ORDER,
@@ -384,7 +385,7 @@ def test_future_move_in_date_is_rejected() -> None:
         json={
             "stage": "moved_in",
             "deposit_krw": 1,
-            "move_in_reported_on": (date.today() + timedelta(days=1)).isoformat(),
+            "move_in_reported_on": (today_kst() + timedelta(days=1)).isoformat(),
         },
     )
 
