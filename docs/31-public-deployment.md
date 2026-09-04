@@ -162,9 +162,9 @@ cd ~/finshield-ai
 
 # .env 의 태그 한 줄만 바꾼다. 줄이 없으면 추가한다
 if grep -q '^FINSHIELD_IMAGE_TAG=' .env; then
-  sed -i 's/^FINSHIELD_IMAGE_TAG=.*/FINSHIELD_IMAGE_TAG=v0.5.0/' .env
+  sed -i 's/^FINSHIELD_IMAGE_TAG=.*/FINSHIELD_IMAGE_TAG=v0.6.0/' .env
 else
-  echo 'FINSHIELD_IMAGE_TAG=v0.5.0' >> .env
+  echo 'FINSHIELD_IMAGE_TAG=v0.6.0' >> .env
 fi
 grep '^FINSHIELD_IMAGE_TAG=' .env
 
@@ -824,6 +824,8 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 | `v0.4.0` | `3511c3d` | 2026-08-26 | `finshield-web` | `sha256:1a259cd8e30980590e29ffd301450f992c06ba13c2a6cbede80ac7b9aacd2897` |
 | `v0.5.0` | `6777a74` | 2026-09-04 | `finshield-backend` | `sha256:11426233598f5bdfeddc1993e53278320f344dc0da3566920a380f0230fe182f` |
 | `v0.5.0` | `6777a74` | 2026-09-04 | `finshield-web` | `sha256:fd95124c5a958667c376c0603702a21e9bd007e044cc6e137a96e07a5f45209a` |
+| `v0.6.0` | `ec59a9f` | 2026-09-04 | `finshield-backend` | `sha256:2260f03b106fecb38e09aee2c16d005dbff6da90ebfb07575550990bcaf96824` |
+| `v0.6.0` | `ec59a9f` | 2026-09-04 | `finshield-web` | `sha256:6d4783e4c3f6b2389053e3d695622788aecbf1789672bbe3f22fc20f3a9fa697` |
 
 `v0.1.0` 은 **태그로 만든 첫 릴리스**다. 그 이전 두 번은 `workflow_dispatch` 라
 `sha-<커밋>` 태그만 붙었다.
@@ -877,6 +879,39 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 확인만 아직 안 한 줄이 구분되지 않는다.** 앞으로 이 표에는 **밖에서 찍어 본 뒤에만
 줄을 추가한다.** 미리 적어 둔 줄은 대장이 아니라 계획이고, 계획을 대장에 적으면
 대장이 하는 일이 없어진다.
+
+#### `v0.6.0` 을 올린 뒤 찍을 것 — **근거가 있는** 문장 하나
+
+`v0.5.0` 배포 확인은 "근거 없는 문장에 `status: not_asked`" 를 찍었다. 그 검사는
+통과했고, 같은 날 **근거가 있는 문장은 `status: failed`** 였다 — 설명 계층이 죽어
+있었는데 확인 절차가 그것을 묻지 않았다(`docs/34` 18절).
+
+그래서 이 릴리스의 확인은 **두 방향을 다** 찍는다. 하나만 찍으면 그 방향만 알게
+된다.
+
+```bash
+cat > demo.json <<'EOF'
+{"text": "[국제발신] 고객님 명의로 개설된 계좌가 대포통장 범죄에 연루되어 검찰 수사가 진행 중입니다. 오늘 중 아래 안전계좌로 자금을 이체하지 않으면 계좌가 전부 동결됩니다. 수사기밀이므로 가족을 포함해 누구에게도 알리지 마시고, 원격 확인 앱을 설치한 뒤 담당 수사관에게 직접 연락 주십시오.", "state": "received_only", "persona": "early_career"}
+EOF
+
+cat > normal.json <<'EOF'
+{"text": "[○○아파트 관리사무소] 9월분 관리비 고지서가 발송되었습니다. 납부 기한은 9월 30일이며, 세대별 고지 금액은 관리사무소 게시판과 우편 고지서에서 확인하실 수 있습니다.", "state": "received_only", "persona": "early_career"}
+EOF
+
+BASE=https://finshield-ai.duckdns.org/api/proxy/analyze/explanation
+
+# 1. 근거가 있는 문장 — status 가 ready 여야 하고 text 가 비어 있으면 안 된다
+curl -s -X POST "$BASE" -H 'Content-Type: application/json' --data-binary @demo.json
+
+# 2. 근거가 없는 문장 — 여전히 not_asked 여야 한다 (v0.4.0 동작이 살아 있는가)
+curl -s -X POST "$BASE" -H 'Content-Type: application/json' --data-binary @normal.json
+```
+
+1번이 `{"status":"failed"}` 로 오면 이 릴리스가 안 올라간 것이다. `v0.5.0` 이 그
+응답을 내고 있었고, 그것이 이 릴리스가 존재하는 이유다.
+
+한글 payload 는 **UTF-8 파일에 담아 `@file` 로 보낸다.** 셸에 직접 적으면 인코딩이
+조용히 깨져서 "모델이 이상한 답을 했다" 로 보인다.
 
 `v0.1.0` 과 `v0.2.0` 은 **이 표에 줄이 없다.** 만들어졌지만 배포된 적이 없다.
 줄이 없는 것이 이 표가 하는 일이다 — 위 대장만 보면 세 릴리스가 나란히
