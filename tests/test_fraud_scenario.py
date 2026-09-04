@@ -1701,7 +1701,7 @@ def test_a_normal_message_naming_an_account_to_pay_into_is_raised_but_not_named(
 
 
 def test_a_prosecutor_claim_that_orders_payment_into_an_account_is_caught() -> None:
-    """held-out v1.2 `fh-806`. 검찰 사칭의 교과서인데 신호가 하나도 없었다.
+    """held-out v1.0 `fh-806`. 검찰 사칭의 교과서인데 신호가 하나도 없었다.
 
     두 게이트가 서로를 기다렸다. `지검` 은 민감 요구가 있어야 켜지는 조건부
     자칭 어휘이고, 민감 요구 쪽은 `납부` 를 몰랐다. 목적지를 댄 납부 요구가
