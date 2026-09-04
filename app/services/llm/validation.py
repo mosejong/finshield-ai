@@ -155,7 +155,21 @@ _REASSURANCE_CHECKED_LEVELS = frozenset({"medium", "high"})
 # 규칙이 아니라 정규화였다.
 _NON_WORD = re.compile(r"[^0-9A-Za-z가-힣]+")
 
-# 법령 인용. 설명에 조문 번호가 필요한 경우가 없으므로 허용 목록 없이 거부한다.
+# 법령 인용. **연락처·기관과 같은 방식으로 근거에 대조한다.**
+#
+# 오래 허용 목록 없이 거부했고, 그 근거는 "설명에 조문 번호가 필요한 경우가
+# 없다" 였다. 틀린 전제였다 — 엔진은 계좌·인증 접근권을 넘긴 사건에
+# `국가법령정보센터: 전자금융거래법 제6조 …` 를 **공식 근거로 붙이고, 그 줄을
+# 그대로 프롬프트에 넣는다.** 모델에게 법령을 읽히고 그 법령을 되읽었다고
+# 거부한 것이다. 2026-09-04 홀드아웃 v1.3 에서 `fh-1135` 가 이것으로 죽었고,
+# **주 모델과 대체 모델이 같은 이유로 걸려 그 사건만 설명이 아예 없었다.**
+# 기관 규칙과 같은 자리에서 같은 모양으로 틀렸다(`docs/devlog/2026-09-04`).
+#
+# 좁히는 쪽은 그대로다. 근거에 없는 법률과 근거에 없는 조문 번호는 여전히
+# 거부되고, 대조는 부분 문자열이라 이름을 줄여 쓴 것도 통과하지 못한다
+# (`전기통신금융사기 피해 방지 및 피해금 환급에 관한 특별법` 을
+# `전기통신금융사기특별법` 으로 줄이면 붙지 않는다). 이 변경으로 거부가
+# **늘어나는 입력은 없다** — 통과하던 것은 전부 그대로 통과한다.
 #
 # **맨 `~법` 은 쓸 수 없다.** 방법·수법·불법·비법·요법이 같은 꼬리를 갖는다.
 # `저` 지시관형사를 제외했던 것과 같은 모양의 문제이고, 같은 방식으로 푼다 —
@@ -289,6 +303,25 @@ def _ungrounded_organizations(explanation: str, grounded_text: str) -> set[str]:
     }
 
 
+def _ungrounded_laws(explanation: str, grounded_text: str) -> set[str]:
+    """설명이 든 법령 중 근거에 없는 것. 법률 이름과 조문 번호를 **따로** 본다.
+
+    따로 보는 것이 중요하다. 근거가 `전자금융거래법 제6조` 를 달고 왔을 때
+    `예금자보호법 제6조` 는 조문 번호만 빌린 문장이고, `전자금융거래법 제9조` 는
+    법률 이름만 빌린 문장이다. 둘 다 걸려야 한다.
+
+    문자 원문은 여기 들어가지 않는다. `_ungrounded_organizations` 와 같은
+    이유다 — 사기 문자가 법 조항을 들먹였다는 사실이 그 조항을 설명에 실어도
+    된다는 뜻은 아니다.
+    """
+    grounded = _normalize(grounded_text)
+    return {
+        name
+        for match in _LAW_PATTERN.findall(explanation)
+        if (name := _normalize(match)) and name not in grounded
+    }
+
+
 def _ungrounded_numbers(
     explanation: str, grounded_text: str, message_text: str
 ) -> set[str]:
@@ -372,9 +405,10 @@ def validate_explanation(
             f"explanation named organizations absent from the evidence: {sorted(named)}",
             outcome=ExplanationOutcome.REJECTED_UNGROUNDED_ORG,
         )
-    if _LAW_PATTERN.search(explanation):
+    statutes = _ungrounded_laws(explanation, grounded_text)
+    if statutes:
         raise LlmOutputRejected(
-            "explanation cited a statute",
+            f"explanation cited statutes absent from the evidence: {sorted(statutes)}",
             outcome=ExplanationOutcome.REJECTED_LAW_CITATION,
         )
     figures = _ungrounded_numbers(explanation, grounded_text, message_text)
