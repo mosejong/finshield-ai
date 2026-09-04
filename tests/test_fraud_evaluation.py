@@ -23,7 +23,11 @@ from evaluation.fraud_benchmark import (
     evaluate_golden_set,
     normalized_dataset_sha256,
 )
-from app.domain.fraud.policy import STATE_MINIMUM_RISK
+from app.domain.fraud.policy import (
+    STATE_MINIMUM_RISK,
+    score_ceiling_for_level,
+    score_floor_for_level,
+)
 from app.domain.fraud.signals import CANONICAL_TO_LEGACY_PUBLIC, SIGNAL_RULES
 from evaluation.fraud_golden import (
     ACTION_CODES,
@@ -1560,3 +1564,46 @@ def test_holdout_judge_runs_name_the_dataset_they_actually_judged() -> None:
         assert {judgement.case_id for judgement in run.judgements} == {
             case.case_id for case in cases
         }
+
+
+def _every_labelled_case() -> list:
+    cases = list(load_golden_cases())
+    for path in HOLDOUT_SIZES:
+        cases.extend(load_holdout_cases(path))
+    return cases
+
+
+def test_no_response_asserts_a_level_it_cannot_explain() -> None:
+    """등급을 올렸으면 그것을 설명하는 것이 응답 안에 하나는 있어야 한다.
+
+    **이것은 성능 단언이 아니다.** 라벨을 한 번도 보지 않는다. held-out
+    문장을 쓰지만 재는 것은 맞았는지가 아니라 **응답이 스스로를 부정하지
+    않는지**이고, 규칙을 라벨 쪽으로 당겨서 통과시킬 수 있는 종류가 아니다.
+    그래서 위의 "held-out 셋에 성능 단언을 두지 않는다" 와 어긋나지 않는다.
+
+    `fh-061` 이 이 불변식을 깨고 있었다. 926건 전체에 두는 이유는 그것이
+    한 건이었기 때문이다 - 사례 하나를 고정하면 같은 모양이 다음 셋에서
+    다시 나올 때 아무도 모른다.
+    """
+    offenders = [
+        case.case_id
+        for case in _every_labelled_case()
+        for response in [analyze_fraud(case.request())]
+        if response.risk_level != "low" and not response.signals and not response.actions
+    ]
+
+    assert offenders == []
+
+
+def test_every_response_score_sits_inside_its_own_level_band() -> None:
+    """점수와 등급이 같은 것을 말한다. 화면에 둘 다 보이기 때문이다.
+
+    v0.8 은 바닥만 깔았다(`risk_level: high` 인데 `risk_score: 0`). 등급을
+    내리는 예외가 생기면서 반대쪽도 필요해졌다.
+    """
+    for case in _every_labelled_case():
+        response = analyze_fraud(case.request())
+        floor = score_floor_for_level(response.risk_level)
+        ceiling = score_ceiling_for_level(response.risk_level)
+
+        assert floor <= response.risk_score <= ceiling, case.case_id
