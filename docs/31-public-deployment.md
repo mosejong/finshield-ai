@@ -873,6 +873,7 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 | ~~2026-08-26~~ | ~~`v0.4.0`~~ | **올라간 적 없음** | 2026-09-04 확인 — 바로 아래 |
 | 2026-09-04 | `v0.5.0` | 3-6 재배포 | 근거 없는 문장에 `status: not_asked`, held-out v1.0 `fh-806` 에 `level: high` + 신호 2종, 실제 관리비 고지에 `level: low`, `verify_public_deployment` 27/27 |
 | ~~2026-09-04~~ | ~~`v0.6.0`~~ | **올라간 적 없음** | 2026-09-04 확인 — 아래 `v0.6.0 도 올라가지 않았다` |
+| 2026-09-04 | `v0.7.0` | 3-6 재배포 | 프로브 셋 다 통과 — 데모 문장 `status: ready` 3/3(`gemini-3.6-flash`, 263·261·232자, 8.4~12.8초), 관리비 문장 `not_asked`, 예방 안내문 `level: low`·`score: 0`. 데모 `/analyze` `high`·70점·신호 4·유형 3·행동 5·근거 3. `images` 의 IMAGE ID 가 12절 대장 digest 와 일치(`a140a7a49b91` / `c99bb50e1ede`). `verify_public_deployment` 27/27 |
 
 `v0.4.0` 줄에는 **취소선을 쳤다.** 2026-08-26 에 이 줄을 미리 적어 두고 확인 칸을
 `*(배포 후 채운다)*` 로 비워 두었는데, 2026-09-04 에 밖에서 찍어 보니 그 배포는
@@ -1070,6 +1071,27 @@ curl -s -X POST https://finshield-ai.duckdns.org/api/proxy/analyze \
 `v0.4.0` 이상이라는 것까지는 알았지만 그 위 세 릴리스는 구분하지 못했다.
 
 한글 payload 는 **UTF-8 파일에 담아 `@file` 로 보낸다.**
+
+#### 2026-09-04 — `v0.7.0` 이 올라갔다
+
+위 표를 그대로 찍었다. 세 칸이 다 왼쪽이다.
+
+| 프로브 | 나온 값 | 가리키는 경계 |
+|---|---|---|
+| 1. 데모 문장 → `/explanation` | `status: ready` · `gemini-3.6-flash` · 263자 (3회 반복 263·261·232자, 8.4~12.8초) | `v0.6.0` 이상 ✅ |
+| 2. 관리비 문장 → `/explanation` | `not_asked` (0.48초) | `v0.4.0` 이상 ✅ |
+| 3. 예방 안내문 → `/analyze` | `level: low` · `score: 0` (0.55초) | `v0.7.0` 이상 ✅ |
+
+**1번은 같은 날 오전에 4회 전부 `failed` 였다.** 같은 입력, 같은 URL 이다. 바뀐 것은 올라간 이미지 하나뿐이다.
+
+곁들여 찍은 것:
+
+- 데모 문장 `/analyze` → `high` · 70점 · 신호 4 · 유형 3 · 행동 5 · 근거 3 — 로컬 `main` 과 값이 같다.
+- held-out `fh-061` → `low` · 0점. 오전에는 이 자리가 `medium` · 35점이었다 (PR #117 이 고친 것).
+- `/` `200` 0.69초, `verify_public_deployment --domain finshield-ai.duckdns.org` **27/27**, 실패 0.
+- `$DC images` 의 IMAGE ID 가 `a140a7a49b91`(backend) · `c99bb50e1ede`(web) 로 12절 대장의 digest 앞 12자리와 일치한다. **태그가 아니라 digest 로 확인한 것이다.**
+
+`migration-1` 은 `Exited` 로 정상 종료했다. `v0.5.0..v0.7.0` 에 `migrations/` 변경이 없으므로 할 일이 없는 것이 맞다.
 
 ### 되돌릴 대상
 
