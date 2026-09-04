@@ -239,19 +239,53 @@ def _normalize(text: str) -> str:
     return _NON_WORD.sub("", text)
 
 
+def _boundary_suffixes(text: str) -> list[str]:
+    """공백에서 끊어지는 뒷조각들. 자기 자신이 첫 번째다.
+
+    `_ORG_PATTERN` 은 기관 꼬리 **앞의 어절 세 개까지** 함께 삼킨다. 이름 앞에
+    보통 낱말이 오면("필요하다면 보이스피싱 통합신고대응센터") 잡힌 덩어리가
+    근거에 없는 문자열이 되고, 근거에 **있는** 기관을 부른 문장이 지어낸 것으로
+    거부된다. 앞 어절을 하나씩 떼어 보는 것이 그것을 되돌린다.
+    """
+    parts = text.split()
+    return [" ".join(parts[i:]) for i in range(len(parts))] or [text]
+
+
+def _grounded_organizations(grounded_text: str) -> set[str]:
+    """근거가 이름을 댄 기관. 앞 어절이 붙지 않은 **온전한 이름**만 담는다."""
+    return {
+        name
+        for match in _ORG_PATTERN.findall(grounded_text)
+        if (name := _normalize(match))
+    }
+
+
 def _ungrounded_organizations(explanation: str, grounded_text: str) -> set[str]:
     """설명이 이름을 댄 기관 중 근거에 없는 것.
 
     문자 원문은 여기 들어가지 않는다. 사칭 문자가 "국세청" 이라고 적었다는 사실이
     그 기관을 안내해도 된다는 뜻은 아니기 때문이다.
+
+    통과하는 길은 둘이고, **둘 다 좁다.**
+
+    1. 잡힌 덩어리 전체가 근거 안에 있다. 표기가 달라도(`경찰청: 사이버범죄
+       신고시스템` 대 `경찰청 사이버범죄 신고시스템`) 정규화가 흡수한다.
+    2. 덩어리의 **어절 경계 뒷조각 중 하나가 근거의 온전한 기관 이름과 같다.**
+
+    2번이 없으면 이름 앞에 낱말 하나만 와도 정당한 설명이 죽는다. 2번을 부분
+    문자열이 아니라 **일치**로 둔 것은 그 반대쪽 값이다 — 부분 문자열로 열면
+    "국세청 신고시스템" 이 근거의 "사이버범죄 신고시스템" 을 빌려 통과한다.
+    앞에 무엇이 붙어 있든 뒷조각이 근거의 이름과 **같아야** 한다.
     """
     grounded = _normalize(grounded_text)
+    named = _grounded_organizations(grounded_text)
     return {
         name
         for match in _ORG_PATTERN.findall(explanation)
         if (name := _normalize(match))
         and not name.endswith(_ORG_GENERIC_TAILS)
         and name not in grounded
+        and not any(_normalize(part) in named for part in _boundary_suffixes(match))
     }
 
 
