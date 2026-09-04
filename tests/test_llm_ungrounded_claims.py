@@ -147,7 +147,10 @@ def test_legitimate_explanations_survive_the_grounding_checks(output: str) -> No
 # --- 잡아야 하는 문장 -------------------------------------------------------
 
 FABRICATED_OUTPUTS = [
-    # 법령. 설명에 조문 번호나 법률 이름이 필요한 경우가 없다.
+    # 법령. **아래 둘은 이 근거(`GROUNDED`)에 법령이 없어서** 걸린다.
+    # "조문이 필요한 경우가 없다" 는 전제로 무조건 거부하던 판이 있었고,
+    # 그 판이 근거가 법령을 달고 온 사건을 죽였다 — 아래
+    # `GROUNDED_WITH_LAW` 묶음이 그 값이다.
     (
         ExplanationOutcome.REJECTED_LAW_CITATION,
         "전기통신금융사기 피해 방지 특별법 제17조에 따라 즉시 지급정지를 신청하실 수 있습니다.",
@@ -259,6 +262,12 @@ STILL_PASSING = [
     "청년 안심 전환 대출로 갈아타시면 이자 부담을 줄일 수 있습니다.",
     # 지어낸 절차. 숫자도 기관도 법령도 없다.
     "통신사 대리점에서 명의도용 차단 서비스를 무료로 신청할 수 있습니다.",
+    # 법률 이름을 **띄어 쓴** 문장. `_LAW_PATTERN` 의 `[가-힣]{2,}` 는 공백을
+    # 넘지 못하므로 꼬리가 이름에서 떨어지면 아예 잡히지 않는다. 붙여 쓴
+    # "개인정보보호법" 은 잡히고 띄어 쓴 "정보통신망 이용법" 은 안 잡힌다.
+    # 꼬리만으로 잡으러 가면 방법·수법·불법이 함께 죽으므로, 지금은 이쪽을
+    # 열어 두고 여기 적어 둔다.
+    "정보통신망 이용법 위반으로 처벌될 수 있습니다.",
 ]
 
 
@@ -326,3 +335,80 @@ def test_evidence_punctuation_does_not_hide_a_grounded_organization() -> None:
             "경찰청 사이버범죄 신고시스템에 신고하실 수 있습니다.",
             grounded="- 송금을 요구하는 표현",
         )
+
+
+# --- 근거가 법령을 달고 온 사건 ---------------------------------------------
+#
+# 실제 응답 모양이다. 계좌·인증 접근권을 넘긴 사건에 엔진이 붙이는 출처 줄이고,
+# `build_grounded_text` 가 이 줄을 그대로 프롬프트에 넣는다. 즉 **모델은 이
+# 법령을 읽고 답한다.** 무조건 거부하던 판은 그 답을 거부했다.
+
+GROUNDED_WITH_LAW = "\n".join(
+    [
+        "- 인증정보 요구",
+        "- (1순위) 인증정보와 금융 접근수단을 공유하지 마세요 — 비밀번호, OTP,"
+        " 통장, 카드를 넘기면 계좌와 자금에 접근할 수 있습니다.",
+        "- 경찰청: 보이스피싱 통합신고대응센터 1394 안내",
+        "- 국가법령정보센터: 전자금융거래법 제6조 접근매체의 선정과 사용 및 관리",
+    ]
+)
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        # 근거가 준 법률 이름과 조문 번호를 그대로 되읽는다.
+        "전자금융거래법 제6조는 접근매체를 남에게 넘기지 않도록 정하고 있습니다.",
+        "비밀번호와 OTP 를 넘기는 것은 전자금융거래법이 다루는 접근매체 양도입니다.",
+        # 법률 이름만, 조문 번호만 되읽는 경우도 각각 통과해야 한다.
+        "제6조가 말하는 접근매체에 통장과 카드가 포함됩니다.",
+    ],
+)
+def test_a_statute_the_evidence_supplied_survives(output: str) -> None:
+    """`fh-1135` 가 이것으로 죽었다 (홀드아웃 v1.3, 2026-09-04).
+
+    주 모델과 대체 모델이 **같은 이유로** 걸렸으므로 그 사건은 설명이 아예
+    없었다. 대체 모델은 다른 모델일 뿐 다른 규칙이 아니라서, 규칙이 틀리면
+    둘을 세워 둔 것이 아무 도움이 되지 않는다.
+    """
+    assert _check(output, grounded=GROUNDED_WITH_LAW) == output
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        # 조문 번호만 빌렸다. 법률 이름이 근거에 없다.
+        "예금자보호법 제6조에 따라 피해액이 보전됩니다.",
+        # 법률 이름만 빌렸다. 조문 번호가 근거에 없다.
+        "전자금융거래법 제9조에 따라 금융회사가 손해를 배상합니다.",
+        # 이름을 줄여 썼다. 부분 문자열 대조라 붙지 않는다.
+        "전기통신금융사기특별법에 따라 지급정지를 신청할 수 있습니다.",
+        # 근거에 있는 법령과 아무 상관이 없다.
+        "개인정보보호법 위반으로 처벌될 수 있습니다.",
+    ],
+)
+def test_a_statute_the_evidence_never_supplied_is_still_rejected(output: str) -> None:
+    """넓힌 것은 **근거가 준 것**까지다. 빌려 쓰는 길은 열지 않았다.
+
+    법률 이름과 조문 번호를 따로 보는 이유가 위 두 줄이다. 하나만 봤다면 둘 중
+    하나는 통과했을 것이고, 사용자는 없는 조항을 근거로 읽게 된다.
+    """
+    with pytest.raises(LlmOutputRejected) as rejected:
+        _check(output, grounded=GROUNDED_WITH_LAW)
+    assert rejected.value.outcome is ExplanationOutcome.REJECTED_LAW_CITATION
+
+
+def test_the_law_check_widened_and_never_narrowed() -> None:
+    """근거에 법령이 없으면 예전과 똑같이 전부 거부된다.
+
+    이 변경으로 **거부가 늘어나는 입력은 없다.** 통과하던 문장은 전부 그대로
+    통과하고, 죽던 문장 중 근거가 준 법령을 되읽은 것만 살아난다. 안전 검사를
+    넓힐 때 이 방향을 확인해 두지 않으면, 넓힌 값을 나중에 재게 된다.
+    """
+    quoting = "전자금융거래법 제6조는 접근매체를 남에게 넘기지 않도록 정하고 있습니다."
+
+    assert _check(quoting, grounded=GROUNDED_WITH_LAW) == quoting
+
+    with pytest.raises(LlmOutputRejected) as rejected:
+        _check(quoting, grounded=GROUNDED)
+    assert rejected.value.outcome is ExplanationOutcome.REJECTED_LAW_CITATION

@@ -1,0 +1,988 @@
+{
+  "call_policy": "skip_when_no_evidence",
+  "cases": [
+    {
+      "attempts": [],
+      "case_id": "fh-1101",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1102",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1103",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1104",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1105",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1106",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1107",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1108",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7726.02800000459,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1109",
+      "chars": 259,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1110",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 3394.068200024776,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1111",
+      "chars": 239,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 9160.937000007834,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1112",
+      "chars": 190,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 8227.10439999355,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1113",
+      "chars": 201,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7487.623499997426,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1114",
+      "chars": 138,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7670.146199990995,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1115",
+      "chars": 203,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7733.362399972975,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1116",
+      "chars": 200,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 3060.1619000080973,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1117",
+      "chars": 285,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 6239.677599980496,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1118",
+      "chars": 188,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 8471.707299991976,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1119",
+      "chars": 216,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7969.81959999539,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1120",
+      "chars": 230,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 2349.661400017794,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1121",
+      "chars": 198,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7731.44110001158,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1122",
+      "chars": 196,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 6811.550799990073,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1123",
+      "chars": 198,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7958.123200049158,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1124",
+      "chars": 224,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1125",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1126",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7988.362899981439,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1127",
+      "chars": 168,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 8680.815700034145,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1128",
+      "chars": 231,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7310.677100031171,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1129",
+      "chars": 211,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 2639.513000031002,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1130",
+      "chars": 202,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1131",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1132",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1133",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1134",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 2991.731600021012,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1135",
+      "chars": 212,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7791.6691999998875,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1136",
+      "chars": 228,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 8658.71629997855,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1137",
+      "chars": 248,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 6527.851200022269,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1138",
+      "chars": 212,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1139",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1140",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1141",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 2386.1800999729894,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1142",
+      "chars": 266,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 9215.250100009143,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1143",
+      "chars": 261,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 8018.917999987025,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1144",
+      "chars": 278,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1145",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1146",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 2220.1823000214063,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1147",
+      "chars": 252,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 6709.08410003176,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1148",
+      "chars": 212,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7649.6672999928705,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1149",
+      "chars": 214,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 8676.061899983324,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1150",
+      "chars": 202,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1151",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1152",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1153",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7220.15680000186,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1154",
+      "chars": 226,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 2498.235700011719,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1155",
+      "chars": 207,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 8881.406100001186,
+          "model": "gemini-3.6-flash",
+          "outcome": "rejected_contradicts_verdict"
+        },
+        {
+          "duration_ms": 2196.8720000004396,
+          "model": "gemini-3.1-flash-lite",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1156",
+      "chars": 273,
+      "model": "gemini-3.1-flash-lite",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1157",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1158",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1159",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1160",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 6930.532599973958,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1161",
+      "chars": 205,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7264.982100052293,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1162",
+      "chars": 225,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 8571.05239998782,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1163",
+      "chars": 251,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7541.555400006473,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1164",
+      "chars": 243,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7603.355300030671,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1165",
+      "chars": 236,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 7795.746099960525,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1166",
+      "chars": 207,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 10273.262700007763,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1167",
+      "chars": 209,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 8275.948200025596,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1168",
+      "chars": 182,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 3145.588500017766,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1169",
+      "chars": 252,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 9232.404500013217,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1170",
+      "chars": 281,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 8947.883699962404,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1171",
+      "chars": 235,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 8381.758700008504,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1172",
+      "chars": 166,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "medium"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1173",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1174",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1175",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1176",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 10134.071499982383,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1177",
+      "chars": 240,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 3217.7555999951437,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1178",
+      "chars": 248,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1179",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1180",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1181",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [],
+      "case_id": "fh-1182",
+      "chars": null,
+      "model": null,
+      "outcome": "not_asked_no_evidence",
+      "risk_level": "low"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 2826.323599962052,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1183",
+      "chars": 286,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    },
+    {
+      "attempts": [
+        {
+          "duration_ms": 3481.241900008172,
+          "model": "gemini-3.6-flash",
+          "outcome": "ok"
+        }
+      ],
+      "case_id": "fh-1184",
+      "chars": 272,
+      "model": "gemini-3.6-flash",
+      "outcome": "ok",
+      "risk_level": "high"
+    }
+  ],
+  "contracts": [
+    "gemini-3.6-flash",
+    "gemini-3.1-flash-lite"
+  ],
+  "dataset_id": "fraud_holdout_v1.3",
+  "dataset_sha256": "42c1e46dbde397f5018a404715fee5ce5304fdbef6d41b0122d5a6eb4844e191",
+  "max_chars": 600,
+  "probed_at": "2026-09-04T05:24:44+00:00",
+  "prompt_id": "fraud_explanation_v2",
+  "prompt_sha256": "c7532280daf58884020ccda3e025c3ff2c5e3ad2b23c6881555d4a561b9ed76b",
+  "provider": "google_ai_studio",
+  "temperature": 0.0
+}
