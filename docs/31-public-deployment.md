@@ -153,18 +153,44 @@ git diff --name-only <직전에_배포한_SHA>..<새_태그> -- migrations/
 
 비어 있으면 코드만 바뀐 것이다.
 
-```bash
-export FINSHIELD_IMAGE_TAG=v0.3.0
-export FINSHIELD_DOMAIN=finshield-ai.duckdns.org
-export FINSHIELD_ACME_EMAIL=<갱신 실패를 실제로 읽을 주소>
+**override 목록을 한 번 정하고 변수에 담는다.** 이 절차에서 사고가 나는 자리는
+`pull` 도 `up -d` 도 아니고 **`-f` 를 하나 빠뜨리는 것**이다. 세 줄에 같은 목록을
+손으로 세 번 쓰면 반드시 한 번은 다르게 쓴다.
 
-docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml pull
-docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml up -d
-docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml images
+```bash
+cd ~/finshield-ai
+
+# .env 의 태그 한 줄만 바꾼다. 줄이 없으면 추가한다
+if grep -q '^FINSHIELD_IMAGE_TAG=' .env; then
+  sed -i 's/^FINSHIELD_IMAGE_TAG=.*/FINSHIELD_IMAGE_TAG=v0.5.0/' .env
+else
+  echo 'FINSHIELD_IMAGE_TAG=v0.5.0' >> .env
+fi
+grep '^FINSHIELD_IMAGE_TAG=' .env
+
+DC="docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml -f compose.gemini.yaml"
+
+$DC pull
+$DC up -d
+$DC images
 ```
 
-`-f compose.deploy.yaml` 을 빠뜨리면 VM 이 빌드를 시작하고 OOM 으로 조용히 죽는다
-(11-1). 마지막 `images` 로 digest 를 확인한다 — 태그는 옮겨 붙지만 digest 는 아니다.
+`.env` 는 **`grep` 으로 그 한 줄만 본다.** 같은 파일에 DB 비밀번호와 프로필 암호화
+키가 있어서 `cat` 하지 않는다. 2절의 나머지 두 값(`FINSHIELD_DOMAIN`,
+`FINSHIELD_ACME_EMAIL`)은 이미 떠 있는 스택이라면 `.env` 에 있다 — 없으면 compose 가
+`:?` 로 거부하므로 애초에 지금 떠 있지 않았을 것이다.
+
+빠뜨리면 안 되는 두 개, 그리고 각각 무엇이 되는지:
+
+| 빠뜨린 것 | 일어나는 일 |
+|---|---|
+| `-f compose.deploy.yaml` | VM 이 **빌드를 시작하고** OOM 으로 조용히 죽는다 (11-1) |
+| `-f compose.gemini.yaml` | 키 secret 이 사라져 설명 계층이 `status: off` 로 떨어진다. 판정은 살아 있어서 화면상으로는 멀쩡해 보인다 |
+
+두 번째가 더 위험하다. 첫 번째는 죽어서 알게 되고, 두 번째는 **안 죽어서 모른다.**
+
+마지막 `images` 로 digest 를 확인한다 — 태그는 옮겨 붙지만 digest 는 아니다.
+그 값을 12절 릴리스 대장의 값과 대조하면 "무엇이 떠 있는가" 에 답이 된다.
 
 #### 설명 계층을 켜려면 키 파일이 서버에 있어야 한다
 
@@ -796,6 +822,8 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 | `v0.3.0` | `ec43f86` | 2026-08-25 | `finshield-web` | `sha256:99ebf6c6732cf1f4187d0a9e09e16b77960ba8a3d51c33a0964b8c7aebf79d1e` |
 | `v0.4.0` | `3511c3d` | 2026-08-26 | `finshield-backend` | `sha256:98af77a9a8177e18905ab5ffb346e6cb85469ffe00257b2dfe74ac19cc468146` |
 | `v0.4.0` | `3511c3d` | 2026-08-26 | `finshield-web` | `sha256:1a259cd8e30980590e29ffd301450f992c06ba13c2a6cbede80ac7b9aacd2897` |
+| `v0.5.0` | `6777a74` | 2026-09-04 | `finshield-backend` | `sha256:11426233598f5bdfeddc1993e53278320f344dc0da3566920a380f0230fe182f` |
+| `v0.5.0` | `6777a74` | 2026-09-04 | `finshield-web` | `sha256:fd95124c5a958667c376c0603702a21e9bd007e044cc6e137a96e07a5f45209a` |
 
 `v0.1.0` 은 **태그로 만든 첫 릴리스**다. 그 이전 두 번은 `workflow_dispatch` 라
 `sha-<커밋>` 태그만 붙었다.
@@ -838,15 +866,71 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 |---|---|---|---|
 | 2026-08-18 | `sha-4457f0e…` | 3-4 최초 기동 | — |
 | 2026-08-25 | `v0.3.0` | 3-6 재배포 | `/check/deposit` `200`, `POST /api/proxy/analyze` `200`, `.../explanation` `200 status: ready` |
-| 2026-08-26 | `v0.4.0` | 3-6 재배포 | *(배포 후 채운다)* `.../explanation` 근거 없는 문장에 `status: not_asked` |
+| ~~2026-08-26~~ | ~~`v0.4.0`~~ | **올라간 적 없음** | 2026-09-04 확인 — 바로 아래 |
+| 2026-09-04 | `v0.5.0` | 3-6 재배포 | 근거 없는 문장에 `status: not_asked`, held-out v1.0 `fh-806` 에 `level: high` + 신호 2종, 실제 관리비 고지에 `level: low`, `verify_public_deployment` 27/27 |
 
-`v0.4.0` 줄은 **아직 확인 칸이 비어 있다.** 이미지가 만들어졌다는 것과 올라갔다는
-것이 다르다는 것이 이 표가 존재하는 이유이므로, 밖에서 찍어 보기 전에는 채우지
-않는다.
+`v0.4.0` 줄에는 **취소선을 쳤다.** 2026-08-26 에 이 줄을 미리 적어 두고 확인 칸을
+`*(배포 후 채운다)*` 로 비워 두었는데, 2026-09-04 에 밖에서 찍어 보니 그 배포는
+일어나지 않았다. 이미지는 만들어졌고 위 대장에 digest 도 있지만 VM 은 받지 않았다.
+
+배운 것을 한 줄로: **확인 칸을 "배포 후 채운다" 로 비워 두면, 배포가 빠진 줄과
+확인만 아직 안 한 줄이 구분되지 않는다.** 앞으로 이 표에는 **밖에서 찍어 본 뒤에만
+줄을 추가한다.** 미리 적어 둔 줄은 대장이 아니라 계획이고, 계획을 대장에 적으면
+대장이 하는 일이 없어진다.
 
 `v0.1.0` 과 `v0.2.0` 은 **이 표에 줄이 없다.** 만들어졌지만 배포된 적이 없다.
 줄이 없는 것이 이 표가 하는 일이다 — 위 대장만 보면 세 릴리스가 나란히
 있으니 다 올라간 것처럼 읽힌다.
+
+#### 공개 URL 이 실제로 돌리고 있던 것 (2026-09-04 확인)
+
+제출 마감 사흘 전에 다시 찍었다. 이번에는 릴리스마다 **처음 생긴 경로**를 찍는
+8월 25일 방법이 통하지 않는다 — `v0.4.0` 과 `v0.5.0` 은 새 경로를 만들지 않았고
+같은 경로의 **답이 달라졌을** 뿐이다. 그래서 응답 모양을 찍었다.
+
+| 찍은 것 | 받은 답 | 무엇을 말해 주나 |
+|---|---|---|
+| `POST /api/proxy/analyze/explanation`<br>`{"text":"이번 달 관리비 고지서가 발송되었습니다."}` | `status: ready` + 문장 | **`v0.4.0` 이전.** `v0.4.0` 은 근거가 없으면 모델을 안 부르고 `not_asked` 를 돌려준다 |
+| `POST /api/proxy/analyze`<br>held-out v1.0 `fh-806` 본문 | `level: low`, `signals: []`, `fraudTypes: []` | **PR #109 이전.** 지금 코드는 이 문장에 신호를 켠다 |
+
+두 검사 다 **유료 호출을 쓰지 않는다.** 첫 줄은 `not_asked` 가 돌아오면 모델을
+부르지 않은 것이고, 거꾸로 `ready` 가 돌아왔다는 것 자체가 **근거 하나 없는 문장에
+유료 호출이 나가고 있었다**는 뜻이다. 이 배포 지연은 화면이 낡았다는 문제만이 아니라
+**돈이 새고 있었다**는 문제이기도 했다.
+
+`v0.3.0` 이후 `main` 에 커밋 40개가 들어왔다. 그중 사용자가 보는 답이 바뀌는 것은
+설명 프롬프트 v2, 근거 없을 때 모델 안 부르기, 출력 검증기(grounding checks),
+결제 목적지 게이트다.
+
+**이 표가 두 번째로 같은 일을 잡았다.** 8월 25일에는 `v0.1.0`·`v0.2.0` 이 만들어만
+지고 7일 동안 안 올라간 것을 잡았고, 이번에는 `v0.4.0` 이 아흐레다. 두 번 다 원인이
+같다 — 릴리스는 태그 push 로 자동인데 재배포는 사람이 Cloud Shell 에서 손으로
+하는 일이라, **자동인 쪽만 일어나고 손으로 하는 쪽이 빠진다.** 대장을 두 개로
+나눠 둔 것이 이 격차를 보이게 하는 유일한 장치다.
+
+#### 2026-09-04 재배포 (`v0.3.0` → `v0.5.0`)
+
+열흘 만에 올렸다. 마이그레이션도 compose 변경도 없어 **순수 이미지 교체**였다
+(`git diff --name-only v0.3.0..main -- migrations/ alembic.ini` 가 비어 있고,
+`compose*.yaml` 과 두 `Dockerfile` 도 마찬가지다). 백엔드가 읽는 환경변수에도
+새로 생긴 것이 없다.
+
+`pull` 이 127초, 스택 전체 교체가 134초. `migration` 은 이미 head 라 no-op 으로
+끝났다. `images` 의 IMAGE ID 가 12절 릴리스 대장의 digest 앞 12자리와 일치했다 —
+`11426233598f`(backend), `fd95124c5a95`(web).
+
+밖에서 찍은 것:
+
+| 찍은 것 | 받은 답 | 뜻 |
+|---|---|---|
+| 근거 없는 관리비 문장 → `/explanation` | `status: not_asked`, `text: null` | `v0.4.0` 이상. **모델을 안 부른다** |
+| held-out v1.0 `fh-806` → `/analyze` | `level: high`, 신호 `authority_impersonation`·`money_transfer_request` | #109 이상. 열흘 전에는 `low` + `signals: []` 였다 |
+| 실제 관리비 고지(`납부 기한` 포함) | `level: low`, 신호 없음 | 결제 목적지 게이트가 **정상 쪽에서 값을 치르지 않았다** |
+| `verify_public_deployment --domain finshield-ai.duckdns.org` | 27/27, 실패 0 | TLS 73일 남음(만료 2026-11-16), 내부 포트 셋 다 닫힘 |
+
+세 번째 줄이 이 배포에서 제일 확인하고 싶었던 것이다. #109 는 셋 안에서 공짜로
+보였던 어휘 추가를 셋 밖의 진짜 고지 문자로 반증하고 목적지 조건으로 바꾼
+회차였는데, 그 판단이 운영에서도 같은지는 여기서만 확인된다.
 
 2026-08-25 재배포에서 실제로 일어난 일을 순서대로 적어 둔다. 이미지 교체
 자체는 한 번에 됐고, 시간을 쓴 것은 그다음이다.
