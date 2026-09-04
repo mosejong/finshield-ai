@@ -447,13 +447,48 @@ HIGH_RISK_SCORE_THRESHOLD = 70
 MEDIUM_RISK_SCORE_THRESHOLD = 35
 
 
+def has_nothing_to_show(signals: list[RiskSignal], state: UserState) -> bool:
+    """이 응답이 사용자에게 보여 줄 것이 하나도 없는가.
+
+    canonical 신호가 없으면 유형도(`classify_fraud_types` 는 신호에서만
+    유형을 만든다) 행동도 근거도 따라서 빈다. 거기에 상태까지
+    `received_only` 면 "이미 한 일" 도 없다. 화면이 통째로 비는 조건이다.
+
+    등급과 점수가 **같은 조건을 보게** 하려고 술어로 뺐다. 한쪽만 고치면
+    등급은 내려가는데 점수는 남아 모순이 방향만 바뀐다.
+    """
+    return not signals and state is UserState.RECEIVED_ONLY
+
+
 def determine_risk_level(
     score: int, signals: list[RiskSignal], state: UserState
 ) -> str:
     """점수·신호·사용자 상태 중 가장 높은 위험 수준을 채택한다.
 
     세 근거는 서로 독립적이며 어느 하나도 다른 하나를 낮추지 못한다.
+    예외는 하나뿐이고 아래에 적었다 - **근거가 하나도 없을 때**다.
     """
+    # v1.3. canonical 신호도 없고 사용자가 한 일도 없으면 화면에 실릴 것이
+    # 하나도 없다. 유형은 신호에서만 나오고(`classify_fraud_types`),
+    # 행동도 근거도 그 뒤를 따르므로 전부 빈다. 그 상태에서 등급을 만들 수
+    # 있는 것은 `LEGACY_RULES` 점수 하나뿐인데, 그것은 판단 계층이 아니라
+    # canonical 이전의 **호환 어휘표**다("어휘는 늘리지 않되").
+    #
+    # 그 하나만으로 medium 을 선언하면 사용자는 `주의` 라는 머리말과
+    # `명시적인 사기 위험 신호는 확인되지 않았습니다` 라는 본문을 같은
+    # 화면에서 함께 읽고, 할 일은 한 줄도 받지 못한다. held-out `fh-061`
+    # 이 그 모양이었다 - "통장이나 체크카드를 빌려주면 본인도 처벌받을 수
+    # 있습니다" 는 계좌 대여를 **말리는** 예방 안내문인데, 어휘표가
+    # `account_access` 35점을 켜서 medium 이 됐다. canonical 규칙은 같은
+    # 문장을 보고 아무것도 켜지 않았다. 정확한 쪽이 조용하고 거친 쪽이
+    # 혼자 말한 것이다.
+    #
+    # 이것은 근거 하나가 다른 근거를 낮추는 것이 아니다. 근거가 하나도
+    # 없을 때 호환 계층이 **혼자 등급을 선언하지 못하게** 하는 것이다.
+    # 안전 방향으로 잃는 것도 없다 - 이 자리에서 medium 이 사용자에게
+    # 말해 줄 수 있는 행동이 애초에 없다.
+    if has_nothing_to_show(signals, state):
+        return "low"
     if score >= HIGH_RISK_SCORE_THRESHOLD:
         signal_level = "high"
     elif score >= MEDIUM_RISK_SCORE_THRESHOLD:
@@ -491,6 +526,28 @@ def score_floor_for_level(level: str) -> int:
     if level == "medium":
         return MEDIUM_RISK_SCORE_THRESHOLD
     return 0
+
+
+def score_ceiling_for_level(level: str) -> int:
+    """그 등급에서 점수가 넘을 수 없는 값은 얼마인가.
+
+    v1.3. `score_floor_for_level` 은 점수를 **올리기만** 한다. 등급이
+    점수보다 높은 경우만 있었기 때문이다 - 등급은 점수·신호·상태 중
+    최댓값이니 점수가 등급을 앞지를 수 없었다.
+
+    `determine_risk_level` 의 예외 하나가 그 전제를 깼다. 근거가 하나도
+    없을 때 legacy 점수를 무시하고 low 를 돌려주므로, 점수 35 와 등급
+    `낮음` 이 같은 응답에 실린다. **v0.8 이 고친 모순이 방향만 바꿔
+    되살아난 것이다.** 등급을 내렸으면 점수도 같이 내려야 한다.
+
+    다른 자리에서는 아무것도 하지 않는다 - 예외가 없으면 등급은 언제나
+    점수의 띠 이상이고, 이 상한은 그 띠의 끝이다.
+    """
+    if level == "high":
+        return 100
+    if level == "medium":
+        return HIGH_RISK_SCORE_THRESHOLD - 1
+    return MEDIUM_RISK_SCORE_THRESHOLD - 1
 
 
 def select_actions(

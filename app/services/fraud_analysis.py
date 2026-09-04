@@ -1,6 +1,8 @@
 from app.domain.fraud.classification import classify_fraud_types
 from app.domain.fraud.policy import (
     determine_risk_level,
+    has_nothing_to_show,
+    score_ceiling_for_level,
     score_floor_for_level,
     select_actions,
 )
@@ -79,9 +81,18 @@ def analyze_fraud(request: AnalyzeRequest) -> AnalyzeResponse:
     score = baseline_score(legacy_signals)
     fraud_types = classify_fraud_types(canonical_signals, request.text)
     level = determine_risk_level(score, canonical_signals, request.state)
-    # 등급을 정한 **뒤에** 점수를 그 띠까지 올린다. 순서가 중요하다 - 올린
-    # 점수를 다시 등급 계산에 넣으면 자기 자신을 근거로 삼는다.
-    score = max(score, score_floor_for_level(level))
+    if has_nothing_to_show(canonical_signals, request.state):
+        # 등급을 만들지 못한 점수는 표시도 하지 않는다. 여기서 상한으로
+        # 깎기만 하면 34 가 남는데, 아무것도 못 찾은 문장에 `낮음` 띠의
+        # 꼭대기를 주는 것은 정직한 값이 아니다.
+        score = 0
+    # 등급을 정한 **뒤에** 점수를 그 띠 안으로 옮긴다. 순서가 중요하다 -
+    # 옮긴 점수를 다시 등급 계산에 넣으면 자기 자신을 근거로 삼는다.
+    # 상한은 지금 어느 입력에서도 걸리지 않는다. 등급을 내리는 예외를
+    # 뒤에 또 만들면서 점수를 잊는 경우를 위해 남겨 둔다.
+    score = min(
+        max(score, score_floor_for_level(level)), score_ceiling_for_level(level)
+    )
     actions = select_actions(canonical_signals, request.state, request.text)
     official_sources = sources_for_actions(actions)
     public_signals = project_public_signals(canonical_signals)
