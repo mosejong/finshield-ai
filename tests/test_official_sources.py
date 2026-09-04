@@ -6,12 +6,13 @@ health check 는 통과했다.
 """
 
 import json
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.clock import today_kst
 from app.domain.fraud.sources import (
     SOURCE_DATA_PATH,
     SOURCE_REVIEW_INTERVAL_DAYS,
@@ -42,19 +43,19 @@ def test_re_verifying_one_source_does_not_break_analysis(source_file) -> None:
     """링크 하나를 오늘 재확인해 날짜를 갱신해도 정상 동작해야 한다."""
     original, write = source_file
     records = [dict(record) for record in original]
-    records[0]["retrieved_at"] = date.today().isoformat()
+    records[0]["retrieved_at"] = today_kst().isoformat()
     write(records)
 
     catalog = load_official_sources()
 
-    assert catalog[records[0]["source_id"]].retrieved_at == date.today().isoformat()
+    assert catalog[records[0]["source_id"]].retrieved_at == today_kst().isoformat()
 
 
 def test_future_retrieved_at_is_rejected(source_file) -> None:
     """미래 날짜는 데이터 오류다."""
     original, write = source_file
     records = [dict(record) for record in original]
-    records[0]["retrieved_at"] = (date.today() + timedelta(days=1)).isoformat()
+    records[0]["retrieved_at"] = (today_kst() + timedelta(days=1)).isoformat()
     write(records)
 
     with pytest.raises(OfficialSourceDataError, match="future retrieved_at"):
@@ -84,7 +85,7 @@ def test_old_source_is_reported_stale_but_still_usable(source_file) -> None:
     """재확인 주기가 지나도 분석을 막지 않는다. 안전 안내를 끊는 쪽이 더 위험하다."""
     original, write = source_file
     records = [dict(record) for record in original]
-    stale_date = date.today() - timedelta(days=SOURCE_REVIEW_INTERVAL_DAYS + 1)
+    stale_date = today_kst() - timedelta(days=SOURCE_REVIEW_INTERVAL_DAYS + 1)
     records[0]["retrieved_at"] = stale_date.isoformat()
     write(records)
 
