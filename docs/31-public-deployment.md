@@ -826,6 +826,8 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 | `v0.5.0` | `6777a74` | 2026-09-04 | `finshield-web` | `sha256:fd95124c5a958667c376c0603702a21e9bd007e044cc6e137a96e07a5f45209a` |
 | `v0.6.0` | `ec59a9f` | 2026-09-04 | `finshield-backend` | `sha256:2260f03b106fecb38e09aee2c16d005dbff6da90ebfb07575550990bcaf96824` |
 | `v0.6.0` | `ec59a9f` | 2026-09-04 | `finshield-web` | `sha256:6d4783e4c3f6b2389053e3d695622788aecbf1789672bbe3f22fc20f3a9fa697` |
+| `v0.7.0` | `4a99418` | 2026-09-04 | `finshield-backend` | `sha256:a140a7a49b910c4613e53780cfd512e32e7cd42f411bcb4401a5452767c24c00` |
+| `v0.7.0` | `4a99418` | 2026-09-04 | `finshield-web` | `sha256:c99bb50e1edef4d2dc1fe4e64f662eb5691a6eb355c18f9d22358c9c152785f2` |
 
 `v0.1.0` 은 **태그로 만든 첫 릴리스**다. 그 이전 두 번은 `workflow_dispatch` 라
 `sha-<커밋>` 태그만 붙었다.
