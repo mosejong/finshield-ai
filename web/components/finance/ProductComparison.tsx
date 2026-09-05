@@ -6,6 +6,7 @@ import { ExternalLink } from "lucide-react";
 import { DisclaimerNote } from "@/components/common/DisclaimerNote";
 import { PRODUCT_FIELD_GROUPS, officialText } from "@/components/finance/ProductFacts";
 import { compareProducts } from "@/lib/api/products";
+import { productProviderLabel } from "@/lib/format/labels";
 import type { ProductComparisonResponse } from "@/lib/api/contracts";
 
 
@@ -56,7 +57,7 @@ export function ProductComparison({ productIds }: { productIds: string[] }) {
   return (
     <>
       <p className="mb-4 text-caption text-muted-foreground">
-        공식 기준월 {data.source_base_month} · 같은 snapshot에서 불러온 원문입니다.
+        {productProviderLabel(data.provider)} 공공데이터 · 공식 기준월 {data.source_base_month} · 같은 snapshot에서 불러온 원문입니다.
       </p>
 
       <div className="grid grid-cols-2 gap-3">

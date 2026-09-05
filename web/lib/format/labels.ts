@@ -64,6 +64,25 @@ export const FRAUD_TYPE_LABEL: Record<FraudType, string> = {
   isolation_coercion: "고립·확인 차단 유도",
 };
 
+/**
+ * 공식 상품 데이터를 제공한 기관. `app/clients/public_data_products.py` 의
+ * `PROVIDER_NAME` 과 같은 문자열을 받는다.
+ *
+ * 화면에 이미 나오는 `offering_institution` 은 **취급기관**(은행)이고 이것은
+ * **데이터 주체**다. 둘은 다른 기관이므로 함께 보여야 출처가 읽힌다.
+ */
+export const PRODUCT_PROVIDER_LABEL: Record<string, string> = {
+  financial_services_commission: "금융위원회",
+};
+
+/**
+ * 모르는 provider 는 원문 식별자를 그대로 돌려준다. 없는 기관명을 지어내는
+ * 것이 표시하지 않는 것보다 나쁘다.
+ */
+export function productProviderLabel(provider: string): string {
+  return PRODUCT_PROVIDER_LABEL[provider] ?? provider;
+}
+
 export function optionsOf<T extends string>(
   map: Record<T, string>,
 ): ReadonlyArray<{ value: T; label: string }> {
