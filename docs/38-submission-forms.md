@@ -467,7 +467,7 @@ AI 서비스**에 그대로 적용된다.
 | 전세보증금 위험 점검 | 만원 단위 입력, **세션 불필요 · 저장 안 함 · 외부 호출 없음 · LLM 없음** |
 | 재테크 기초 가이드 | 공식 금융교육 근거 기반. **입력·종목·매매 추천 없음** |
 | PWA | 설치 + **문자 앱 공유 시트 진입** (원문을 주소에 싣지 않도록 POST) + 오프라인 셸 |
-| 운영 | `/health`, `/health/live`, `/health/ready`, `/internal/metrics` |
+| 운영 | 공개 `/health`, `/health/live`, `/health/ready` · 내부 전용 `/internal/metrics` |
 | 보안·프라이버시 | 익명 세션 / HttpOnly·SameSite=Strict / DB 에는 SHA-256 해시만 / 미소유 자원 **404** / 필드 단위 암호화 / IP 기준 요청 한도 |
 
 ### 제외 (이번 MVP 범위 아님 — 5칸 제한사항에 다시 적음)
@@ -489,7 +489,7 @@ STT 음성 사기 대응, 화면 캡처·피싱 페이지 이미지 분석, 사�
 | F-06 | **목표 기반 상품 후보 제시** | 목표만으로 후보를 `potential_match`/`mismatch`/`needs_review` 로 분류. `POST /api/v1/recommendations` | `/products` | **구현 완료** |
 | F-07 | **재테크 기초 가이드** | 공식 금융교육 근거 기반 기초 가이드. 종목·매매 추천 없음. `GET /api/v1/guidance/wealth` | `/learn/wealth` | **구현 완료** |
 | F-08 | **PWA · 문자 앱 공유 진입** | 설치 지원, `share_target` 을 **POST** 로 두어 문자 원문이 URL 에 남지 않게 함, 오프라인 셸 | 전 화면, `/offline` | **구현 완료** |
-| F-09 | **상태·관측** | `GET /health`, `/health/live`, `/health/ready`, `/internal/metrics`. 로그는 카운트와 성공/실패만 기록 | — | **구현 완료** |
+| F-09 | **상태·관측** | 공개 `GET /health`, `/health/live`, `/health/ready`. `/internal/metrics` 는 내부 전용이라 공개 주소로 열지 않음. 로그는 카운트와 성공/실패만 기록 | — | **구현 완료** |
 | F-10 | **전세보증금 위험 점검** | 보증금·매매가·선순위 채권을 만원 단위로 받아 위험도 점검. `POST /api/v1/housing/deposit-risk`. **세션 불필요 · 저장 안 함 · 외부 호출 없음 · LLM 없음 · 빈 칸은 null** | `/check/deposit` | **구현 완료** |
 
 ---

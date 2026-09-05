@@ -51,7 +51,8 @@ FinShield AI — 첨부2 「2026 금융 AI Challenge 기능 명세서」 붙여�
 - 재테크 기초 가이드 : 공식 금융교육 근거 기반. 입력·종목·매매 추천 없음.
 - PWA : 설치, 문자 앱 공유 시트 진입(원문을 주소에 싣지 않도록 POST),
   오프라인 셸.
-- 운영 : /health, /health/live, /health/ready, /internal/metrics.
+- 운영 : 공개 /health, /health/live, /health/ready.
+  /internal/metrics 는 내부 전용이라 공개 주소로 열지 않는다.
 - 보안·프라이버시 : 익명 세션 / HttpOnly·SameSite=Strict 쿠키 / DB 에는
   SHA-256 해시만 / 미소유 자원 404 / 필드 단위 암호화 / IP 기준 요청 한도.
 
@@ -119,7 +120,8 @@ F-08. PWA · 문자 앱 공유 진입  [구현 완료]
 
 F-09. 상태·관측  [구현 완료]
   설명 : 상태 점검과 지표 노출. 로그는 카운트와 성공/실패만 기록한다.
-  API  : GET /health, /health/live, /health/ready, /internal/metrics
+  API  : GET /health, /health/live, /health/ready (공개)
+         GET /internal/metrics (내부 전용, 공개 주소 아님)
 
 F-10. 전세보증금 위험 점검  [구현 완료]
   설명 : 보증금·매매 시세·선순위 채권을 만원 단위로 받아 위험도를 점검한다.
