@@ -174,15 +174,20 @@ cd ~/finshield-ai
 - **길이 확인이 `chmod 400` 보다 먼저다.** 순서를 뒤집으면 비어 있다는 사실을
   확인할 권한이 그 시점에 사라진다.
 
-**처음 한 번은 스크립트부터 가져와야 한다.** 스크립트는 `v0.9.0` 에서 처음 생겼고
-VM 의 작업본은 그 이전 태그에 멈춰 있다 — 없는 파일은 실행할 수 없다.
+**처음 한 번은 스크립트부터 가져와야 한다.** VM 의 작업본은 스크립트가 생기기
+이전 태그에 멈춰 있다 — 없는 파일은 실행할 수 없다.
 
 ```bash
 cd ~/finshield-ai
 git fetch --tags
-git checkout v0.9.0 -- deploy/redeploy.sh
-./deploy/redeploy.sh v0.9.0
+git checkout v0.9.1 -- deploy/redeploy.sh
+./deploy/redeploy.sh v0.9.1
 ```
+
+**가져오는 태그와 배포하는 태그는 같아야 한다.** 스크립트는 작업본이 더러우면
+멈추는데, 이 두 줄이 정확히 작업본을 더럽힌다. 그래서 예외를 딱 하나 두었다 —
+**`deploy/redeploy.sh` 한 파일, 그리고 내용이 배포할 태그와 같을 때만.** 다른
+태그에서 가져오거나 손으로 고쳤으면 그대로 걸린다.
 
 **두 번째부터는 이 두 줄이 필요 없다.** 스크립트가 태그 전체를 checkout 하기
 때문이고, 바로 그때 **자기 자신도 함께 바뀐다.** bash 는 스크립트를 통째로 읽어
@@ -1015,6 +1020,8 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 | `v0.7.0` | `4a99418` | 2026-09-04 | `finshield-web` | `sha256:c99bb50e1edef4d2dc1fe4e64f662eb5691a6eb355c18f9d22358c9c152785f2` |
 | `v0.8.0` | `c64e199` | 2026-09-05 | `finshield-backend` | `sha256:3cf82928330fea3e082b83d9fe21ae08a51b3b350911fdc4614881cbb0629d77` |
 | `v0.8.0` | `c64e199` | 2026-09-05 | `finshield-web` | `sha256:cfe3eb9826b9d516bb138b9f6521238502cb022e604937c82a20707711a9272e` |
+| `v0.9.0` | `60adf09` | 2026-09-05 | `finshield-backend` | `sha256:a0fae15682800ee7aab18348da69f1990ec423cf4c244d5b904cf34c03134fae` |
+| `v0.9.0` | `60adf09` | 2026-09-05 | `finshield-web` | `sha256:7bb59525427d613dd23b80b062773d1fccbf1ce742d6d97ba69d7dc57066092c` |
 
 `v0.1.0` 은 **태그로 만든 첫 릴리스**다. 그 이전 두 번은 `workflow_dispatch` 라
 `sha-<커밋>` 태그만 붙었다.
@@ -1023,6 +1030,27 @@ CPU 를 볼 때는 `docker stats` 순간값이 아니라 누적 `TIME` 이나 `u
 그중 무엇이 실제로 공개 URL 에서 돌고 있었는지는 아래에서 따로 적는다. 이 둘을
 같은 줄에 적어 두면 "태그를 밀었으니 배포됐겠지" 로 읽히고, 실제로 그렇게 읽어서
 아래의 일이 났다.
+
+### 만들었지만 배포하지 않은 태그 — `v0.9.0`
+
+`v0.9.0` 의 이미지 두 개는 실제로 만들어졌고 위 대장에 그대로 남겨 둔다. 지우면
+**왜 건너뛰었는지가 같이 사라진다.**
+
+배포에 쓰지 않은 이유는 그 태그의 `deploy/redeploy.sh` 가 **자기 자신의 첫
+실행을 통과하지 못하기 때문**이다. 구멍이 둘이었고, 둘 다 스크립트를 실제로
+올리려고 명령을 적어 보다가 나왔다 — **코드가 초록인 것과 아무 상관이 없었다.**
+
+- 스크립트를 먼저 가져오는 `git checkout <태그> -- deploy/redeploy.sh` 가
+  작업본을 더럽히고, 스크립트의 "작업본에 손댄 것이 있다" 검사에 **자기 자신이
+  걸린다.**
+- digest 대조를 **체크아웃된 `docs/31`** 에서 했다. 그런데 digest 는 태그를 민
+  **뒤에** 만들어지므로 **어떤 태그도 자기 digest 를 담을 수 없다.** 항상 "릴리스
+  대장에 태그가 없다" 로 죽는다. 대장은 태그가 아니라 **main 에서 계속 자라는
+  기록**이므로, 이제 `git show origin/main:docs/31-...` 로 읽는다.
+
+`v0.9.1` 이 이 둘을 고친 태그다. **태그를 옮겨 붙이지 않았다** — `v0.9.0` 이
+가리키는 이미지는 그대로 두고 새 번호를 썼다. 태그가 움직이면 대장의 digest 가
+무엇을 가리키는지 아무도 확신할 수 없다.
 
 ### 공개 URL 이 실제로 돌리고 있던 것 (2026-08-25 확인)
 
@@ -1338,6 +1366,84 @@ python -m scripts.verify_public_deployment --domain finshield-ai.duckdns.org
 달라졌어요」. 문자를 넣어 결과를 본 뒤 상태를 「송금함」으로 바꿔 다시 확인하면
 **주소의 결과 id 가 바뀌고** 행동 목록이 늘어야 한다. curl 로는 확인되지
 않는다(메모리 한 칸에 사는 값이라 서버에 흔적이 없다).
+
+#### `v0.9.1` 을 올린 뒤 찍을 것
+
+**올리기 전에 적는다.** 찍고 나서 기준을 정하면 나온 값이 기준이 된다.
+
+이번 회차는 **처음으로 스크립트가 배포한다.** 그래서 확인할 것이 두 겹이다 —
+서비스가 맞게 떴는가, 그리고 **스크립트가 절차를 실제로 밟았는가.**
+
+올리는 명령. 스크립트가 VM 작업본에 아직 없으므로 가운데 두 줄이 한 번 필요하다.
+
+```bash
+cd ~/finshield-ai
+git fetch --tags
+git checkout v0.9.1 -- deploy/redeploy.sh
+./deploy/redeploy.sh v0.9.1
+```
+
+**`v0.9.0` 이 아니라 `v0.9.1` 이다.** `v0.9.0` 의 이미지는 만들어졌지만 그
+태그의 스크립트로는 배포가 시작되지도 못한다 — 아래 "만들었지만 배포하지 않은
+태그" 를 본다.
+
+앞 회차 프로브 1~7 을 **그대로 유지**하고 네 개를 더한다. 이번에 고친 것은
+**콜드 경로의 시간**이므로, 새 프로브는 상태 코드만이 아니라 **걸린 시간**을
+같이 잰다.
+
+```bash
+# 8. 콜드 경로 — 재배포 직후 첫 요청. 느린 것은 통과, 502 는 실패다
+curl -s -o /dev/null -w '첫번째 %{http_code} %{time_total}s\n' \
+  -X POST https://finshield-ai.duckdns.org/api/proxy/recommendations \
+  -H 'Content-Type: application/json' -d '{"goal":"emergency_cash"}'
+
+# 9. 바로 이어서 두 번째. 캐시가 찼으면 1초대다
+curl -s -o /dev/null -w '두번째 %{http_code} %{time_total}s\n' \
+  -X POST https://finshield-ai.duckdns.org/api/proxy/recommendations \
+  -H 'Content-Type: application/json' -d '{"goal":"emergency_cash"}'
+
+# 10. 상세 — 8번 응답에서 꺼낸 id 를 URL 인코딩해서 넣는다 (`:` 는 %3A)
+curl -s -o /dev/null -w '%{http_code}\n' \
+  'https://finshield-ai.duckdns.org/api/proxy/products/202608%3A1'
+
+# 11. 두 개 비교 — 같은 목록에서 꺼낸 id 두 개
+curl -s -X POST https://finshield-ai.duckdns.org/api/proxy/products/compare \
+  -H 'Content-Type: application/json' \
+  -d '{"product_ids":["202608:1","202608:2"]}'
+```
+
+| 프로브 | `v0.9.1` 이 맞으면 | 안 됐으면, 그리고 그 뜻 |
+|---|---|---|
+| 8. 첫 요청 | `200`, **20초 안** | `502` = 예산이 아직 8초 (이미지가 안 바뀌었다) · `503` = 키 또는 override 누락이라 원인이 다른 것 |
+| 9. 두 번째 | `200`, **3초 안** | 첫 번째와 비슷하게 느리면 **캐시가 안 물린 것**이고 TTL 변경이 안 올라간 것이다 |
+| 10. 상세 | `200` | `404` = id 형식이 다르다(8번 응답에서 그대로 꺼낸다) · `502` = 예산 문제가 이 경로에만 남았다 |
+| 11. 비교 | `200` + 상품 2건 | 같은 구분 |
+
+**8번이 9초대여도 통과다.** 이번 수정은 콜드 경로를 **빠르게** 만든 것이 아니라
+**끊기지 않게** 만든 것이다. 빠른 것과 안 죽는 것을 같은 칸에서 재면, 다음에
+제공자가 조금 느려졌을 때 또 「고장」으로 읽는다.
+
+그리고 **스크립트가 밟았는지**를 따로 본다. 스크립트의 출력이 아니라 결과를
+본다 — 스스로 「했다」고 말하는 것은 증거가 아니다.
+
+```bash
+cd ~/finshield-ai
+git describe --tags               # v0.9.1 이어야 한다
+grep '^FINSHIELD_IMAGE_TAG=' .env # v0.9.1 이어야 한다
+$DC images                        # digest 가 12절 대장의 v0.9.1 두 줄과 같아야 한다
+$DC exec proxy grep -c public_health /etc/caddy/Caddyfile
+```
+
+마지막 줄이 **이번 회차에서 가장 중요한 한 칸이다.** 호스트가 아니라
+**컨테이너 안**에서 세는 것이고, 여기서 `0` 이 나오면 `--force-recreate` 가
+안 먹었다는 뜻이다 — 그때는 `/health` 가 200 이어도 다음 Caddyfile 변경이
+같은 방식으로 조용히 빠진다.
+
+그다음 검사기를 밖에서 돌린다. 실패 0 인지만 본다.
+
+```bash
+python -m scripts.verify_public_deployment --domain finshield-ai.duckdns.org
+```
 
 ### 되돌릴 대상
 
