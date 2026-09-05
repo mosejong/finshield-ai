@@ -145,12 +145,46 @@ python -m scripts.verify_public_deployment --domain finshield.example.com
 
 실패가 하나도 없어야 P0-4 완료다. 종료코드는 0 통과 / 1 실패 / 2 설정 오류.
 
-### 3-6. 재배포 — 이미 떠 있는 스택의 이미지만 바꾼다
+### 3-6. 재배포
 
-3-1~3-4 를 이미 한 서버에는 인증서도 DNS 도 그대로 있다. 바꿀 것은 이미지 태그
-하나뿐이다.
+3-1~3-4 를 이미 한 서버에는 인증서도 DNS 도 그대로 있다. 보통은 이미지 태그
+하나만 바꾸면 되지만, **항상 그런 것은 아니다.**
 
-**먼저 마이그레이션이 끼어 있는지 본다.** 없으면 이 절차가 성립하고, 있으면
+#### 먼저: 이미지 밖에서 오는 파일이 바뀌었는가
+
+서버가 쓰는 파일 전부가 이미지 안에 있는 것이 아니다. 두 종류가 **VM 의 저장소
+작업본에서 직접** 온다.
+
+| 파일 | 어떻게 쓰이는가 |
+|---|---|
+| `deploy/Caddyfile` | `compose.https.yaml` 이 `:ro` 로 bind mount 한다 |
+| `compose*.yaml` | `docker compose` 가 실행할 때 읽는다 |
+
+**이 둘은 `pull` 로 안 바뀐다.** 태그를 올리고 digest 를 대조해서 전부 맞아도,
+작업본이 옛것이면 라우팅과 override 는 옛것 그대로다. 그리고 컨테이너 digest 는
+맞으므로 **확인 절차를 정직하게 다 밟아도 통과한다.**
+
+```bash
+git diff --name-only <직전에_배포한_SHA>..<새_태그> -- deploy/ 'compose*.yaml'
+```
+
+비어 있지 않으면 `.env` 를 고치기 전에 작업본부터 올린다.
+
+```bash
+cd ~/finshield-ai
+git fetch --tags
+git status --short          # 손으로 고친 것이 없어야 한다. .env 는 추적 대상이 아니다
+git checkout <새_태그>
+```
+
+`deploy/Caddyfile` 이 바뀌었다면 **`up -d` 만으로는 반영되지 않는다.** compose 는
+서비스 정의가 같으면 컨테이너를 다시 만들지 않고, mount 된 파일의 내용은 그
+정의에 안 들어간다. Caddy 는 그 파일을 뜰 때 한 번 읽으므로 명시적으로 다시
+읽히거나 다시 만들어져야 한다 — 아래 `up -d` 뒤에 한 줄 더 있다.
+
+#### 그다음: 마이그레이션이 끼어 있는가
+
+없으면 이 절차가 성립하고, 있으면 없으면 이 절차가 성립하고, 있으면
 `docs/28` P1-3 의 expand/contract 규칙을 지킨 릴리스인지 확인한 뒤에 진행한다.
 
 ```bash
@@ -178,8 +212,18 @@ DC="docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml 
 
 $DC pull
 $DC up -d
+
+# deploy/Caddyfile 이 바뀐 릴리스에서만. 위에서 봤다시피 up -d 는 이 파일을
+# 안 본다. adapt 로 문법을 먼저 보고, 통과하면 그 자리에서 다시 읽힌다.
+$DC exec caddy caddy validate --config /etc/caddy/Caddyfile
+$DC exec caddy caddy reload --config /etc/caddy/Caddyfile
+
 $DC images
 ```
+
+`reload` 를 쓰는 이유는 재시작이 아니기 때문이다 — 인증서를 쥔 채 설정만 바꾸고,
+문법이 틀리면 **옛 설정으로 계속 돌면서** 0 이 아닌 코드로 끝난다. 반영이 안 된
+것이 조용히 성공으로 보이지 않는다.
 
 `.env` 는 **`grep` 으로 그 한 줄만 본다.** 같은 파일에 DB 비밀번호와 프로필 암호화
 키가 있어서 `cat` 하지 않는다. 2절의 나머지 두 값(`FINSHIELD_DOMAIN`,
@@ -1168,6 +1212,65 @@ curl -s -X POST https://finshield-ai.duckdns.org/api/proxy/analyze \
 - `$DC images` 의 IMAGE ID 가 `a140a7a49b91`(backend) · `c99bb50e1ede`(web) 로 12절 대장의 digest 앞 12자리와 일치한다. **태그가 아니라 digest 로 확인한 것이다.**
 
 `migration-1` 은 `Exited` 로 정상 종료했다. `v0.5.0..v0.7.0` 에 `migrations/` 변경이 없으므로 할 일이 없는 것이 맞다.
+
+#### `v0.8.0` 을 올린 뒤 찍을 것
+
+**올리기 전에 적는다.** 찍고 나서 기준을 정하면 나온 값이 기준이 된다.
+
+앞 회차 프로브 3개를 **그대로 유지**하고 네 개를 더한다. 이번 릴리스는 앞의
+어느 회차와도 성격이 다르다 — 고친 것 셋이 **서로 다른 곳에서** 오기 때문에
+한 칸이 통과했다고 다른 칸을 유추하면 안 된다.
+
+| 무엇이 고쳐졌나 | 어디서 오는가 | 안 됐으면 무엇이 빠진 것 |
+|---|---|---|
+| 판정·화면 (프로브 1~3) | **이미지** | `.env` 태그 / `$DC pull` |
+| `/health` 공개 (프로브 4~5) | **VM 작업본의 `deploy/Caddyfile`** | `git checkout` / `caddy reload` |
+| 금융상품 (프로브 6~7) | **VM 의 키 파일 + override 목록** | `secrets/public_data_service_key.txt` / `-f compose.public-data.yaml` |
+
+```bash
+# 4. 공개 health — 리버스 프록시가 backend 로 보내는가
+curl -s -o /dev/null -w '%{http_code}\n' https://finshield-ai.duckdns.org/health
+curl -s https://finshield-ai.duckdns.org/health
+
+# 5. 준비 상태
+curl -s https://finshield-ai.duckdns.org/health/ready
+
+# 6. 금융상품 목록
+curl -s -X POST https://finshield-ai.duckdns.org/api/proxy/recommendations \
+  -H 'Content-Type: application/json' -d '{"goal":"emergency_cash"}'
+
+# 7. /internal/metrics 는 열지 않았다 — 404 가 나오는 것이 맞다
+curl -s -o /dev/null -w '%{http_code}\n' https://finshield-ai.duckdns.org/internal/metrics
+```
+
+| 프로브 | `v0.8.0` 이 맞으면 | 안 됐으면, 그리고 그 뜻 |
+|---|---|---|
+| 4. `/health` | `200` + `"status":"ok"` | `404` = 작업본이 옛 `Caddyfile` · `400` = Host 재작성이 안 먹었다 |
+| 5. `/health/ready` | `200` + `"ready"` | 같은 원인. `503` 이면 라우팅은 됐고 **백엔드가 준비 안 된 것** — 원인이 다르다 |
+| 6. 상품 목록 | `200` + 상품 1건 이상 | `503` = 키 파일 없음 또는 override 누락 · `502` = 키는 있고 공공데이터가 실패 |
+| 7. `/internal/metrics` | `404` | `200` 이면 **의도와 다르게 열린 것**이다 |
+
+**4번과 5번이 200 이어도 본문을 본다.** Next 가 그럴듯한 200 을 줄 수 있으므로
+`"ok"`/`"ready"` 라는 낱말이 실제로 있어야 한다. 검사기의 `health:*` 칸이 같은
+것을 보고, 그 규칙을 지키는 테스트가
+`tests/test_public_deployment.py::TestPublicHealth` 에 있다.
+
+**7번을 표에 넣은 이유**는 이번 수정이 세 경로만 열었기 때문이다. 열지 않기로
+한 것이 열려 있으면 그것도 배포 결함이고, 제출 원고가 이 경로를 「내부 전용」
+이라고 적고 있으므로 원고와도 어긋난다.
+
+그다음 검사기를 밖에서 한 번 돌린다. **칸 수가 27 에서 늘었다** — 늘어난
+숫자를 여기 미리 적지 않는 이유는 아직 실제 배포에서 재 본 적이 없기 때문이다.
+실패 0 인지만 본다.
+
+```bash
+python -m scripts.verify_public_deployment --domain finshield-ai.duckdns.org
+```
+
+마지막으로 **브라우저에서만 확인되는 것 하나** — 결과 화면의 「상황이
+달라졌어요」. 문자를 넣어 결과를 본 뒤 상태를 「송금함」으로 바꿔 다시 확인하면
+**주소의 결과 id 가 바뀌고** 행동 목록이 늘어야 한다. curl 로는 확인되지
+않는다(메모리 한 칸에 사는 값이라 서버에 흔적이 없다).
 
 ### 되돌릴 대상
 
