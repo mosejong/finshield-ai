@@ -150,6 +150,53 @@ python -m scripts.verify_public_deployment --domain finshield.example.com
 3-1~3-4 를 이미 한 서버에는 인증서도 DNS 도 그대로 있다. 보통은 이미지 태그
 하나만 바꾸면 되지만, **항상 그런 것은 아니다.**
 
+#### 한 줄로 돌리려면 — `deploy/redeploy.sh`
+
+아래 절차 전체를 그대로 실행하는 스크립트가 있다. VM 안에서 돈다.
+
+```bash
+cd ~/finshield-ai
+./deploy/redeploy.sh v0.9.0
+```
+
+**문서가 원본이고 스크립트가 사본이다.** 절차를 바꿀 때는 이 절을 먼저 고친다 —
+`tests/test_public_routing.py` 가 둘의 override 목록이 같은지, 둘 다 존재하는
+서비스 이름을 부르는지, 둘 다 `--force-recreate` 로 Caddy 를 반영하는지 본다.
+
+스크립트가 손 절차보다 나은 점은 셋뿐이고, 셋 다 **2026-09-05 에 실제로 난
+사고**다. 나머지는 똑같다.
+
+- **붙여넣기 사고가 구조적으로 불가능하다.** 그날 `cd ~/finshield-ai` 가 실패했는데
+  붙여넣은 나머지 줄이 계속 실행돼서 엉뚱한 기계의 홈 디렉터리에 키 파일이
+  만들어졌다. 스크립트에서는 `set -e` 가 거기서 멈춘다.
+- **`read -rs` 가 붙여넣기 버퍼가 아니라 터미널에서 읽는다.** 여러 줄을 한꺼번에
+  붙여넣으면 `read` 가 입력을 기다리지 않고 지나가서 **0바이트 키 파일**이 생긴다.
+- **길이 확인이 `chmod 400` 보다 먼저다.** 순서를 뒤집으면 비어 있다는 사실을
+  확인할 권한이 그 시점에 사라진다.
+
+**처음 한 번은 스크립트부터 가져와야 한다.** 스크립트는 `v0.9.0` 에서 처음 생겼고
+VM 의 작업본은 그 이전 태그에 멈춰 있다 — 없는 파일은 실행할 수 없다.
+
+```bash
+cd ~/finshield-ai
+git fetch --tags
+git checkout v0.9.0 -- deploy/redeploy.sh
+./deploy/redeploy.sh v0.9.0
+```
+
+**두 번째부터는 이 두 줄이 필요 없다.** 스크립트가 태그 전체를 checkout 하기
+때문이고, 바로 그때 **자기 자신도 함께 바뀐다.** bash 는 스크립트를 통째로 읽어
+두지 않고 실행하면서 조금씩 읽으므로, 그대로 두면 남은 절반을 엉뚱한 바이트
+위치부터 읽는다. 그래서 스크립트는 시작하자마자 자기 사본을 만들어 거기서 다시
+실행한다(`exec`). **손 절차에는 없던 위험이고 자동화하면서 새로 생긴 것이다.**
+
+스크립트는 **공개 URL 을 찍지 않는다.** 배포한 기계가 스스로 확인하면
+라우팅·인증서·DNS 가 검사에서 통째로 빠진다. 마지막에 밖에서 돌릴 명령을
+안내하고 끝난다 (3-5).
+
+아래는 그 스크립트가 무엇을 왜 하는지다. **스크립트를 안 쓰더라도 그대로
+성립한다.**
+
 #### 먼저: 이미지 밖에서 오는 파일이 바뀌었는가
 
 서버가 쓰는 파일 전부가 이미지 안에 있는 것이 아니다. 두 종류가 **VM 의 저장소
@@ -179,12 +226,12 @@ git checkout <새_태그>
 
 `deploy/Caddyfile` 이 바뀌었다면 **`up -d` 만으로는 반영되지 않는다.** compose 는
 서비스 정의가 같으면 컨테이너를 다시 만들지 않고, mount 된 파일의 내용은 그
-정의에 안 들어간다. Caddy 는 그 파일을 뜰 때 한 번 읽으므로 명시적으로 다시
-읽히거나 다시 만들어져야 한다 — 아래 `up -d` 뒤에 한 줄 더 있다.
+정의에 안 들어간다. Caddy 는 그 파일을 뜰 때 한 번 읽는다. **그리고 다시
+읽히는 것만으로도 부족하다** — 아래 `up -d` 뒤 두 줄과 그 이유를 본다.
 
 #### 그다음: 마이그레이션이 끼어 있는가
 
-없으면 이 절차가 성립하고, 있으면 없으면 이 절차가 성립하고, 있으면
+없으면 이 절차가 성립하고, 있으면
 `docs/28` P1-3 의 expand/contract 규칙을 지킨 릴리스인지 확인한 뒤에 진행한다.
 
 ```bash
@@ -213,17 +260,35 @@ DC="docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml 
 $DC pull
 $DC up -d
 
-# deploy/Caddyfile 이 바뀐 릴리스에서만. 위에서 봤다시피 up -d 는 이 파일을
-# 안 본다. adapt 로 문법을 먼저 보고, 통과하면 그 자리에서 다시 읽힌다.
-$DC exec caddy caddy validate --config /etc/caddy/Caddyfile
-$DC exec caddy caddy reload --config /etc/caddy/Caddyfile
+# deploy/Caddyfile 이 바뀐 릴리스에서만. up -d 도, reload 도 이 파일을 반영하지
+# 못한다(아래 이유). validate 는 새 컨테이너로 돌린다 — 떠 있는 컨테이너 안에서
+# 보면 옛 내용을 본다.
+$DC run --rm --no-deps --entrypoint caddy proxy validate --config /etc/caddy/Caddyfile
+$DC up -d --force-recreate proxy
 
 $DC images
 ```
 
-`reload` 를 쓰는 이유는 재시작이 아니기 때문이다 — 인증서를 쥔 채 설정만 바꾸고,
-문법이 틀리면 **옛 설정으로 계속 돌면서** 0 이 아닌 코드로 끝난다. 반영이 안 된
-것이 조용히 성공으로 보이지 않는다.
+**`reload` 로는 안 된다.** 2026-09-05 에 이 문서가 시키는 대로 `validate` 와
+`reload` 를 돌렸고 **둘 다 성공했는데 `/health` 는 계속 404** 였다.
+
+Docker 의 단일 파일 bind mount 는 경로가 아니라 **inode 에 붙는다.** `git checkout`
+은 파일을 제자리에서 고치지 않고 **새로 써서 이름을 바꿔 단다.** inode 가 바뀌고,
+컨테이너는 이름이 사라진 **옛 inode 를 계속 읽는다.** 그래서 `validate` 도
+`reload` 도 **옛 내용을 상대로 정직하게 성공한다** — 거짓말이 아니라 다른 파일을
+보고 있는 것이다. 그날 호스트에서 `grep -c public_health deploy/Caddyfile` 은 `2`,
+같은 명령을 컨테이너 안에서 돌리면 `0` 이었는데 `reload` 는 `Valid configuration`
+이라고 답했다.
+
+**이것이 이 문서에서 네 번째로 발견된 「조용한 성공」이다.** 앞의 셋 —
+문서의 `-f` 목록이 저장소보다 짧은 것, `$DC pull` 이 작업본에서 오는 파일을 안
+건드리는 것, `up -d` 가 mount 된 파일 내용 변화로 컨테이너를 안 다시 만드는 것 —
+과 성질이 같다. **확인 명령이 통과했다는 사실 자체가 반영을 뜻하지 않는다.**
+
+그래서 `--force-recreate` 다. 컨테이너를 다시 만들면 mount 가 지금의 경로를
+다시 찾는다. 인증서는 `caddy-data` 볼륨에 있어 재생성으로 잃지 않는다. 문법은
+`run --rm` 으로 **뜨기 전에** 본다 — 그 컨테이너는 방금 만들어져서 지금 파일을
+본다. 재생성 동안 몇 초 끊기지만, **끊긴 것은 보이고 반영 안 된 것은 안 보인다.**
 
 `.env` 는 **`grep` 으로 그 한 줄만 본다.** 같은 파일에 DB 비밀번호와 프로필 암호화
 키가 있어서 `cat` 하지 않는다. 2절의 나머지 두 값(`FINSHIELD_DOMAIN`,
@@ -1226,7 +1291,7 @@ curl -s -X POST https://finshield-ai.duckdns.org/api/proxy/analyze \
 | 무엇이 고쳐졌나 | 어디서 오는가 | 안 됐으면 무엇이 빠진 것 |
 |---|---|---|
 | 판정·화면 (프로브 1~3) | **이미지** | `.env` 태그 / `$DC pull` |
-| `/health` 공개 (프로브 4~5) | **VM 작업본의 `deploy/Caddyfile`** | `git checkout` / `caddy reload` |
+| `/health` 공개 (프로브 4~5) | **VM 작업본의 `deploy/Caddyfile`** | `git checkout` / `up -d --force-recreate proxy` |
 | 금융상품 (프로브 6~7) | **VM 의 키 파일 + override 목록** | `secrets/public_data_service_key.txt` / `-f compose.public-data.yaml` |
 
 ```bash
