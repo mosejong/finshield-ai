@@ -26,6 +26,13 @@ from app.schemas.product import FinancialProduct
 
 ACTIVE_PRODUCT_QUERY = "active:Y"
 
+# Rows requested per provider call. The whole month fits in one call: the
+# 202608 base month holds 325 rows, and the provider returned all of them for
+# numOfRows=500 in 0.64s versus 0.48s for numOfRows=100 (measured 2026-09-05).
+# Paging over it cost four sequential round trips and bought nothing. The loop
+# below still pages, so a larger month stays correct.
+PROVIDER_PAGE_SIZE = 500
+
 
 @dataclass(frozen=True)
 class ProductCatalogSnapshotKey:
@@ -122,7 +129,7 @@ def load_latest_product_snapshot(
     *,
     start_month: str,
     lookback_months: int,
-    provider_page_size: int = 100,
+    provider_page_size: int = PROVIDER_PAGE_SIZE,
 ) -> ProductCatalogSnapshot:
     base_month = discover_latest_month(
         client,

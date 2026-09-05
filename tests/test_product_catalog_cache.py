@@ -15,11 +15,13 @@ from app.clients.public_data_products import (
 )
 from app.domain.finance.product_identity import ProductCatalogIdentityAudit
 from app.services.product_catalog import (
+    DEFAULT_CACHE_TTL_SECONDS,
     ProductCatalogService,
     build_product_catalog_service,
 )
 from app.services.product_catalog_snapshot import (
     ACTIVE_PRODUCT_QUERY,
+    PROVIDER_PAGE_SIZE,
     ProductCatalogSnapshot,
     ProductCatalogSnapshotCache,
     ProductCatalogSnapshotKey,
@@ -32,7 +34,7 @@ def provider_payload(
     rows: list[dict],
     total_count: int,
     page_no: int = 1,
-    page_size: int = 100,
+    page_size: int = PROVIDER_PAGE_SIZE,
 ) -> dict:
     return {
         "response": {
@@ -134,7 +136,7 @@ def test_service_caches_latest_full_snapshot_and_paginates_locally() -> None:
     assert calls == [
         ("202608", 1, 1),
         ("202607", 1, 1),
-        ("202607", 1, 100),
+        ("202607", 1, PROVIDER_PAGE_SIZE),
     ]
     assert first.total_count == second.total_count == 3
     assert first.source_base_month == second.source_base_month == "202607"
@@ -256,7 +258,7 @@ def provider_page(
     rows: list[dict],
     total_count: int,
     page_no: int = 1,
-    page_size: int = 100,
+    page_size: int = PROVIDER_PAGE_SIZE,
 ) -> ProviderProductPage:
     return ProviderProductPage(
         rows=rows,
@@ -335,7 +337,7 @@ def test_snapshot_loader_rejects_mixed_base_month_rows() -> None:
             ("202607", 1, 1): provider_page(
                 rows=[mismatched], total_count=1, page_size=1
             ),
-            ("202607", 1, 100): provider_page(
+            ("202607", 1, PROVIDER_PAGE_SIZE): provider_page(
                 rows=[mismatched], total_count=1
             ),
         }
@@ -347,3 +349,72 @@ def test_snapshot_loader_rejects_mixed_base_month_rows() -> None:
             start_month="202607",
             lookback_months=0,
         )
+
+
+class CountingSnapshotClient:
+    """Serves one whole month from a single page, and counts the round trips."""
+
+    def __init__(self, *, base_month: str, total_count: int) -> None:
+        self.base_month = base_month
+        self.total_count = total_count
+        self.calls: list[tuple[str, int, int]] = []
+
+    def fetch_products(
+        self,
+        *,
+        page_no: int,
+        page_size: int,
+        base_month: str | None = None,
+    ) -> ProviderProductPage:
+        assert base_month is not None
+        self.calls.append((base_month, page_no, page_size))
+        if base_month != self.base_month:
+            return provider_page(rows=[], total_count=0, page_size=page_size)
+        start = (page_no - 1) * page_size
+        end = min(start + page_size, self.total_count)
+        return provider_page(
+            rows=[row(n) for n in range(start + 1, end + 1)],
+            total_count=self.total_count,
+            page_no=page_no,
+            page_size=page_size,
+        )
+
+
+def test_full_month_snapshot_costs_one_page_request() -> None:
+    """
+    2026-09-05 공개 URL 장애의 회귀 시험.
+
+    한 달치는 325건이었는데 100건씩 끊어 받느라 네 번을 순서대로 왕복했고,
+    us-west1 에서 한국 서버까지의 왕복이 곱해져 캐시가 빈 첫 요청이 9.6 초에
+    닿았다. 프록시 예산이 먼저 끝나 사용자에게는 502 가 갔다.
+
+    공급자는 numOfRows 를 크게 줘도 같은 시간에 답한다(325건 0.64초 대
+    100건 0.48초, 같은 날 측정). 그래서 페이지 순회는 비용만 있고 얻는 것이
+    없었다. 여기서 못 박는 것은 "보통의 한 달은 왕복 한 번" 이다. 달이 더
+    커지면 아래 로더가 그대로 페이지를 넘기므로 정확성은 그대로다.
+    """
+    client = CountingSnapshotClient(base_month="202607", total_count=325)
+
+    snapshot = load_latest_product_snapshot(
+        client,
+        start_month="202608",
+        lookback_months=1,
+    )
+
+    assert len(snapshot.items) == 325
+    assert client.calls == [
+        ("202608", 1, 1),
+        ("202607", 1, 1),
+        ("202607", 1, PROVIDER_PAGE_SIZE),
+    ]
+
+
+def test_cache_ttl_outlives_a_visitor_gap() -> None:
+    """
+    공식 데이터는 `basYm` 단위, 즉 한 달에 한 번 바뀐다. TTL 을 짧게 잡으면
+    새로워지는 것은 없고 누가 콜드 경로를 무는지만 정해진다. 5 분이었을 때는
+    5 분 넘게 아무도 안 들어오면 다음 첫 방문자가 그 값을 전부 치렀다.
+
+    `fetched_at` 은 응답에 그대로 실려 나가므로 얼마나 묵었는지는 계속 보인다.
+    """
+    assert DEFAULT_CACHE_TTL_SECONDS >= 1800

@@ -9,6 +9,20 @@ import { z } from "zod";
 
 const DEFAULT_TIMEOUT_MS = 8000;
 
+/**
+ * 공식 상품 목록을 거치는 경로의 예산.
+ *
+ * 기본 8초는 백엔드 한 번 왕복을 재는 값이다. 상품 경로는 그 안에서
+ * 공공데이터포털을 여러 번 부르고, 캐시가 비어 있으면 그 값을 전부 치른다.
+ * 2026-09-05 공개 URL 에서 캐시 없는 첫 요청이 9.6초에 끊겨 502 가 됐고,
+ * 같은 요청이 캐시가 찬 뒤에는 1.1초였다. 8초는 백엔드가 살아 있는데도
+ * 고장으로 보이게 만드는 값이었다.
+ *
+ * 늘린 예산은 실패를 감추지 않는다. 공급자가 정말 죽어 있으면 그때도 502 가
+ * 나가고, 다만 살아 있는 느린 응답을 죽음으로 바꾸지 않을 뿐이다.
+ */
+export const CATALOG_TIMEOUT_MS = 20000;
+
 export class ApiError extends Error {
   readonly status: number;
   readonly kind: "network" | "timeout" | "http" | "schema";
