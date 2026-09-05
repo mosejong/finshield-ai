@@ -197,6 +197,71 @@ def evaluate_share_target(status: int, headers: dict[str, str]) -> list[CheckRes
     ]
 
 
+# 밖에서 상태를 볼 수 있어야 하는 경로와 각 경로가 내는 값.
+# `app/api/routes/health.py` 와 `deploy/Caddyfile` 의 `@public_health` 가 같은
+# 목록을 갖는지는 `tests/test_public_routing.py` 가 지킨다. 여기서 보는 것은
+# 그 세 경로가 **공개 도메인에서** 실제로 답하느냐다. 2026-09-05 외부 검수가
+# 셋 다 404 라고 보고했고, 그때 이 검사는 없었다.
+PUBLIC_HEALTH_STATUS = {
+    "/health": "ok",
+    "/health/live": "alive",
+    "/health/ready": "ready",
+}
+
+# 금융상품 경로가 실패할 때 상태 코드가 원인을 가른다. 이 대응은
+# `app/api/routes/products.py` 가 정한 것이고, Next 프록시가 503 을 그대로
+# 통과시키기 때문에(`web/lib/api/proxy-response.ts` 의 `PASSTHROUGH_STATUSES`)
+# 밖에서 두드려도 구분이 남는다. 이 구분이 2026-09-05 에 실제로 값을 했다 -
+# 돌아온 것이 503 이었으므로 제공자 장애가 아니라 배포 설정 누락으로 바로
+# 좁혔고, VM 에 들어가기 전에 원인이 정해졌다.
+PRODUCT_FAILURE_CAUSES = {
+    503: "설정 누락 - backend 에 PUBLIC_DATA_SERVICE_KEY 가 없다 (compose.public-data.yaml)",
+    502: "제공자 실패 - 키는 있고 공공데이터 호출이 실패했다",
+    404: "그 상품이 이번 기준월 목록에 없다",
+    400: "요청이 스키마에 맞지 않는다. 검사기 쪽 문제다",
+    429: "요청 한도에 걸렸다. 잠시 뒤 다시 찍는다",
+}
+
+
+def evaluate_public_health(path: str, status: int, body: str) -> CheckResult:
+    """상태 확인 경로가 backend 까지 닿았는가.
+
+    404 는 "백엔드가 죽었다" 가 아니라 **리버스 프록시가 backend 로 보내지
+    않는다** 는 뜻이다. 그래서 본문의 값까지 본다 - 200 이어도 그것이 Next 가
+    낸 200 이면 여기 적힌 문자열이 없다.
+    """
+    name = f"health:{path}"
+    expected = PUBLIC_HEALTH_STATUS.get(path)
+    if expected is None:
+        return CheckResult(name, False, "공개 대상이 아닌 경로다")
+    if status == 404:
+        return CheckResult(name, False, "404 - 리버스 프록시가 backend 로 보내지 않는다")
+    if status == 400:
+        return CheckResult(name, False, "400 - backend 가 Host 를 거부했다 (TRUSTED_HOSTS)")
+    if status != 200:
+        return CheckResult(name, False, str(status))
+    if f'"{expected}"' not in body:
+        return CheckResult(name, False, f'200 인데 "{expected}" 가 없다. backend 응답이 아니다')
+    return CheckResult(name, True, f"200 {expected}")
+
+
+def evaluate_product_endpoint(name: str, status: int, item_count: int) -> CheckResult:
+    """공식 상품 경로 하나가 실제로 상품을 돌려주는가.
+
+    화면이 200 이라는 사실만으로는 아무것도 알 수 없다. `/products` 는 껍데기가
+    먼저 그려지고 상품은 그 뒤에 브라우저가 따로 부르므로, 상품이 전부 죽어
+    있어도 `page:/products` 는 초록이다. 2026-09-05 에 정확히 그랬다 - 화면은
+    200, 상품은 전부 503.
+    """
+    check = f"product:{name}"
+    if status != 200:
+        cause = PRODUCT_FAILURE_CAUSES.get(status, "알 수 없는 실패")
+        return CheckResult(check, False, f"{status} - {cause}")
+    if item_count <= 0:
+        return CheckResult(check, False, "200 인데 상품이 0건이다")
+    return CheckResult(check, True, f"200, {item_count}건")
+
+
 def evaluate_internal_port(port: int, reachable: bool) -> CheckResult:
     return CheckResult(
         f"internal_port:{port}",

@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { ProductRecommendations } from "@/components/finance/ProductRecommendations";
 
 export const metadata = {
-  title: "금융상품 | FinShield",
+  title: "금융상품",
 };
 
 export default function ProductsPage() {

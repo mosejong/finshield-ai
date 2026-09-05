@@ -1,8 +1,9 @@
 "use client";
 
-import { use, useMemo } from "react";
+import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { UserState } from "@/lib/api/contracts";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionHeading } from "@/components/common/SectionHeading";
@@ -23,9 +24,17 @@ import { demoAnalysisFor } from "@/lib/mock/analysis";
 import { clearAnalysis, useStoredAnalysis } from "@/lib/store/analysis-store";
 import {
   forgetExplanation,
+  rememberAnalysisInput,
   useExplanation,
 } from "@/lib/store/explanation-store";
+import {
+  forgetRecheckInput,
+  rememberRecheckInput,
+  useRecheckInput,
+} from "@/lib/store/recheck-store";
 import { useHydrated } from "@/lib/store/session-store";
+import { analyzeFromClient } from "@/lib/api/analysis";
+import { saveAnalysis } from "@/lib/store/analysis-store";
 
 /**
  * 위험 분석 결과.
@@ -58,6 +67,51 @@ export default function CheckResultPage({
     모델 호출이 나가면 안 된다.
   */
   const explanation = useExplanation(id, !isDemo);
+
+  const [recheckPending, setRecheckPending] = useState(false);
+  const [recheckError, setRecheckError] = useState<string | null>(null);
+
+  /*
+    상황을 바꿔 다시 확인할 수 있는가. 물어볼 원문이 메모리에 남아 있을 때만
+    이다 - 새로고침으로 들어왔거나 예시 결과를 보고 있으면 `null` 이고, 그때는
+    `UserStateRecap` 이 종전대로 `/check` 링크를 보여준다.
+  */
+  const recheckable = useRecheckInput(id, !isDemo);
+
+  async function handleRecheck(next: UserState) {
+    if (!recheckable || recheckPending) return;
+
+    setRecheckPending(true);
+    setRecheckError(null);
+
+    const request = { ...recheckable, state: next };
+    const response = await analyzeFromClient(request);
+
+    if (!response.ok) {
+      setRecheckError(response.hint ? `${response.message} ${response.hint}` : response.message);
+      setRecheckPending(false);
+      return;
+    }
+
+    /*
+      새 판정은 새 결과다. 같은 id 에 덮어쓰지 않는 이유는 설명 캐시가 id 로
+      묶여 있어서다 - 덮어쓰면 상황이 바뀌었는데 앞의 상황으로 만든 설명이
+      그대로 붙는다.
+
+      그리고 앞의 결과는 지운다. 같은 문자에서 나온 결과가 둘 남을 이유가
+      없고, 세션에 남는 것은 적을수록 좋다. `replace` 를 쓰는 것도 같은
+      이유다 - 뒤로 가기로 방금 지운 결과에 돌아가면 "결과를 찾을 수 없습니다"
+      가 뜬다.
+    */
+    saveAnalysis(response.result);
+    rememberAnalysisInput(response.result.id, request);
+    rememberRecheckInput(response.result.id, request);
+
+    clearAnalysis(id);
+    forgetExplanation(id);
+
+    router.replace(`/check/result/${response.result.id}`);
+  }
 
   if (!loaded) {
     return (
@@ -127,7 +181,19 @@ export default function CheckResultPage({
           <SectionHeading>
             <span id="result-state">지금까지 하신 것</span>
           </SectionHeading>
-          <UserStateRecap state={result.state} summary={result.stateSummary} />
+          <UserStateRecap
+            state={result.state}
+            summary={result.stateSummary}
+            recheck={
+              recheckable
+                ? {
+                    pending: recheckPending,
+                    error: recheckError,
+                    onSubmit: handleRecheck,
+                  }
+                : undefined
+            }
+          />
         </section>
 
         {/* 5. 지금 해야 할 행동 */}
@@ -167,6 +233,7 @@ export default function CheckResultPage({
             onClick={() => {
               clearAnalysis(id);
               forgetExplanation(id);
+              forgetRecheckInput(id);
               router.replace("/check");
             }}
             className="min-h-9 text-caption font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"

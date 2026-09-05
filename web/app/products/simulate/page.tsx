@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { LoanWhatIf } from "@/components/finance/LoanWhatIf";
 
 export const metadata = {
-  title: "대출 조건 비교 | FinShield",
+  title: "대출 조건 비교",
 };
 
 export default function LoanSimulationPage() {

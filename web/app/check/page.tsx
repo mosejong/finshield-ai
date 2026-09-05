@@ -15,6 +15,7 @@ import { StateSelector } from "@/components/safety/StateSelector";
 import { analyzeFromClient } from "@/lib/api/analysis";
 import { saveAnalysis } from "@/lib/store/analysis-store";
 import { rememberAnalysisInput } from "@/lib/store/explanation-store";
+import { rememberRecheckInput } from "@/lib/store/recheck-store";
 import { useProfileStore } from "@/lib/store/profile-store";
 
 /**
@@ -81,6 +82,13 @@ export default function CheckPage() {
       `explanation-store.ts` 에 적었다.
     */
     rememberAnalysisInput(response.result.id, request);
+    /*
+      결과 화면에서 상황만 바꿔 다시 확인할 수 있게 원문을 한 칸 더
+      넘긴다. 설명 보관소와 나눠 둔 이유는 `recheck-store.ts` 에 적었다 -
+      그쪽은 요청을 만들자마자 버리고, 이쪽은 사용자가 상황을 고칠 때까지
+      들고 있어야 한다. 둘 다 메모리 한 칸이고 저장소에 쓰지 않는다.
+    */
+    rememberRecheckInput(response.result.id, request);
     router.push(`/check/result/${response.result.id}`);
   }
 

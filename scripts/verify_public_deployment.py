@@ -13,6 +13,11 @@ loopback 에만 bind 된 내부 포트가 열려 보이고, 방화벽도 통과�
 실패해도 사용자는 만료 당일까지 아무것도 느끼지 못한다. `--certificate-only`
 로 주기 실행해 두면 그 침묵을 깬다 (`docs/28` P1-1 이 붙기 전까지의 최소한).
 
+화면이 200 이라는 것과 그 화면이 부르는 API 가 산다는 것은 다른 문제다.
+2026-09-05 에 `page:/products` 는 초록이었고 금융상품은 전부 503 이었다 -
+껍데기는 서버가 그리고 상품은 브라우저가 따로 부르기 때문이다. 그래서 화면
+목록과 별도로 **그 화면이 부르는 경로**를 목록·상세·비교까지 이어서 찍는다.
+
 출력은 JSON 한 줄씩이다. 공유 문구 왕복 검사에는 실제 문자 대신 고정된
 검사 문자열만 쓴다 - 검사기가 남의 문자 원문을 만들 이유가 없다.
 """
@@ -24,6 +29,7 @@ import socket
 import ssl
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
@@ -31,17 +37,24 @@ from cryptography import x509
 
 from app.core.public_deployment import (
     INTERNAL_PORTS,
+    PUBLIC_HEALTH_STATUS,
     CheckResult,
     evaluate_certificate,
     evaluate_https_redirect,
     evaluate_hsts,
     evaluate_internal_port,
+    evaluate_product_endpoint,
+    evaluate_public_health,
     evaluate_security_headers,
     evaluate_share_target,
     summarize,
 )
 
 TIMEOUT = 10
+
+# 공공데이터 왕복이 들어 있어 화면보다 느리다. 10초로는 느린 날에 검사기가
+# 스스로 타임아웃을 내고, 그러면 배포 실패와 구분되지 않는다.
+PRODUCT_TIMEOUT = 25
 
 # 로그인 없이 열려야 하는 주요 화면. 하나라도 500 이면 공개 상태가 아니다.
 PUBLIC_PATHS = (
@@ -57,6 +70,10 @@ PUBLIC_PATHS = (
 )
 
 SHARE_PROBE_TEXT = "배포 확인용 문구입니다. 실제 사용자 메시지가 아닙니다."
+
+# 상품 목록을 받아 올 때 쓰는 목표값. `FinancialGoal` 의 한 값이고, 프로필을
+# 만들지 않는다 - 이 경로는 목표 하나만 받는다.
+PRODUCT_PROBE_GOAL = "emergency_cash"
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -110,6 +127,101 @@ def check_paths(domain: str, context: ssl.SSLContext) -> list[CheckResult]:
                     cache_control or "Cache-Control 이 없다",
                 )
             )
+    return results
+
+
+def check_public_health(domain: str, context: ssl.SSLContext) -> list[CheckResult]:
+    """상태 확인 세 경로를 공개 도메인에서 찍는다.
+
+    컨테이너 안에서 찍으면 언제나 초록이다. 리버스 프록시가 그 요청을 backend
+    로 보내는지는 **밖에서만** 보인다.
+    """
+    results: list[CheckResult] = []
+    for path in PUBLIC_HEALTH_STATUS:
+        try:
+            status, _, body = fetch(f"https://{domain}{path}", context)
+        except OSError as error:
+            results.append(CheckResult(f"health:{path}", False, type(error).__name__))
+            continue
+        results.append(evaluate_public_health(path, status, body.decode("utf-8", "replace")))
+    return results
+
+
+def post_json(url: str, payload: dict, context: ssl.SSLContext) -> tuple[int, object]:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=PRODUCT_TIMEOUT, context=context) as response:
+            return response.status, _decode(response.read())
+    except urllib.error.HTTPError as error:
+        return error.code, _decode(error.read())
+
+
+def _decode(raw: bytes) -> object:
+    try:
+        return json.loads(raw or b"null")
+    except ValueError:
+        return None
+
+
+def check_product_catalog(domain: str, context: ssl.SSLContext) -> list[CheckResult]:
+    """목록 → 상세 → 비교를 실제 식별자로 이어서 찍는다.
+
+    상세와 비교는 목록이 돌려준 `source_product_id` 를 그대로 쓴다. 검사기가
+    식별자를 지어내면 404 가 나고, 그 404 는 배포가 아니라 검사기 탓이다.
+    목록이 실패하면 뒤의 둘은 찍지 않는다 - 같은 원인 하나를 세 번 세면
+    실패 개수가 원인 개수를 속인다.
+    """
+    try:
+        status, payload = post_json(
+            f"https://{domain}/api/proxy/recommendations",
+            {"goal": PRODUCT_PROBE_GOAL},
+            context,
+        )
+    except OSError as error:
+        return [CheckResult("product:list", False, type(error).__name__)]
+
+    matches = payload.get("results") if isinstance(payload, dict) else None
+    matches = matches if isinstance(matches, list) else []
+    results = [evaluate_product_endpoint("list", status, len(matches))]
+
+    identifiers = [
+        match["product"]["source_product_id"]
+        for match in matches
+        if isinstance(match, dict)
+        and isinstance(match.get("product"), dict)
+        and isinstance(match["product"].get("source_product_id"), str)
+    ]
+    if len(identifiers) < 2:
+        return results
+
+    detail_url = f"https://{domain}/api/proxy/products/{urllib.parse.quote(identifiers[0], safe='')}"
+    try:
+        status, _, body = fetch(detail_url, context)
+    except OSError as error:
+        results.append(CheckResult("product:detail", False, type(error).__name__))
+    else:
+        detail = _decode(body)
+        found = isinstance(detail, dict) and detail.get("source_product_id") == identifiers[0]
+        results.append(evaluate_product_endpoint("detail", status, 1 if found else 0))
+
+    try:
+        status, payload = post_json(
+            f"https://{domain}/api/proxy/products/compare",
+            {"product_ids": identifiers[:2]},
+            context,
+        )
+    except OSError as error:
+        results.append(CheckResult("product:compare", False, type(error).__name__))
+    else:
+        items = payload.get("items") if isinstance(payload, dict) else None
+        results.append(
+            evaluate_product_endpoint("compare", status, len(items) if isinstance(items, list) else 0)
+        )
     return results
 
 
@@ -236,6 +348,8 @@ def main() -> int:
 
         results.append(check_https_redirect(domain))
         results.extend(check_paths(domain, context))
+        results.extend(check_public_health(domain, context))
+        results.extend(check_product_catalog(domain, context))
         results.extend(check_share_target(domain, context))
         results.extend(check_internal_ports(domain))
 
