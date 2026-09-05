@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { BackendRecommendationGoalSchema, ProductRecommendationResponseSchema } from "@/lib/api/contracts";
-import { postJson } from "@/lib/api/client";
+import { CATALOG_TIMEOUT_MS, postJson } from "@/lib/api/client";
 import { backendHeaders } from "@/lib/api/server-auth";
 import { upstreamFailure } from "@/lib/api/proxy-response";
 import { readJsonBody } from "@/lib/api/request-body";
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       "/api/v1/recommendations?page_size=100",
       { goal: parsed.data },
       ProductRecommendationResponseSchema,
-      undefined,
+      CATALOG_TIMEOUT_MS,
       backendHeaders(request),
     );
     return NextResponse.json(result);

@@ -26,7 +26,10 @@ from app.services.product_catalog_snapshot import (
 )
 
 
-DEFAULT_CACHE_TTL_SECONDS = 300.0
+# The official dataset is keyed by `basYm`, so it changes once a month. A short
+# TTL therefore buys no freshness; it only decides how often somebody pays the
+# cold path. `fetched_at` travels with every response, so age stays visible.
+DEFAULT_CACHE_TTL_SECONDS = 3600.0
 DEFAULT_LOOKBACK_MONTHS = 36
 PRODUCT_COMPARISON_DISCLAIMER = (
     "공식 원문을 나란히 표시한 결과이며 적격성, 승인 가능성, 금리 우열을 "

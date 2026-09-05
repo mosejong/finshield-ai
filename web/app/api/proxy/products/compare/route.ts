@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { postJson } from "@/lib/api/client";
+import { CATALOG_TIMEOUT_MS, postJson } from "@/lib/api/client";
 import {
   ProductComparisonRequestSchema,
   ProductComparisonResponseSchema,
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       "/api/v1/products/compare",
       parsed.data,
       ProductComparisonResponseSchema,
-      undefined,
+      CATALOG_TIMEOUT_MS,
       backendHeaders(request),
     );
     return NextResponse.json(result);

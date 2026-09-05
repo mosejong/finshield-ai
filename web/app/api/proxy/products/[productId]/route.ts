@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requestJson } from "@/lib/api/client";
+import { CATALOG_TIMEOUT_MS, requestJson } from "@/lib/api/client";
 import {
   BackendProductSchema,
   ProductSourceIdSchema,
@@ -39,7 +39,7 @@ export async function GET(request: Request, context: Context) {
       `/api/v1/products/${encodeURIComponent(parsed.data)}`,
       undefined,
       BackendProductSchema,
-      undefined,
+      CATALOG_TIMEOUT_MS,
       backendHeaders(request),
     );
     return NextResponse.json(result);

@@ -27,6 +27,14 @@ class ProductProviderResponseError(ProductProviderError):
     """Raised when the provider returns an error or unsupported payload."""
 
 
+# One provider round trip, measured 2026-09-05. From the dev PC a 325-row page
+# takes 0.64s; from the us-west1 VM the first call of a process takes 2.33s,
+# because the TLS handshake to the Korean host is paid there. A 5s budget left
+# too little margin for that, and exceeding it turns a slow provider into a
+# hard failure the user sees as "official product data unavailable".
+PROVIDER_TIMEOUT_SECONDS = 10.0
+
+
 @dataclass(frozen=True)
 class ProviderProductPage:
     rows: list[Mapping[str, Any]]
@@ -42,7 +50,7 @@ class PublicDataProductClient:
         service_key: str,
         *,
         client: httpx.Client | None = None,
-        timeout_seconds: float = 5.0,
+        timeout_seconds: float = PROVIDER_TIMEOUT_SECONDS,
     ) -> None:
         normalized_key = service_key.strip()
         if not normalized_key:
