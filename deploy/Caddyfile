@@ -26,17 +26,44 @@
 		-Server
 	}
 
-	reverse_proxy web:3000 {
-		# 클라이언트가 미리 적어 보낸 X-Forwarded-For 체인을 이어붙이지 않고
-		# 버린다. 이 Caddy 가 인터넷에 직접 붙어 있으므로 믿을 수 있는 주소는
-		# TCP peer 하나뿐이고, 남겨두면 backend 가 세는 홉 수만 흔들린다.
-		# 앞단에 CDN 을 두게 되면 이 줄과 backend 의
-		# FINSHIELD_TRUSTED_PROXY_HOPS 를 함께 고쳐야 한다.
-		#
-		# Caddy 는 기동할 때 이 줄을 "unnecessary" 라고 경고한다. 경고를 믿고
-		# 지우면 안 된다. 기본 동작은 클라이언트가 보낸 값 뒤에 덧붙이는
-		# append 이고, 이 줄은 통째로 바꾸는 set 이다. 실제로 그런지는 adapt
-		# 결과로 확인했다: `"request":{"set":{"X-Forwarded-For":[...]}}`.
-		header_up X-Forwarded-For {remote_host}
+	# 밖에서 상태를 볼 수 있어야 하는 경로만 backend 로 보낸다.
+	#
+	# 이 matcher 가 없으면 `/health` 도 web:3000 으로 가고, Next 에는 그런
+	# 페이지가 없으니 404 가 돌아온다. FastAPI 에는 세 경로가 전부 있는데도
+	# **밖에서는 항상 404 였다.** 2026-09-05 외부 검수가 잡았다. 배포 상태
+	# 문제가 아니라 이 파일이 정한 대로 동작한 결과였다.
+	#
+	# `path` 는 정확히 일치하는 것만 고른다(접두사가 아니다). 그래서
+	# `/health/anything` 은 여기 걸리지 않고 Next 로 간다. `/internal/metrics`
+	# 는 이번에도 공개하지 않는다 — 그쪽은 어떤 요청이 얼마나 오는지를 그대로
+	# 드러내므로 "살아 있나" 와 같은 취급을 받으면 안 된다.
+	@public_health path /health /health/live /health/ready
+
+	handle @public_health {
+		reverse_proxy backend:8000 {
+			# backend 는 `FINSHIELD_TRUSTED_HOSTS=backend,localhost,127.0.0.1`
+			# 로 뜬다(compose.https.yaml). 공개 도메인 Host 를 그대로 넘기면
+			# TrustedHostMiddleware 가 400 으로 끊는다. web 이 부를 때와 같은
+			# Host 로 맞춰 보낸다 — 신뢰 목록에 공개 도메인을 더하는 것보다
+			# 좁고, 밖에서 온 Host 값이 backend 에 닿지 않는다.
+			header_up Host backend:8000
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+
+	handle {
+		reverse_proxy web:3000 {
+			# 클라이언트가 미리 적어 보낸 X-Forwarded-For 체인을 이어붙이지 않고
+			# 버린다. 이 Caddy 가 인터넷에 직접 붙어 있으므로 믿을 수 있는 주소는
+			# TCP peer 하나뿐이고, 남겨두면 backend 가 세는 홉 수만 흔들린다.
+			# 앞단에 CDN 을 두게 되면 이 줄과 backend 의
+			# FINSHIELD_TRUSTED_PROXY_HOPS 를 함께 고쳐야 한다.
+			#
+			# Caddy 는 기동할 때 이 줄을 "unnecessary" 라고 경고한다. 경고를 믿고
+			# 지우면 안 된다. 기본 동작은 클라이언트가 보낸 값 뒤에 덧붙이는
+			# append 이고, 이 줄은 통째로 바꾸는 set 이다. 실제로 그런지는 adapt
+			# 결과로 확인했다: `"request":{"set":{"X-Forwarded-For":[...]}}`.
+			header_up X-Forwarded-For {remote_host}
+		}
 	}
 }
