@@ -203,7 +203,17 @@ git fetch --tags --quiet
 git rev-parse -q --verify "refs/tags/$TAG^{commit}" >/dev/null \
     || die "태그를 못 찾았다: $TAG"
 
-dirty="$(git status --porcelain)"
+# 부트스트랩 예외 하나. 이 스크립트는 자기가 배포할 태그에서 처음 생겼을 수
+# 있고, 그러면 `git checkout <태그> -- deploy/redeploy.sh` 로 먼저 가져와야
+# 실행된다. 그 순간 작업본은 더러워지고, 아래 검사에 스크립트 자신이 걸린다.
+#
+# 그래서 봐주되 **내용이 배포할 태그와 같을 때만** 봐준다. 손으로 고친 것은
+# 그대로 걸린다 — 예외의 크기가 정확히 "한 파일, 그 태그의 내용" 이다.
+if git diff --quiet "$TAG" -- "$SELF" 2>/dev/null; then
+    dirty="$(git status --porcelain -- . ":(exclude)$SELF")"
+else
+    dirty="$(git status --porcelain)"
+fi
 [ -z "$dirty" ] || die "작업본에 손댄 것이 있다. 먼저 정리한다:
 $dirty"
 
@@ -282,7 +292,17 @@ step "digest"
 owner="$(grep -E '^FINSHIELD_IMAGE_OWNER=' .env | cut -d= -f2- || true)"
 owner="${owner:-mosejong}"
 
-ledger="$(grep -F "| \`$TAG\` |" "$LEDGER" || true)"
+# 대장은 **태그 안에 없다.** digest 는 태그를 민 뒤에 만들어지므로 어떤 태그도
+# 자기 digest 를 담을 수 없다. 대장은 main 에서 계속 자라는 기록이고, 그래서
+# 체크아웃된 파일이 아니라 방금 fetch 한 main 에서 읽는다.
+if git rev-parse -q --verify origin/main >/dev/null; then
+    ledger_text="$(git show "origin/main:$LEDGER")"
+else
+    printf '  origin/main 이 없다. 체크아웃된 파일로 본다\n' >&2
+    ledger_text="$(cat "$LEDGER")"
+fi
+
+ledger="$(printf '%s\n' "$ledger_text" | grep -F "| \`$TAG\` |" || true)"
 [ -n "$ledger" ] || die "릴리스 대장에 $TAG 가 없다. 이미지가 만들어졌는지부터 본다"
 
 mismatch=0
@@ -306,7 +326,7 @@ done <<< "$ledger"
 
 # --------------------------------------------------------------------------
 
-cat <<'NEXT'
+cat <<NEXT
 
 == 여기까지가 이 기계에서 확인할 수 있는 전부다
 
@@ -315,6 +335,6 @@ cat <<'NEXT'
 
   python -m scripts.verify_public_deployment --domain finshield-ai.duckdns.org
 
-그리고 `docs/31` 의 "v0.8.0 을 올린 뒤 찍을 것" 표를 따라간다.
-통과한 뒤에 12절 배포 대장에 줄을 적는다 — 먼저 적지 않는다.
+그리고 docs/31 의 "$TAG 을 올린 뒤 찍을 것" 표를 따라간다.
+통과한 뒤에 12절 배포 대장에 줄을 적는다 - 먼저 적지 않는다.
 NEXT
