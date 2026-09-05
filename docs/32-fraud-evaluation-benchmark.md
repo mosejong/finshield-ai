@@ -2769,8 +2769,8 @@ p95 3.921ms. **열세 회차 동안 p95 는 4ms 아래에 머물러 있다.**
 
 ### 자동화
 
-`pytest -q` **1,256 passed, 2 skipped**. 프론트엔드 `vitest` **139 passed**
-(20 파일).
+`pytest -q` **1,292 passed, 2 skipped**(CI 는 DB 연동 2건이 돌아 **1,294**).
+프론트엔드 `vitest` **151 passed** (22 파일).
 
 ### 이 절이 고친 것
 
