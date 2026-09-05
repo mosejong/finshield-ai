@@ -17,6 +17,8 @@ from app.core.public_deployment import (
     evaluate_https_redirect,
     evaluate_hsts,
     evaluate_internal_port,
+    evaluate_product_endpoint,
+    evaluate_public_health,
     evaluate_security_headers,
     evaluate_share_target,
     summarize,
@@ -170,6 +172,81 @@ class TestInternalPorts:
 
     def test_reachable_database_port_fails(self):
         assert not evaluate_internal_port(5432, reachable=True).passed
+
+
+class TestPublicHealth:
+    """상태 확인 경로가 밖에서 답하는지.
+
+    2026-09-05 외부 검수가 `/health` 와 `/health/ready` 를 Next 404 로 받았다.
+    배포가 망가진 것이 아니라 리버스 프록시가 그 요청을 backend 로 보낸 적이
+    없었다. 그때 이 판정은 존재하지 않았다.
+    """
+
+    def test_backend_answer_passes(self):
+        assert evaluate_public_health("/health", 200, '{"status":"ok"}').passed
+
+    def test_ready_answer_passes(self):
+        assert evaluate_public_health("/health/ready", 200, '{"status":"ready"}').passed
+
+    def test_not_found_names_the_proxy(self):
+        result = evaluate_public_health("/health", 404, "")
+        assert not result.passed
+        assert "프록시" in result.detail
+
+    def test_rejected_host_is_named_separately(self):
+        """400 은 Caddy 가 보내긴 했는데 backend 가 Host 를 거부한 것이다."""
+        result = evaluate_public_health("/health", 400, "")
+        assert not result.passed
+        assert "Host" in result.detail
+
+    def test_two_hundred_from_the_wrong_service_fails(self):
+        """이 검사의 핵심. Next 가 낸 200 을 backend 의 200 으로 세면 안 된다.
+
+        상태 코드만 보면 어떤 서비스가 답했는지 알 수 없다. 본문의 값까지
+        봐야 "backend 까지 닿았다" 를 말할 수 있다.
+        """
+        result = evaluate_public_health("/health", 200, "<!DOCTYPE html><title>FinShield")
+        assert not result.passed
+
+    def test_live_and_ready_do_not_share_an_answer(self):
+        """경로마다 다른 값을 요구한다. 하나로 뭉치면 오배선을 못 잡는다."""
+        assert not evaluate_public_health("/health/live", 200, '{"status":"ready"}').passed
+
+    def test_unpublished_path_is_not_treated_as_health(self):
+        assert not evaluate_public_health("/internal/metrics", 200, '{"status":"ok"}').passed
+
+
+class TestProductEndpoint:
+    """금융상품 경로의 실패를 원인별로 가른다.
+
+    `app/api/routes/products.py` 가 정한 대응이다. 503 은 배포에 키가 없다는
+    뜻이고 502 는 키가 있는데 상대가 응답하지 않는다는 뜻이라, 손댈 곳이
+    서로 다르다. 2026-09-05 에 돌아온 것은 503 이었고 그래서 VM 에 들어가기
+    전에 원인이 정해졌다.
+    """
+
+    def test_products_returned_passes(self):
+        assert evaluate_product_endpoint("list", 200, 12).passed
+
+    def test_configuration_error_names_the_missing_override(self):
+        result = evaluate_product_endpoint("list", 503, 0)
+        assert not result.passed
+        assert "compose.public-data.yaml" in result.detail
+
+    def test_provider_error_is_a_different_cause(self):
+        result = evaluate_product_endpoint("list", 502, 0)
+        assert not result.passed
+        assert "제공자" in result.detail
+        assert "compose.public-data.yaml" not in result.detail
+
+    def test_two_hundred_with_no_products_fails(self):
+        """200 인데 0건이면 화면에는 아무것도 없다. 그것도 실패다."""
+        assert not evaluate_product_endpoint("list", 200, 0).passed
+
+    def test_unknown_status_still_fails(self):
+        result = evaluate_product_endpoint("compare", 418, 0)
+        assert not result.passed
+        assert "418" in result.detail
 
 
 class TestSummary:
