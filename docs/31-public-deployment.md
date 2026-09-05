@@ -4,14 +4,17 @@
 
 판단 기준은 하나다. **인증서가 발급됐다는 것은 배포가 끝났다는 뜻이 아니다.** 밖에서 붙었을 때 평문으로 새지 않고, 갱신이 멈춰 있지 않고, 내부 포트가 열려 있지 않아야 끝이다.
 
-## 0. 먼저 읽을 것 — 이 배포에서 조용히 실패하는 두 가지
+## 0. 먼저 읽을 것 — 이 배포에서 조용히 실패하는 세 가지
 
 | 실패 | 왜 조용한가 | 대응 |
 |---|---|---|
 | 인증서 갱신 정지 | Caddy 는 만료 30일 전부터 갱신을 시도하고 실패해도 재시도만 한다. 사용자는 **만료 당일까지** 아무것도 못 느낀다 | ACME 연락처 필수화 + `--certificate-only` 주기 실행 |
 | 발급 한도 소진 | Let's Encrypt 운영 디렉터리는 도메인당 검증 실패 5회/시간, 같은 이름 중복 인증서 5장/주. DNS 가 아직 서버를 가리키지 않은 채로 스택을 올리면 재시도가 한도를 태운다 | 첫 발급은 staging 으로 예행연습 |
+| **배포 목록 누락** | `docker compose config` 도 `caddy validate` 도 **문법만** 본다. 적어 둔 목록이 실제로 필요한 것보다 **짧다**는 것은 어느 쪽도 잡지 못한다. 빠진 기능만 죽고 나머지는 전부 멀쩡하다 | 재배포 명령줄과 라우팅을 `tests/test_public_routing.py` 가 검사한다 |
 
 두 번째가 특히 아프다. 한도를 태운 사실은 **준비가 다 끝난 뒤 발급을 못 받을 때** 알게 된다. 그래서 staging 경로를 미리 만들어 뒀다.
+
+세 번째는 2026-09-05 외부 검수에서 두 건이 한꺼번에 드러났다. 재배포 명령줄에 `compose.public-data.yaml` 이 **한 번도 없었고**, 그래서 공개 서비스의 금융상품은 공개 이후 한 번도 동작한 적이 없다(전부 `503`). 그런데 컨테이너는 내내 healthy 였다 — `/health/ready` 는 저장소만 보고 상품 제공자는 보지 않는다. 같은 검수에서 `/health` 세 경로가 밖에서 `404` 라는 것도 나왔는데, 이쪽은 `deploy/Caddyfile` 이 **모든** 요청을 `web:3000` 으로 보내고 있었다. 둘 다 코드는 맞았고 **배포 설정이 그 코드에 닿지 못한** 경우다.
 
 ## 1. 구성
 
@@ -21,9 +24,12 @@
 | HTTPS override | `compose.https.yaml` | `proxy` 서비스, 80/443 공개, SNI healthcheck |
 | staging 발급자 | `deploy/acme-staging.caddy` | `acme_ca` 를 Let's Encrypt staging 으로 교체 |
 | staging override | `compose.acme-staging.yaml` | 위 파일을 `/etc/caddy/acme/` 에 mount |
+| 설명 계층 override | `compose.gemini.yaml` | Gemini 키를 secret 으로 backend 에 붙인다 |
+| 금융상품 override | `compose.public-data.yaml` | 공공데이터 서비스키를 secret 으로 backend 에 붙인다 |
 | 판정 기준 | `app/core/public_deployment.py` | 순수 함수. 무엇이 합격인지 |
 | 실측 | `scripts/verify_public_deployment.py` | 밖에서 두드려 값을 가져온다 |
 | 기준 테스트 | `tests/test_public_deployment.py` | 떨어져야 하는 입력이 실제로 떨어지는지 |
+| 라우팅·목록 대조 | `tests/test_public_routing.py` | Caddy 가 보내는 곳과 FastAPI 가 가진 경로, 그리고 3-6 의 재배포 목록과 저장소의 override 파일이 같은지 |
 
 판정과 실측을 나눈 이유는 P0-3 에서 겪은 것 때문이다. 검사가 돌고 있었지만 실패할 수 없는 검사였고, 초록불이 아무것도 증명하지 않았다. 판정을 순수 함수로 빼면 네트워크 없이 **기준 자체**를 테스트할 수 있다.
 
@@ -168,7 +174,7 @@ else
 fi
 grep '^FINSHIELD_IMAGE_TAG=' .env
 
-DC="docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml -f compose.gemini.yaml"
+DC="docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml -f compose.gemini.yaml -f compose.public-data.yaml"
 
 $DC pull
 $DC up -d
@@ -180,14 +186,17 @@ $DC images
 `FINSHIELD_ACME_EMAIL`)은 이미 떠 있는 스택이라면 `.env` 에 있다 — 없으면 compose 가
 `:?` 로 거부하므로 애초에 지금 떠 있지 않았을 것이다.
 
-빠뜨리면 안 되는 두 개, 그리고 각각 무엇이 되는지:
+빠뜨리면 안 되는 세 개, 그리고 각각 무엇이 되는지:
 
 | 빠뜨린 것 | 일어나는 일 |
 |---|---|
 | `-f compose.deploy.yaml` | VM 이 **빌드를 시작하고** OOM 으로 조용히 죽는다 (11-1) |
 | `-f compose.gemini.yaml` | 키 secret 이 사라져 설명 계층이 `status: off` 로 떨어진다. 판정은 살아 있어서 화면상으로는 멀쩡해 보인다 |
+| `-f compose.public-data.yaml` | 공공데이터 키 secret 이 사라져 **금융상품 전체가 `503`** 이 된다. 판정도 설명도 멀쩡하고 상품만 죽는다 |
 
 두 번째가 더 위험하다. 첫 번째는 죽어서 알게 되고, 두 번째는 **안 죽어서 모른다.**
+
+세 번째는 그 말을 실제로 증명했다. **2026-09-05 검수 전까지 이 줄에 `compose.public-data.yaml` 이 없었다.** 아무도 안 죽었고 아무도 몰랐다. 그래서 지금은 이 명령줄을 `tests/test_public_routing.py` 가 읽어서 저장소의 `compose*.yaml` 전부(staging 제외)와 같은 집합인지 검사한다. **문서가 짧아지면 테스트가 떨어진다.** 새 override 를 만들면 이 줄에 더하는 것이 선택이 아니게 됐다.
 
 마지막 `images` 로 digest 를 확인한다 — 태그는 옮겨 붙지만 digest 는 아니다.
 그 값을 12절 릴리스 대장의 값과 대조하면 "무엇이 떠 있는가" 에 답이 된다.
@@ -232,9 +241,10 @@ uid 10001 에게는 **읽기 거부**다. 그리고 `app/main.py` 의 lifespan �
 증상과 원인이 멀어지는 자리라 로그를 어디서 보는지 적어 둔다.
 
 ```bash
-docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml \
-  -f compose.gemini.yaml logs --tail=40 backend
+$DC logs --tail=40 backend
 ```
+
+`$DC` 는 3-6 에서 정의한 그 변수다. 여기서 파일 목록을 다시 적지 않는 이유가 있다 — 이 문서는 목록을 네 군데에 적어 두고 있었고, 그중 하나에만 새 override 를 더하면 나머지 셋이 조용히 옛 구성으로 돈다. 실제로 그렇게 어긋났다.
 
 `LlmRuntimeConfigurationError: ... the API key is missing` 은 **키가 없다는
 뜻이 아니다.** `read_secret_setting` 의 `OSError` 가 거기까지 접혀 온 것이고,
@@ -243,8 +253,7 @@ docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml \
 그다음 override 를 끼워 다시 올린다.
 
 ```bash
-docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml \
-  -f compose.gemini.yaml up -d
+$DC up -d
 ```
 
 키 파일은 `.gitignore` 의 `secrets/` 에 걸려 있어 커밋되지 않는다. 값은 어떤
@@ -271,8 +280,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 정상 호출은 6~8초 걸린다. 키를 드러내지 않고 컨테이너 안에서 확인한다.
 
 ```bash
-docker compose -f compose.yaml -f compose.https.yaml -f compose.deploy.yaml \
-  -f compose.gemini.yaml exec backend python -c '
+$DC exec backend python -c '
 import io, httpx
 k = io.open("/run/secrets/gemini_api_key").read().strip()
 print("key_len", len(k))
@@ -332,6 +340,66 @@ API 제한사항과 결합할 수 없습니다" 가 뜬다. 둘은 상호 배타
 | `API key not valid` | 키 값 자체 | 키를 다시 만든다 |
 | `has not been used in project … or it is disabled` | 프로젝트에서 API 가 꺼짐 | `gcloud services enable` |
 | `Requests to this API … are blocked` | 키의 API 제한 목록 | 콘솔에서 제한을 바꾼다 |
+
+#### 금융상품을 켜려면 공공데이터 키 파일이 서버에 있어야 한다
+
+`compose.public-data.yaml` 은 `./secrets/public_data_service_key.txt` 를 **파일로**
+요구한다. 파일이 없으면 스택 자체가 안 뜨므로, 키가 아직 서버에 없다면 그
+override 없이 먼저 올린다 — 금융상품만 꺼진 채 판정·설명·전세는 전부 돈다.
+
+키는 공공데이터포털에서 「금융위원회 서민금융진흥원 대출상품 정보」 활용신청을
+하고 받은 **일반 인증키(Decoding)** 다. 올리는 절차는 Gemini 키와 같다.
+
+```bash
+mkdir -p secrets
+read -rsp '공공데이터 서비스키: ' KEY && printf '%s' "$KEY" > secrets/public_data_service_key.txt
+unset KEY
+sudo chown 10001:10001 secrets/public_data_service_key.txt
+sudo chmod 400 secrets/public_data_service_key.txt
+ls -ln secrets/public_data_service_key.txt      # -r-------- 1 10001 10001
+```
+
+`read -rs`·`printf '%s'`·`chown 10001:10001`·`chmod 400` 이 왜 그래야 하는지는 바로
+위 Gemini 절에 적은 그대로다. `600` 은 컨테이너가 못 읽고 `644` 는 VM 의 모든
+계정이 읽는다.
+
+**Gemini 키와 다른 점이 하나 있다. 이쪽은 없어도 백엔드가 뜬다.** 설명 계층은
+lifespan 이 기동할 때 조립을 시도하므로 키가 잘못되면 백엔드가 아예 안 뜨고,
+그래서 바로 알게 된다. 상품 쪽은 `get_product_catalog_service()` 가 **첫 요청
+때** 조립을 시도하고 실패하면 `503` 을 돌려준다. 컨테이너는 계속 healthy 이고
+`/health/ready` 도 초록이다 — 그 검사는 저장소만 보고 상품 제공자는 보지 않는다.
+**밖에서 상품을 실제로 불러 보는 것 말고는 알 방법이 없다.** 2026-09-05 까지
+아무도 안 불러 봤다.
+
+#### 확인
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  https://finshield-ai.duckdns.org/api/proxy/recommendations \
+  -H 'Content-Type: application/json' -d '{"goal":"emergency_cash"}'
+```
+
+| 결과 | 뜻 |
+|---|---|
+| **503** | **설정 누락.** `-f compose.public-data.yaml` 이 빠졌거나 키 파일이 서버에 없다 |
+| **502** | **제공자 실패.** 키는 붙었고 공공데이터 호출이 실패했다. 키 값이 틀렸거나 상대편 장애다 |
+| 400 | `goal` 값이 enum 에 없다. 부르는 쪽 문제다 |
+| 200 | 완료. 본문의 `results` 가 비어 있지 않은지도 같이 본다 |
+
+**이 두 줄을 가르는 것이 이 절의 전부다.** 503 과 502 는 손댈 곳이 다르다 —
+앞은 compose 목록이고 뒤는 키 값과 상대편 상태다. Next 프록시가 503 을 그대로
+통과시키기 때문에(`web/lib/api/proxy-response.ts` 의 `PASSTHROUGH_STATUSES`)
+**VM 에 들어가지 않고도** 이 구분이 밖에 남는다. 2026-09-05 에 돌아온 것은
+`503` 이었고, 그래서 서버에 붙기 전에 원인이 정해졌다.
+
+키 값 자체는 로그·이슈·채팅 어디에도 출력하지 않는다. 붙었는지만 본다.
+
+```bash
+$DC exec backend python -c '
+import io
+print("key_len", len(io.open("/run/secrets/public_data_service_key").read().strip()))
+'
+```
 
 #### 그 릴리스에서 처음 생긴 경로를 하나 찍는다
 
@@ -398,11 +466,17 @@ curl -s --max-time 30 -X POST \
 | `header:*` | `docs/26` 의 값과 정확히 일치 | 존재만 보면 `X-Frame-Options: ALLOWALL` 같은 무력화를 못 잡는다 |
 | `header:server`, `header:x-powered-by` | 없음 | 버전을 알려 줄 이유가 없다 |
 | `page:*` | 주요 화면 9개 전부 200 | `/offline`, `/manifest.webmanifest`, `/sw.js` 포함 — PWA 는 이 세 개가 없으면 설치되지 않는다 |
+| `health:*` | `/health`·`/health/live`·`/health/ready` 가 200 **이고 본문이 backend 가 낸 값** | 404 면 프록시가 backend 로 안 보낸다는 뜻이다. 상태 코드만 보면 Next 가 낸 200 과 구분되지 않아 본문 값까지 본다 |
+| `product:list` / `:detail` / `:compare` | 200 + 1건 이상 | `page:/products` 는 껍데기만 본다. 상품은 브라우저가 따로 부르므로 상품이 전부 죽어도 그 검사는 초록이다 |
 | `service_worker_not_cached` | `/sw.js` 에 `no-store` | 낡은 워커가 캐시에 박히면 배포가 사용자에게 도달하지 않는다 |
 | `share_target_*` | 200 + `no-store` + `Set-Cookie` 없음 | 공유된 문자 원문이 담긴 응답이다 (`docs/30`) |
 | `internal_port:*` | 18000 / 13000 / 5432 전부 닫힘 | 열려 있으면 Caddy 를 우회해 평문으로 붙을 수 있고 HTTPS 를 붙인 의미가 없다 |
 
 공유 왕복 검사는 **고정된 검사 문구**만 보낸다(`SHARE_PROBE_TEXT`). 검사기가 남의 문자 원문을 만들어 낼 이유가 없다.
+
+상품 검사는 목록 → 상세 → 비교를 **목록이 돌려준 식별자로** 이어서 찍는다. 검사기가 식별자를 지어내면 404 가 나고 그 404 는 배포가 아니라 검사기 탓이다. 목록이 실패하면 뒤의 둘은 아예 찍지 않는다 — 원인 하나를 세 번 세면 실패 개수가 원인 개수를 속인다.
+
+`page:*` 와 `product:*` 를 나눈 이유가 이 표에서 제일 중요하다. **화면이 200 이라는 것과 그 화면이 부르는 API 가 산다는 것은 다른 사실이다.** 2026-09-05 에 `page:/products` 는 초록이었고 상품은 전부 503 이었다.
 
 ## 5. localhost 예행연습 — 도메인 없이 경로 전체 확인
 
@@ -425,6 +499,8 @@ python -m scripts.verify_public_deployment --domain localhost --insecure
 `--insecure` 는 체인 검증 실패만 봐준다. 만료·헤더·리다이렉트는 그대로 엄격하다. 출력에 `--insecure: 체인 검증을 건너뛴 예행연습` 이 보이면 예행연습이라는 뜻이고, **실도메인 출력에 이 줄이 보이면 잘못된 것이다.**
 
 2026-08-17 실행 결과: 27개 검사 중 위 4개만 실패. 나머지는 전부 통과했다.
+
+**그 숫자는 더 이상 27이 아니다.** 2026-09-05 에 `health:*` 셋과 `product:*` 셋을 더했다. 그리고 위 예행연습 명령줄에는 `compose.public-data.yaml` 이 없으므로 — 예행연습 머신에 키 파일이 없을 수 있고, 없으면 스택이 아예 안 뜬다 — `product:list` 가 `503` 으로 하나 더 실패한다. **그것이 이 검사가 존재하는 이유이므로 예행연습에서는 정상이다.** 상품까지 보려면 키 파일을 올린 뒤 `-f compose.public-data.yaml` 을 붙여 다시 올린다. 이 절의 개수는 2026-09-05 이후 아직 다시 재지 않았다 — 잰 것과 안 잰 것을 구분해서 적는다.
 
 ## 6. 갱신 감시
 
