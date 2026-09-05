@@ -5,6 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { DisclaimerNote } from "@/components/common/DisclaimerNote";
 import { ProductFacts } from "@/components/finance/ProductFacts";
 import { fetchProductDetail } from "@/lib/api/products";
+import { productProviderLabel } from "@/lib/format/labels";
 import type { BackendProduct } from "@/lib/api/contracts";
 
 
@@ -48,7 +49,8 @@ export function ProductDetail({ productId }: { productId: string }) {
           {product.offering_institution ?? "제공기관 확인 필요"}
         </p>
         <p className="mt-3 text-caption text-muted-foreground">
-          기준월 {product.source_base_month ?? "확인 필요"} · 상품 ID {product.source_product_id}
+          {productProviderLabel(product.provider)} 공공데이터 · 기준월{" "}
+          {product.source_base_month ?? "확인 필요"} · 상품 ID {product.source_product_id}
         </p>
       </section>
 

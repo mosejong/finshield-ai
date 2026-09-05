@@ -6,6 +6,7 @@ import { fetchProductRecommendations } from "@/lib/api/products";
 import { useProfileStore } from "@/lib/store/profile-store";
 import type { FinancialProfile, ProductRecommendationResponse, ProductMatchStatus } from "@/lib/api/contracts";
 import { DisclaimerNote } from "@/components/common/DisclaimerNote";
+import { productProviderLabel } from "@/lib/format/labels";
 
 const STATUS_LABEL: Record<ProductMatchStatus, string> = {
   potential_match: "목적이 비슷해요",
@@ -57,7 +58,7 @@ export function ProductRecommendations() {
     <div className="grid grid-cols-3 gap-2" aria-label="상품 후보 분류 요약">
       {(["potential_match", "needs_review", "mismatch"] as const).map((status) => <div key={status} className="rounded-lg border border-border bg-card p-3 text-center"><p className="text-title tabular-nums text-foreground">{data.summary[status]}</p><p className="text-caption text-muted-foreground">{STATUS_LABEL[status]}</p></div>)}
     </div>
-    <p className="mt-3 text-caption text-muted-foreground">공식 기준월 {data.source_base_month} · 전체 {data.total_count}건 중 목적 후보 우선 최대 100건을 표시합니다.</p>
+    <p className="mt-3 text-caption text-muted-foreground">{productProviderLabel(data.provider)} 공공데이터 · 공식 기준월 {data.source_base_month} · 전체 {data.total_count}건 중 목적 후보 우선 최대 100건을 표시합니다.</p>
     <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
       <p className="text-body text-foreground">비교 선택 {activeSelectedIds.length} / 2</p>
       {comparisonHref ? (
