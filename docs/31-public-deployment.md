@@ -1652,3 +1652,66 @@ AI 설명이 죽는 것이 제한을 못 거는 것보다 훨씬 나쁘므로, �
 `flavor: latest=false` 를 명시해 앞으로는 붙지 않게 했다. **이미 올라간
 `latest` 태그는 그대로 남아 있으므로 배포에 쓰지 않는다** — 대장에 없는 태그는
 되돌릴 좌표가 되지 못한다.
+
+## 13. 심사 기간 자원 기준선 — 2026-09-06
+
+제출 당일 값이다. **심사 기간(2026-09-07 11:00 ~ 09-11 23:59)에 무언가
+느려졌을 때 비교할 대상은 이 표다.** 기준선이 없으면 멀쩡한 값을 보고 고치려
+들게 되고, 그 손이 결격을 만든다.
+
+측정: `2026-09-06T05:50:01Z`, 가동 **18일 19시간**(무재부팅), `v0.9.2`.
+
+| 항목 | 값 |
+|---|---|
+| 메모리 total / used / **available** | 969MB / 539MB / **430MB** |
+| buff/cache | 271MB |
+| **swap used** | **390MB** / 2047MB |
+| 디스크 `/` | 7.1G / 30G (**26%**) |
+| load average | 0.44 · 0.34 · 0.30 |
+
+컨테이너 여섯 개 합계 **255.7MiB** (전체 `used` 의 절반이 안 된다 — 나머지
+284MB 는 호스트 OS·dockerd·containerd·guest agent 다).
+
+| 컨테이너 | MEM | % | CPU |
+|---|---|---|---|
+| `finshield-web-1` | 111.9MiB | 11.54% | 0.00% |
+| `finshield-backend-1` | 55.2MiB | 5.69% | 0.20% |
+| `finshield-proxy-1` | 34.58MiB | 3.56% | 0.00% |
+| `finshield-retention-1` | 27.87MiB | 2.87% | 0.00% |
+| `finshield-db-1` | 25MiB | 2.58% | 0.00% |
+| `finshield-backup-1` | 1.16MiB | 0.12% | 0.00% |
+
+### swap 390MB 는 지금 문제가 아니다
+
+e2-micro 는 1GB 이고 18일 동안 배포가 여러 번 돌았다. 빌드·pull 이 도는
+동안 밀려난 페이지가 그대로 남아 있는 것이고, **다시 들어올 이유가 없어서
+안 들어온 것**이다. 판단 근거는 두 가지다 — load average 가 세 구간 모두
+0.5 미만이고, CPU 가 전부 0% 대다. 스왑을 계속 오가는 중이면 이 두 값이
+그렇게 나오지 않는다.
+
+**따라서 심사 기간에 스왑을 비우려고 재부팅하지 않는다.** 얻는 것은 없고
+(available 430MB 로 이미 충분하다) 잃을 수 있는 것은 URL 가동이다.
+
+### 이상 징후로 볼 값
+
+아래에 걸리면 그때 판단한다. 걸리지 않으면 **아무것도 하지 않는다.**
+
+| 신호 | 기준 |
+|---|---|
+| 메모리 여유 | `available` < **150MB** |
+| 스왑 급증 | `used` 가 **800MB** 를 넘음 |
+| 부하 | 1분 load average > **2.0** 이 지속 |
+| 컨테이너 재시작 | `docker ps` 의 `STATUS` 가 분 단위로 리셋됨 |
+| 디스크 | `/` 사용률 > **80%** |
+
+재측정은 같은 명령을 다시 돌리면 된다 (브라우저 Cloud Shell).
+
+```bash
+gcloud compute ssh finshield --zone=us-west1-b --command '
+  echo "=== $(date -u +%FT%TZ) ==="
+  free -m
+  echo; df -h / | tail -1
+  echo; sudo docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.CPUPerc}}"
+  echo; uptime
+'
+```
