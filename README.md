@@ -197,6 +197,23 @@ coverage **0.600** 이었다. 판정을 규칙 엔진에 두고 LLM 을 설명 �
 
 ---
 
+## 저장소 구조
+
+| 경로 | 역할 |
+|---|---|
+| [app/](app/) | FastAPI 백엔드. `api`(라우트) · `services`(오케스트레이션) · `domain`(사기 규칙·금융 계산) · `repositories` · `schemas` · `core` · `db` · `security` |
+| [web/](web/) | Next.js 프론트엔드. `app`(App Router) · `components` · `lib`(API 어댑터·표시 포맷). **금융 계산은 여기 없다** |
+| [docs/](docs/) | 설계 문서 38편, ADR([adr/](docs/adr/)), 개발일지([devlog/](docs/devlog/)), 제출 원고([submission/](docs/submission/)) |
+| [evaluation/](evaluation/) | 사기 탐지 평가. `data/`(골든셋·held-out JSONL) · `results/`(측정 결과 JSON) |
+| [tests/](tests/) | 백엔드 pytest 47파일. 프론트엔드 테스트는 `web/` 안에 함께 있다 |
+| [scripts/](scripts/) | 운영·검증 진입점 — retention 스케줄러, 백업 복원 리허설, 배포 검증, 벤치마크 실행 |
+| [deploy/](deploy/) | Caddy 설정과 VM 운영 셸 스크립트 |
+| [migrations/](migrations/) | Alembic 마이그레이션 |
+| [.github/workflows/](.github/workflows/) | `ci.yml`(테스트) · `release.yml`(태그 릴리스) · `certificate-watch.yml`(인증서 만료 감시) |
+| `compose*.yaml` | Docker Compose 진입점. **루트에 두는 이유**는 CI·`deploy/redeploy.sh`·VM 운영 명령이 전부 루트 기준이기 때문이다 |
+
+---
+
 ## 실행 방법
 
 ### 백엔드
