@@ -5,12 +5,14 @@
 > 금융위원회 공공데이터를 출처로 붙여, "이게 사기인가"에서 끝내지 않고
 > "지금 무엇을 해야 하는가"까지 한 화면에서 답한다.
 
-### 🔗 Live Demo — <https://finshield-ai.duckdns.org>
+### 공개 데모 — 2026-09-22 종료
 
-**공개 URL 로 배포·운영 중** (`v0.9.2` · GCP · Docker Compose · HTTPS).
-심사·데모용 공개 인스턴스이며, 실사용자 트래픽 지표는 없다.
+`v0.9.2` 를 GCP `e2-micro` 에 Docker Compose · HTTPS 로 올려
+`finshield-ai.duckdns.org` 에서 공개 운영했고, 공모전 결과 발표 뒤 서버와
+과금 자원을 정리했다. 실사용자 트래픽 지표는 없다.
+종료 절차와 다시 올리는 방법은 [docs/31](docs/31-public-deployment.md) 14절에 있다.
 
-**2026 금융 AI Challenge 출품작** — 2026-09-06 제출, **심사 진행 중**.
+**2026 금융 AI Challenge 출품작** (2026-09-06 제출).
 
 [![CI](https://github.com/mosejong/finshield-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/mosejong/finshield-ai/actions/workflows/ci.yml)
 
@@ -131,7 +133,7 @@ LLM 에서 떼어냈다.** 규칙 엔진이 위험도·유형·행동을 확정�
 
 ## 배포 · CI
 
-- 공개 URL **<https://finshield-ai.duckdns.org>** — `v0.9.2` 가동 중
+- 공개 URL `finshield-ai.duckdns.org` — `v0.9.2` 로 운영, **2026-09-22 종료**
 - GCP Compute Engine `e2-micro`, Docker Compose 6 컨테이너
   (`proxy` / `web` / `backend` / `db` / `retention` / `backup`)
 - Caddy 자동 TLS(Let's Encrypt), HSTS, 내부 포트는 loopback 만 노출
