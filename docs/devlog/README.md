@@ -169,3 +169,8 @@
 
 상세한 필수 항목과 PR 흐름은 `docs/14-development-workflow.md`를 따른다.
 파일이 아직 생성되지 않은 예정 항목은 완료로 표시하지 않는다.
+
+
+## 2026-10-30
+
+- [portfolio-readme-clarity.md](2026-10-30/portfolio-readme-clarity.md) — 개인 역할·AI 개발 도구 분담, 누적 회귀 평가와 지연 측정 범위, 502 분석 기록의 진입 경로 정리
